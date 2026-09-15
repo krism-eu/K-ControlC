@@ -1,11 +1,14 @@
 #pragma once
 
+#include <QDBusConnection>
+#include <QDBusObjectPath>
 #include <QHash>
 #include <QObject>
 #include <QSet>
 #include <QString>
 #include <QStringList>
 #include <QVariantList>
+#include <QVariantMap>
 
 class SystemBackend : public QObject
 {
