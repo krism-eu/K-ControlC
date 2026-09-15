@@ -1,9 +1,11 @@
+#include <QCoreApplication>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
-#include <QCoreApplication>
+#include <QtQml/qqml.h>
 
 #include "BootcBackend.h"
+#include "PackageSearch.h"
 #include "PolkitHelper.h"
 #include "SystemBackend.h"
 
@@ -16,6 +18,8 @@ int main(int argc, char *argv[])
 
     if (qEnvironmentVariableIsEmpty("QT_QUICK_CONTROLS_STYLE"))
         qputenv("QT_QUICK_CONTROLS_STYLE", "Fusion");
+
+    qmlRegisterType<PackageSearch>("raku.cc", 1, 0, "PackageSearch");
 
     PolkitHelper polkitHelper;
     BootcBackend bootcBackend;

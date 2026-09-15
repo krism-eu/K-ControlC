@@ -4,12 +4,10 @@
 #include <QProcess>
 #include <QSet>
 #include <QString>
-#include <QtQml/qqmlregistration.h>
 
 class PackageSearch : public QAbstractListModel
 {
     Q_OBJECT
-    QML_ELEMENT
     Q_PROPERTY(bool searching READ searching NOTIFY searchingChanged)
 
 public:

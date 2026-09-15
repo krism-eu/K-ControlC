@@ -21,6 +21,8 @@ qt_add_executable(k-controlc
     src/BootcBackend.h
     src/SystemBackend.cpp
     src/SystemBackend.h
+    src/PackageSearch.cpp
+    src/PackageSearch.h
     src/PolkitHelper.cpp
     src/PolkitHelper.h
 )
@@ -30,7 +32,7 @@ qt_add_executable(k-controlc
 set_source_files_properties(qml/Main.qml PROPERTIES QT_RESOURCE_ALIAS Main.qml)
 set_source_files_properties(qml/components/ToolCard.qml PROPERTIES QT_RESOURCE_ALIAS ToolCard.qml)
 set_source_files_properties(qml/modules/DashboardModule.qml PROPERTIES QT_RESOURCE_ALIAS DashboardModule.qml)
-set_source_files_properties(qml/modules/SoftwareModule.qml PROPERTIES QT_RESOURCE_ALIAS SoftwareModule.qml)
+set_source_files_properties(qml/modules/SoftwareModule.qml PROPERTIES QT_RESOURCE_ALIAS SoftwareModule.qml QT_QML_SKIP_CACHEGEN ON)
 set_source_files_properties(qml/modules/BootcModule.qml PROPERTIES QT_RESOURCE_ALIAS BootcModule.qml)
 set_source_files_properties(qml/modules/SystemModule.qml PROPERTIES QT_RESOURCE_ALIAS SystemModule.qml)
 set_source_files_properties(qml/modules/ToolsModule.qml PROPERTIES QT_RESOURCE_ALIAS ToolsModule.qml)
@@ -39,9 +41,6 @@ qt_add_qml_module(k-controlc
     URI raku.cc
     VERSION 1.0
     RESOURCE_PREFIX /qt/qml
-    SOURCES
-        src/PackageSearch.cpp
-        src/PackageSearch.h
     QML_FILES
         qml/Main.qml
         qml/components/ToolCard.qml
