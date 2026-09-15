@@ -1,0 +1,20 @@
+name: Build
+
+on:
+  push:
+    branches: [main, complete-standalone-app]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-fedora:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: dnf -y install gcc-c++ cmake ninja-build qt6-qtbase-devel qt6-qtdeclarative-devel
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build

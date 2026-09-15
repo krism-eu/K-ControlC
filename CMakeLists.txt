@@ -21,8 +21,6 @@ qt_add_executable(k-controlc
     src/BootcBackend.h
     src/SystemBackend.cpp
     src/SystemBackend.h
-    src/PackageSearch.cpp
-    src/PackageSearch.h
     src/PolkitHelper.cpp
     src/PolkitHelper.h
 )
@@ -41,6 +39,9 @@ qt_add_qml_module(k-controlc
     URI raku.cc
     VERSION 1.0
     RESOURCE_PREFIX /qt/qml
+    SOURCES
+        src/PackageSearch.cpp
+        src/PackageSearch.h
     QML_FILES
         qml/Main.qml
         qml/components/ToolCard.qml
