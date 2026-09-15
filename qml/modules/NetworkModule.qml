@@ -9,7 +9,7 @@ ColumnLayout {
     Rectangle { Layout.fillWidth: true; radius: 12; color: "#131c38"; border.color: "#293761"; implicitHeight: col.implicitHeight + 28
         ColumnLayout { id: col; anchors.fill: parent; anchors.margins: 14; spacing: 8
             Label { text: qsTr("Connettività: %1").arg(SystemBackend.networkState()); color: "#e0e7ff"; font.bold: true }
-            Label { text: { root.refreshToken; return qsTr("NetworkManager: %1").arg(SystemBackend.serviceState("NetworkManager.service")) }; color: "#cbd5e1" }
+            Label { text: { root.refreshToken; return qsTr("NetworkManager: %1").arg(SystemBackend.serviceState("NetworkManager.service")) } color: "#cbd5e1" }
             RowLayout { Button { text: qsTr("Configura rete"); onClicked: if (!SystemBackend.launchKcm("kcm_networkmanagement")) SystemBackend.launchTool("systemsettings") } Button { text: qsTr("Riavvia NetworkManager"); onClicked: SystemBackend.restartService("NetworkManager.service") } Button { text: qsTr("Aggiorna"); onClicked: root.refreshToken++ } }
         }
     }
