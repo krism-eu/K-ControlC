@@ -1,52 +1,32 @@
-# Architettura K-ControlC
+# Integrazione K-ControlC nell'immagine raku
 
-K-ControlC è ora un'applicazione standalone Qt 6/QML per il sistema raku/Fedora bootc.
+K-ControlC è un'applicazione standalone Qt 6/QML. Va installata nell'immagine bootc insieme alla desktop entry, all'icona e alla policy Polkit.
 
-## Principi
+## Runtime richiesto
 
-1. **Sistema base image-based**: aggiornamenti e rollback passano da `bootc`.
-2. **Pacchetti persistenti raku**: add/rm/sync passano da `/usr/bin/rk`.
-3. **Ricerca read-only**: `PackageSearch` usa `rpm` e `dnf5 repoquery` senza privilegi e senza bloccare il thread GUI.
-4. **Privilegi minimi**: `PolkitHelper` accetta solo combinazioni esplicite di programma+argomenti; la policy Polkit è limitata a `rk` e `bootc`.
-5. **Utility esterne opzionali**: strumenti desktop vengono lanciati senza privilegi e restano disabilitati se non presenti.
+- Qt 6 Core/Gui/Qml/Quick/DBus
+- `bootc`, `rpm`, `dnf5`, `pkexec`
+- `/usr/bin/rk` e `/var/lib/raku-kris/packages.list`
+- systemd/logind e NetworkManager per i moduli integrati
 
-## Componenti C++
+Strumenti come Plasma System Settings, Info Center, Partition Manager, firewall-config, Discover, KSystemLog, virt-manager, fwupd e Konsole sono opzionali. Il catalogo Strumenti viene generato dai file `.desktop` effettivamente installati.
 
-### `PackageSearch`
+## Privilegi
 
-`QAbstractListModel` esposto al modulo QML `raku.cc`. Gestisce ricerche asincrone, cancella la query precedente quando l'utente continua a digitare e marca i pacchetti installati e quelli appartenenti alla base immutabile.
+Non aggiungere wrapper shell generici. `PolkitHelper` consente soltanto combinazioni esplicite per `rk`, `bootc` e le sei azioni runtime firewalld. La policy usa `exec.path` + `exec.argv1` e `auth_admin` senza retention.
 
-### `PolkitHelper`
+## BootC
 
-Wrapper stretto su `pkexec` con streaming dell'output e gestione degli errori `QProcess`. Le invocazioni ammesse sono definite nel codice, non costruite liberamente dal QML.
+Lo stato viene richiesto con `bootc status --json --format-version=1`; se la versione installata non lo supporta, l'interfaccia ripiega sul formato human-readable. Upgrade e rollback sono sempre eseguiti dal binario bootc.
 
-### `BootcBackend`
+## Verifica immagine
 
-Legge lo stato BootC in modo asincrono e mantiene lo stato della lista di pacchetti persistenti. Il testo di `bootc status --format=humanreadable` viene mostrato, non analizzato programmaticamente.
+Prima di creare il tag di release eseguire almeno:
 
-### `SystemBackend`
+```bash
+./tests/e2e-readonly.sh
+kcmshell6 --list | grep -i flatpak || true
+bootc status --json --format-version=1
+```
 
-Raccoglie informazioni locali senza privilegi e gestisce una allowlist di utility grafiche opzionali.
-
-## Interfaccia
-
-- `DashboardModule`: panoramica e Quick System Info.
-- `SoftwareModule`: ricerca RPM e layer persistente.
-- `BootcModule`: aggiornamenti atomici e rollback.
-- `SystemModule`: dati locali e configurazione desktop.
-- `ToolsModule`: catalogo ricercabile per categorie.
-
-Il layout prende ispirazione funzionale da YaST, Mageia Control Center e MX Tools, ma usa backend e flussi coerenti con Fedora bootc.
-
-## Integrazione nell'immagine raku
-
-Durante la build dell'immagine assicurarsi che siano presenti:
-
-- l'eseguibile `k-controlc`;
-- la policy `org.raku.controlcenter.policy` in `/usr/share/polkit-1/actions/`;
-- la desktop entry in `/usr/share/applications/`;
-- `/usr/bin/rk`;
-- `bootc`, `rpm`, `dnf5`, `pkexec`;
-- Qt 6 runtime con Qt Quick Controls e Layouts.
-
-Le utility elencate in `ToolsModule.qml` sono intenzionalmente opzionali.
+Poi verificare manualmente autenticazione Polkit, `rk sync/add/rm`, upgrade/rollback bootc, session actions logind, restart servizi e quick actions firewalld.

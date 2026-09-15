@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.raku.KControlC</id>
+  <name>K-ControlC</name>
+  <summary>Control center for raku Fedora bootc systems</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description><p>K-ControlC provides system information, software layering, bootc deployments, networking, services, firewall, diagnostics, firmware, recovery and dynamic administration tools in one Qt 6 interface.</p></description>
+  <launchable type="desktop-id">k-controlc.desktop</launchable>
+  <url type="homepage">https://github.com/krism-eu/K-ControlC</url>
+  <provides><binary>k-controlc</binary></provides>
+  <categories><category>Settings</category><category>System</category></categories>
+</component>

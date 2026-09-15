@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QAbstractListModel>
+#include <QDateTime>
+#include <QPointer>
 #include <QProcess>
 #include <QSet>
 #include <QString>
@@ -45,11 +47,17 @@ private:
     void startInstalledQuery(const QString &term);
     void startRepoQuery(const QString &term);
     void stopActiveProcess();
+    bool installedCacheCurrent() const;
+    QString rpmDatabasePath() const;
+    static QString sanitizeTerm(const QString &term);
 
     QList<Entry> m_results;
     QSet<QString> m_owned;
     QSet<QString> m_installed;
-    QProcess *m_process = nullptr;
+    QPointer<QProcess> m_process;
+    QDateTime m_installedCacheMtime;
+    QString m_installedCacheDbPath;
+    bool m_installedCacheValid = false;
     bool m_searching = false;
     quint64 m_generation = 0;
 };
