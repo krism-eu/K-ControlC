@@ -1,8 +1,10 @@
 #pragma once
 
 #include <QObject>
+#include <QPointer>
 #include <QProcess>
 #include <QString>
+#include <QVariantList>
 
 class BootcBackend : public QObject
 {
@@ -11,6 +13,7 @@ class BootcBackend : public QObject
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(QString statusText READ statusText NOTIFY statusChanged)
     Q_PROPERTY(QString errorText READ errorText NOTIFY statusChanged)
+    Q_PROPERTY(QVariantList deployments READ deployments NOTIFY statusChanged)
     Q_PROPERTY(QString persistentPackages READ persistentPackages NOTIFY packagesChanged)
     Q_PROPERTY(int persistentPackageCount READ persistentPackageCount NOTIFY packagesChanged)
 
@@ -21,6 +24,7 @@ public:
     bool busy() const { return m_busy; }
     QString statusText() const { return m_statusText; }
     QString errorText() const { return m_errorText; }
+    QVariantList deployments() const { return m_deployments; }
     QString persistentPackages() const { return m_persistentPackages; }
     int persistentPackageCount() const { return m_persistentPackageCount; }
 
@@ -36,11 +40,14 @@ signals:
 private:
     void setBusy(bool busy);
     void loadPackages();
+    void startHumanStatus(const QString &previousError = QString());
+    void parseJsonStatus(const QByteArray &data);
 
-    QProcess *m_process = nullptr;
+    QPointer<QProcess> m_process;
     bool m_busy = false;
     QString m_statusText;
     QString m_errorText;
+    QVariantList m_deployments;
     QString m_persistentPackages;
     int m_persistentPackageCount = 0;
 };

@@ -1,83 +1,74 @@
 # K-ControlC / rakuCC
 
-K-ControlC è un **Control Center standalone per sistemi Fedora bootc/raku**, scritto in C++ e Qt 6/QML.
+K-ControlC è un **Control Center standalone Qt 6/QML per sistemi Fedora bootc/raku**. Unisce navigazione modulare in stile YaST/Mageia e utility pratiche nello spirito di MX Tools, mantenendo però il modello image-based di bootc.
 
-L'interfaccia combina tre idee: categorie e ricerca in stile YaST, un unico centro amministrativo come Mageia Control Center e utility rapide nello spirito di MX Tools. Le operazioni specifiche del sistema image-based restano però native di bootc: niente emulazione di un package manager tradizionale per il sistema base.
+## Moduli
 
-## Funzioni
+- Panoramica e Quick System Info
+- Software persistente via `rk` + Flatpak
+- Deployment BootC: JSON status, staged/booted/rollback, upgrade e rollback
+- Sistema: data/ora, NTP e sessione via systemd-logind
+- Rete e NetworkManager
+- Utenti tramite KCM Plasma
+- Servizi: NetworkManager, CUPS, Bluetooth
+- Hardware
+- Storage
+- Sicurezza/Firewall con azioni runtime SSH/HTTP/HTTPS
+- Diagnostica e log
+- Firmware/fwupd
+- Recovery
+- Strumenti dinamici da file `.desktop` System/Settings
+- Ricerca globale su moduli, strumenti installati e pacchetti RPM
 
-- **Panoramica** con OS, kernel, memoria, storage, stato BootC e pacchetti persistenti.
-- **Quick System Info** copiabile negli appunti per diagnosi/supporto.
-- **Software**: ricerca RPM asincrona con `dnf5 repoquery`, stato installato/base, add/rm/sync tramite `rk`, accesso Flatpak.
-- **Aggiornamenti BootC**: stato, check, upgrade, download-only, apply/reboot e rollback.
-- **Sistema**: informazioni locali e scorciatoie verso configurazione desktop.
-- **Strumenti**: launcher ricercabile e categorizzato per System Settings, Info Center, Partition Manager, firewall, stampanti, Discover, virt-manager, KSystemLog e terminale. Gli strumenti mancanti risultano disabilitati, non vengono installati automaticamente.
+## Scelte tecniche e sicurezza
 
-## Sicurezza
+`PackageSearch` usa `dnf5 repoquery` con package-spec posizionale (`*term*`): `repoquery --search` non esiste. I caratteri glob forniti dall'utente vengono scartati e l'elenco RPM installato viene riusato finché non cambia il mtime del database RPM (`/usr/lib/sysimage/rpm/rpmdb.sqlite`, con fallback `/var/lib/rpm/rpmdb.sqlite`). Le ricerche obsolete vengono invalidate con una generation id; i processi vengono prima terminati gentilmente e solo dopo 3 secondi eventualmente uccisi.
 
-Le operazioni privilegiate passano esclusivamente da `pkexec` e sono limitate a:
+Le operazioni privilegiate passano da `pkexec`, ma la GUI mantiene una allowlist esatta di programma+argomenti. La policy non usa `auth_admin_keep`: ogni invocazione richiede una decisione fresca e le azioni `rk`/`bootc` sono separate con `org.freedesktop.policykit.exec.argv1`. Anche le azioni rapide firewalld sono limitate a un singolo `argv1` previsto.
 
-- `/usr/bin/rk`: `sync`, `add <pacchetto>`, `rm <pacchetto>`;
-- `/usr/bin/bootc`: `upgrade`, `upgrade --check`, `upgrade --download-only`, `upgrade --apply`, `rollback`, `rollback --apply`.
-
-La policy Polkit installata autorizza solo i due binari previsti. `kcmshell6` e le utility desktop sono avviati senza privilegi e usano, quando necessario, i propri meccanismi Polkit.
-
-## Dipendenze di build
-
-- CMake >= 3.22
-- compilatore C++17
-- Qt >= 6.5: Core, Gui, Qml, Quick
-
-Dipendenze runtime per tutte le funzioni:
-
-- Qt Quick Controls 2 e Qt Quick Layouts
-- `rpm` e `dnf5` per la ricerca software
-- `polkit`/`pkexec` per le azioni amministrative
-- `bootc` su sistemi image-based
-- `/usr/bin/rk` e `/var/lib/raku-kris/packages.list` per il layer persistente raku
-
-Le utility grafiche esterne sono opzionali.
+Il sistema base non usa `dnf distro-sync`: aggiornamento e recovery della base passano da `bootc`; `rk sync` riguarda il layer persistente. Flatpak resta separato.
 
 ## Build
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
 ./build/k-controlc
 ```
 
-Installazione di sistema:
+Installazione:
 
 ```bash
 sudo cmake --install build --prefix /usr
 ```
 
-Questo installa l'eseguibile, la desktop entry e la policy Polkit.
+È presente anche `packaging/k-controlc.spec` per la costruzione RPM nell'immagine raku.
 
-## Struttura
+## CI e test
 
-```text
-CMakeLists.txt
-src/
-  main.cpp
-  BootcBackend.{h,cpp}
-  SystemBackend.{h,cpp}
-  PackageSearch.{h,cpp}
-  PolkitHelper.{h,cpp}
-qml/
-  Main.qml
-  components/ToolCard.qml
-  modules/
-    DashboardModule.qml
-    SoftwareModule.qml
-    BootcModule.qml
-    SystemModule.qml
-    ToolsModule.qml
-data/
-  k-controlc.desktop
-  org.raku.controlcenter.policy
-```
+GitHub Actions usa Fedora 44 e verifica:
 
-## Stato
+1. configurazione CMake e compilazione C++/QML;
+2. avvio QML headless;
+3. `dnf5 repoquery` reale con package-spec posizionale;
+4. assenza del vecchio `--search` nel sorgente;
+5. parsing dello spec RPM;
+6. install staging e pubblicazione dell'artifact.
 
-La repository è ora una applicazione standalone, non più soltanto il bundle di integrazione originario. Il passo successivo consigliato è aggiungere CI su Fedora e testare il pacchetto direttamente nell'immagine raku/bootc di destinazione.
+`tests/e2e-readonly.sh` esegue inoltre probe read-only di bootc quando disponibile. Le operazioni mutanti (`rk add/rm`, `bootc upgrade/rollback`, firewall, reboot) devono essere collaudate nell'immagine raku reale prima della release finale.
+
+## Flatpak
+
+K-ControlC verifica `kcmshell6 --list` quando si apre la gestione Flatpak. Se `kcm_flatpak` non è presente su Plasma 6, usa `plasma-discover` come fallback.
+
+## i18n
+
+Le nuove stringhe QML usano `qsTr()` e il C++ usa `tr()`: il codice è predisposto per cataloghi Qt Translation. Vedi `i18n/README.md`.
+
+## Licenza
+
+MIT, vedi `LICENSE`.
+
+## Stato 0.3.0
+
+La CI non è più un passo futuro: è parte del repository. Il gate finale prima del tag `v0.3.0` è l'E2E sull'immagine bootc raku di destinazione, in particolare PolicyKit, logind, KCM Plasma, fwupd, firewalld e le operazioni mutanti bootc/rk.

@@ -1,12 +1,14 @@
 #include "PackageSearch.h"
 
 #include <QFile>
+#include <QFileInfo>
+#include <QTimer>
 #include <QTextStream>
 
 PackageSearch::PackageSearch(QObject *parent)
     : QAbstractListModel(parent)
 {
-    QFile file("/usr/share/raku-kris/owned-packages.txt");
+    QFile file(QStringLiteral("/usr/share/raku-kris/owned-packages.txt"));
     if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QTextStream in(&file);
         while (!in.atEnd()) {
@@ -49,35 +51,42 @@ QHash<int, QByteArray> PackageSearch::roleNames() const
 
 void PackageSearch::search(const QString &term)
 {
-    const QString trimmed = term.trimmed();
+    const QString sanitized = sanitizeTerm(term);
+
     ++m_generation;
     stopActiveProcess();
 
-    if (trimmed.size() < 2) {
+    if (sanitized.size() < 2) {
         clearResults();
         setSearching(false);
         emit searchFinished();
         return;
     }
 
-    m_installed.clear();
     setSearching(true);
-    startInstalledQuery(trimmed);
+    if (installedCacheCurrent())
+        startRepoQuery(sanitized);
+    else
+        startInstalledQuery(sanitized);
 }
 
 void PackageSearch::startInstalledQuery(const QString &term)
 {
     const quint64 generation = m_generation;
-    auto *process = new QProcess(this);
-    m_process = process;
+    auto *rawProcess = new QProcess(this);
+    const QPointer<QProcess> process(rawProcess);
+    m_process = rawProcess;
 
-    connect(process, &QProcess::finished, this,
+    connect(rawProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
             [this, process, term, generation](int exitCode, QProcess::ExitStatus status) {
+        if (!process)
+            return;
         if (process != m_process || generation != m_generation) {
             process->deleteLater();
             return;
         }
 
+        m_installed.clear();
         if (status == QProcess::NormalExit && exitCode == 0) {
             const auto lines = process->readAllStandardOutput().split('\n');
             for (const QByteArray &line : lines) {
@@ -85,6 +94,13 @@ void PackageSearch::startInstalledQuery(const QString &term)
                 if (!name.isEmpty())
                     m_installed.insert(name);
             }
+
+            m_installedCacheDbPath = rpmDatabasePath();
+            const QFileInfo dbInfo(m_installedCacheDbPath);
+            m_installedCacheMtime = dbInfo.exists() ? dbInfo.lastModified() : QDateTime();
+            m_installedCacheValid = true;
+        } else {
+            m_installedCacheValid = false;
         }
 
         m_process = nullptr;
@@ -92,27 +108,35 @@ void PackageSearch::startInstalledQuery(const QString &term)
         startRepoQuery(term);
     });
 
-    connect(process, &QProcess::errorOccurred, this,
+    connect(rawProcess, &QProcess::errorOccurred, this,
             [this, process, term, generation](QProcess::ProcessError error) {
-        if (process != m_process || generation != m_generation || error != QProcess::FailedToStart)
+        if (!process || process != m_process || generation != m_generation
+            || error != QProcess::FailedToStart)
             return;
+
+        m_installed.clear();
+        m_installedCacheValid = false;
         m_process = nullptr;
         process->deleteLater();
         emit searchError(tr("Impossibile avviare rpm per leggere i pacchetti installati."));
         startRepoQuery(term);
     });
 
-    process->start("/usr/bin/rpm", {"-qa", "--qf", "%{NAME}\\n"});
+    rawProcess->start(QStringLiteral("/usr/bin/rpm"),
+                      {QStringLiteral("-qa"), QStringLiteral("--qf"), QStringLiteral("%{NAME}\\n")});
 }
 
 void PackageSearch::startRepoQuery(const QString &term)
 {
     const quint64 generation = m_generation;
-    auto *process = new QProcess(this);
-    m_process = process;
+    auto *rawProcess = new QProcess(this);
+    const QPointer<QProcess> process(rawProcess);
+    m_process = rawProcess;
 
-    connect(process, &QProcess::finished, this,
+    connect(rawProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
             [this, process, generation](int exitCode, QProcess::ExitStatus status) {
+        if (!process)
+            return;
         if (process != m_process || generation != m_generation) {
             process->deleteLater();
             return;
@@ -160,9 +184,10 @@ void PackageSearch::startRepoQuery(const QString &term)
         emit searchFinished();
     });
 
-    connect(process, &QProcess::errorOccurred, this,
+    connect(rawProcess, &QProcess::errorOccurred, this,
             [this, process, generation](QProcess::ProcessError error) {
-        if (process != m_process || generation != m_generation || error != QProcess::FailedToStart)
+        if (!process || process != m_process || generation != m_generation
+            || error != QProcess::FailedToStart)
             return;
         m_process = nullptr;
         process->deleteLater();
@@ -172,9 +197,13 @@ void PackageSearch::startRepoQuery(const QString &term)
         emit searchFinished();
     });
 
-    process->start("/usr/bin/dnf5",
-                   {"repoquery", "--available", "--search", term,
-                    "--queryformat", "%{name}\t%{summary}\\n"});
+    const QString packageSpec = QStringLiteral("*") + term + QStringLiteral("*");
+    rawProcess->start(QStringLiteral("/usr/bin/dnf5"),
+                      {QStringLiteral("repoquery"),
+                       QStringLiteral("--available"),
+                       QStringLiteral("--queryformat"),
+                       QStringLiteral("%{name}\t%{summary}\\n"),
+                       packageSpec});
 }
 
 void PackageSearch::clearResults()
@@ -198,8 +227,72 @@ void PackageSearch::stopActiveProcess()
 {
     if (!m_process)
         return;
-    disconnect(m_process, nullptr, this, nullptr);
-    m_process->kill();
-    m_process->deleteLater();
+
+    const QPointer<QProcess> process = m_process;
+    QProcess *const rawProcess = process.data();
     m_process = nullptr;
+
+    if (!rawProcess)
+        return;
+
+    disconnect(rawProcess, nullptr, this, nullptr);
+
+    if (rawProcess->state() == QProcess::NotRunning) {
+        rawProcess->deleteLater();
+        return;
+    }
+
+    rawProcess->terminate();
+    connect(rawProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
+            rawProcess, &QObject::deleteLater);
+    QTimer::singleShot(3000, rawProcess, [process]() {
+        if (process && process->state() != QProcess::NotRunning)
+            process->kill();
+    });
+}
+
+bool PackageSearch::installedCacheCurrent() const
+{
+    if (!m_installedCacheValid)
+        return false;
+
+    const QString dbPath = rpmDatabasePath();
+    if (dbPath.isEmpty() || dbPath != m_installedCacheDbPath)
+        return false;
+
+    const QFileInfo info(dbPath);
+    return info.exists() && info.lastModified() == m_installedCacheMtime;
+}
+
+QString PackageSearch::rpmDatabasePath() const
+{
+    static const QStringList candidates = {
+        QStringLiteral("/usr/lib/sysimage/rpm/rpmdb.sqlite"),
+        QStringLiteral("/var/lib/rpm/rpmdb.sqlite")
+    };
+    for (const QString &path : candidates) {
+        if (QFileInfo::exists(path))
+            return path;
+    }
+    return {};
+}
+
+QString PackageSearch::sanitizeTerm(const QString &term)
+{
+    QString out;
+    out.reserve(term.size());
+    bool pendingSeparator = false;
+
+    for (const QChar ch : term.trimmed()) {
+        if (ch.isLetterOrNumber() || QStringLiteral("._+:-").contains(ch)) {
+            if (pendingSeparator && !out.isEmpty())
+                out += QLatin1Char('*');
+            out += ch;
+            pendingSeparator = false;
+        } else if (ch.isSpace()) {
+            pendingSeparator = true;
+        }
+    }
+
+    return out.left(128);
 }

@@ -31,7 +31,7 @@ void PolkitHelper::execute(const QString &program, const QStringList &args)
             this, &PolkitHelper::onReadyRead);
     connect(m_process, &QProcess::errorOccurred,
             this, &PolkitHelper::onProcessError);
-    connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+    connect(m_process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
             this, &PolkitHelper::onProcessFinished);
 
     QStringList fullArgs;
@@ -62,12 +62,21 @@ void PolkitHelper::onProcessFinished(int exitCode, QProcess::ExitStatus status)
     consumeOutput(m_process->readAllStandardOutput(), true);
     const bool success = status == QProcess::NormalExit && exitCode == 0;
     QString output = m_allOutput.trimmed();
-    if (output.isEmpty() && !success)
-        output = tr("Operazione terminata con codice %1.").arg(exitCode);
+
+    if (!success) {
+        if (status == QProcess::NormalExit && exitCode == 126)
+            output = tr("Autenticazione annullata dall'utente.");
+        else if (status == QProcess::NormalExit && exitCode == 127)
+            output = tr("Autenticazione amministrativa non disponibile o non autorizzata.");
+        else if (output.isEmpty())
+            output = tr("Operazione terminata con codice %1.").arg(exitCode);
+    }
 
     m_process->deleteLater();
     m_process = nullptr;
     m_running = false;
+    m_lineBuffer.clear();
+    m_allOutput.clear();
     emit runningChanged();
     emit finished(success, output);
 }
@@ -108,13 +117,28 @@ bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const Q
         return allowed.contains(args);
     }
 
+    if (program == QStringLiteral("/usr/bin/firewall-cmd")) {
+        static const QList<QStringList> allowed = {
+            {QStringLiteral("--add-service=ssh")},
+            {QStringLiteral("--remove-service=ssh")},
+            {QStringLiteral("--add-service=http")},
+            {QStringLiteral("--remove-service=http")},
+            {QStringLiteral("--add-service=https")},
+            {QStringLiteral("--remove-service=https")}
+        };
+        return allowed.contains(args);
+    }
+
     return false;
 }
 
 bool PolkitHelper::isUnprivilegedInvocationAllowed(const QString &program, const QStringList &args) const
 {
-    return program == QStringLiteral("/usr/bin/kcmshell6")
-        && args == QStringList{QStringLiteral("kcm_flatpak")};
+    if (program == QStringLiteral("/usr/bin/kcmshell6"))
+        return args == QStringList{QStringLiteral("kcm_flatpak")};
+    if (program == QStringLiteral("/usr/bin/plasma-discover"))
+        return args.isEmpty();
+    return false;
 }
 
 void PolkitHelper::consumeOutput(const QByteArray &data, bool flushPartial)
@@ -148,6 +172,7 @@ void PolkitHelper::finishWithError(const QString &message)
     }
     m_running = false;
     m_lineBuffer.clear();
+    m_allOutput.clear();
     emit runningChanged();
     emit finished(false, message);
 }

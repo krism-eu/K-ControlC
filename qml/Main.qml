@@ -5,15 +5,31 @@ import raku.cc
 
 ApplicationWindow {
     id: window
-    width: 1180
-    height: 760
-    minimumWidth: 900
-    minimumHeight: 620
+    width: 1220
+    height: 800
+    minimumWidth: 920
+    minimumHeight: 640
     visible: true
-    title: "K-ControlC · raku Control Center"
+    title: qsTr("K-ControlC · raku Control Center")
     color: "#0b1020"
 
     property int pageIndex: 0
+    property var navigation: [
+        { label: qsTr("Panoramica"), glyph: "⌂" },
+        { label: qsTr("Software"), glyph: "▦" },
+        { label: qsTr("Deployment"), glyph: "↻" },
+        { label: qsTr("Sistema"), glyph: "⚙" },
+        { label: qsTr("Rete"), glyph: "◎" },
+        { label: qsTr("Utenti"), glyph: "♙" },
+        { label: qsTr("Servizi"), glyph: "◫" },
+        { label: qsTr("Hardware"), glyph: "◇" },
+        { label: qsTr("Storage"), glyph: "▤" },
+        { label: qsTr("Firewall"), glyph: "◉" },
+        { label: qsTr("Diagnostica"), glyph: "≡" },
+        { label: qsTr("Firmware"), glyph: "⬡" },
+        { label: qsTr("Recovery"), glyph: "↶" },
+        { label: qsTr("Strumenti"), glyph: "◆" }
+    ]
 
     palette.window: "#0b1020"
     palette.windowText: "#e5e7eb"
@@ -25,109 +41,87 @@ ApplicationWindow {
     palette.highlight: "#6366f1"
     palette.highlightedText: "#ffffff"
 
-    ListModel {
-        id: navigation
-        ListElement { label: "Panoramica"; glyph: "⌂" }
-        ListElement { label: "Software"; glyph: "▦" }
-        ListElement { label: "Aggiornamenti"; glyph: "↻" }
-        ListElement { label: "Sistema"; glyph: "⚙" }
-        ListElement { label: "Strumenti"; glyph: "◆" }
-    }
-
     RowLayout {
         anchors.fill: parent
         spacing: 0
 
         Rectangle {
-            Layout.preferredWidth: 262
+            Layout.preferredWidth: 270
             Layout.fillHeight: true
             color: "#0f1630"
             border.color: "#202a4d"
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 18
-                spacing: 14
+                anchors.margins: 16
+                spacing: 10
 
                 ColumnLayout {
                     spacing: 2
-                    Label {
-                        text: "K-ControlC"
-                        font.pixelSize: 24
-                        font.bold: true
-                        color: "#f8fafc"
-                    }
-                    Label {
-                        text: "raku · Fedora bootc"
-                        font.pixelSize: 11
-                        color: "#818cf8"
-                    }
+                    Label { text: "K-ControlC"; font.pixelSize: 24; font.bold: true; color: "#f8fafc" }
+                    Label { text: "raku · Fedora bootc"; font.pixelSize: 11; color: "#818cf8" }
                 }
 
                 TextField {
                     id: globalSearch
                     Layout.fillWidth: true
-                    placeholderText: "Cerca strumenti…"
+                    placeholderText: qsTr("Cerca moduli, strumenti, pacchetti…")
                     selectByMouse: true
-                    onTextChanged: {
-                        if (text.trim().length > 0)
-                            window.pageIndex = 4
-                    }
+                    onTextChanged: if (text.trim().length > 0) window.pageIndex = 13
                 }
 
-                Repeater {
-                    model: navigation
+                ListView {
+                    id: navList
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    spacing: 3
+                    model: window.navigation
                     delegate: Button {
                         required property int index
-                        required property string label
-                        required property string glyph
-                        Layout.fillWidth: true
+                        required property var modelData
+                        width: navList.width
+                        height: 38
                         checkable: true
                         checked: window.pageIndex === index
-                        text: glyph + "   " + label
+                        text: modelData.glyph + "   " + modelData.label
                         onClicked: {
                             window.pageIndex = index
-                            if (index !== 4)
-                                globalSearch.clear()
+                            if (index !== 13) globalSearch.clear()
                         }
                         contentItem: Label {
                             text: parent.text
                             color: parent.checked ? "#ffffff" : "#cbd5e1"
-                            font.pixelSize: 13
+                            font.pixelSize: 12
                             font.bold: parent.checked
                             verticalAlignment: Text.AlignVCenter
                             leftPadding: 8
                         }
                         background: Rectangle {
-                            radius: 9
+                            radius: 8
                             color: parent.checked ? "#4f46e5" : (parent.hovered ? "#192449" : "transparent")
                         }
                     }
                 }
 
-                Item { Layout.fillHeight: true }
-
                 Rectangle {
                     Layout.fillWidth: true
-                    radius: 10
+                    radius: 9
                     color: "#111b38"
                     border.color: "#26335d"
-                    implicitHeight: statusCol.implicitHeight + 22
+                    implicitHeight: statusCol.implicitHeight + 18
                     ColumnLayout {
                         id: statusCol
                         anchors.fill: parent
-                        anchors.margins: 11
-                        spacing: 3
-                        Label { text: "Stato sistema"; font.bold: true; color: "#c7d2fe" }
+                        anchors.margins: 9
+                        spacing: 2
+                        Label { text: qsTr("Stato sistema"); font.bold: true; color: "#c7d2fe" }
                         Label {
-                            text: BootcBackend.bootcAvailable ? "● bootc rilevato" : "○ bootc non rilevato"
+                            text: BootcBackend.bootcAvailable ? qsTr("● bootc rilevato") : qsTr("○ bootc non rilevato")
                             color: BootcBackend.bootcAvailable ? "#34d399" : "#94a3b8"
-                            font.pixelSize: 11
+                            font.pixelSize: 10
                         }
-                        Label {
-                            text: BootcBackend.persistentPackageCount + " pacchetti persistenti"
-                            color: "#94a3b8"; font.pixelSize: 11
-                        }
+                        Label { text: qsTr("%1 pacchetti persistenti").arg(BootcBackend.persistentPackageCount); color: "#94a3b8"; font.pixelSize: 10 }
                     }
                 }
             }
@@ -142,54 +136,29 @@ ApplicationWindow {
                 anchors.fill: parent
                 currentIndex: window.pageIndex
 
+                Item { ScrollView { id: p0; anchors.fill: parent; padding: 26; contentWidth: availableWidth; DashboardModule { width: p0.availableWidth - 52; onOpenPage: function(i) { window.pageIndex = i } } } }
+                Item { ScrollView { id: p1; anchors.fill: parent; padding: 26; contentWidth: availableWidth; SoftwareModule { width: p1.availableWidth - 52 } } }
+                Item { ScrollView { id: p2; anchors.fill: parent; padding: 26; contentWidth: availableWidth; BootcModule { width: p2.availableWidth - 52 } } }
+                Item { ScrollView { id: p3; anchors.fill: parent; padding: 26; contentWidth: availableWidth; SystemModule { width: p3.availableWidth - 52 } } }
+                Item { ScrollView { id: p4; anchors.fill: parent; padding: 26; contentWidth: availableWidth; NetworkModule { width: p4.availableWidth - 52 } } }
+                Item { ScrollView { id: p5; anchors.fill: parent; padding: 26; contentWidth: availableWidth; UsersModule { width: p5.availableWidth - 52 } } }
+                Item { ScrollView { id: p6; anchors.fill: parent; padding: 26; contentWidth: availableWidth; ServicesModule { width: p6.availableWidth - 52 } } }
+                Item { ScrollView { id: p7; anchors.fill: parent; padding: 26; contentWidth: availableWidth; HardwareModule { width: p7.availableWidth - 52 } } }
+                Item { ScrollView { id: p8; anchors.fill: parent; padding: 26; contentWidth: availableWidth; StorageModule { width: p8.availableWidth - 52 } } }
+                Item { ScrollView { id: p9; anchors.fill: parent; padding: 26; contentWidth: availableWidth; FirewallModule { width: p9.availableWidth - 52 } } }
+                Item { ScrollView { id: p10; anchors.fill: parent; padding: 26; contentWidth: availableWidth; DiagnosticsModule { width: p10.availableWidth - 52 } } }
+                Item { ScrollView { id: p11; anchors.fill: parent; padding: 26; contentWidth: availableWidth; FirmwareModule { width: p11.availableWidth - 52 } } }
+                Item { ScrollView { id: p12; anchors.fill: parent; padding: 26; contentWidth: availableWidth; RecoveryModule { width: p12.availableWidth - 52 } } }
                 Item {
                     ScrollView {
-                        id: dashScroll
+                        id: p13
                         anchors.fill: parent
-                        padding: 28
-                        contentWidth: availableWidth
-                        DashboardModule {
-                            width: dashScroll.availableWidth - 56
-                            onOpenPage: function(index) { window.pageIndex = index }
-                        }
-                    }
-                }
-                Item {
-                    ScrollView {
-                        id: softwareScroll
-                        anchors.fill: parent
-                        padding: 28
-                        contentWidth: availableWidth
-                        SoftwareModule { width: softwareScroll.availableWidth - 56 }
-                    }
-                }
-                Item {
-                    ScrollView {
-                        id: bootcScroll
-                        anchors.fill: parent
-                        padding: 28
-                        contentWidth: availableWidth
-                        BootcModule { width: bootcScroll.availableWidth - 56 }
-                    }
-                }
-                Item {
-                    ScrollView {
-                        id: systemScroll
-                        anchors.fill: parent
-                        padding: 28
-                        contentWidth: availableWidth
-                        SystemModule { width: systemScroll.availableWidth - 56 }
-                    }
-                }
-                Item {
-                    ScrollView {
-                        id: toolsScroll
-                        anchors.fill: parent
-                        padding: 28
+                        padding: 26
                         contentWidth: availableWidth
                         ToolsModule {
-                            width: toolsScroll.availableWidth - 56
+                            width: p13.availableWidth - 52
                             externalSearch: globalSearch.text
+                            onOpenPage: function(i) { window.pageIndex = i; globalSearch.clear() }
                         }
                     }
                 }
