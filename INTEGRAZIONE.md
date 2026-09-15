@@ -1,39 +1,79 @@
-# Merge: rakuCC (base) + innesti da bozza D-Bus
+# Integrazione nel rakuCC base
 
-## Cosa prendere da DOVE
+Questo repository contiene l'innesto del modulo **Software** per il progetto rakuCC completo. La precedente bozza D-Bus resta esclusa: le operazioni privilegiate passano da `pkexec` verso i binari gia' previsti dal sistema (`rk` e `bootc`).
 
-BASE = rakuCC (architettura pkexec + backend C++ + 8 moduli + packaging).
-La bozza D-Bus viene **abbandonata**: il suo helper Python/daemon e' una
-superflua superficie di manutenzione. pkexec -> rk|bootc con policy
-exec.path riusa gli stessi binari che rk gia' protegge: una sola enforcement.
+## File da integrare
 
-INNESTI dalla bozza D-Bus (questo pacchetto):
-1. `src/PolkitHelper.{h,cpp}`  -> SOSTITUISCE il PolkitHelper esistente.
-   Aggiunge streaming riga-per-riga (signal `line`) per operazioni lunghe;
-   RIMUOVE `executeRaw` (codice morto pericoloso: pkexec arbitrario non ha
-   action policy; se mai aggiunta catch-all diventerebbe un buco).
-2. `src/PackageSearch.{h,cpp}` -> NUOVO. Ricerca read-only dnf5 repoquery
-   + marcatura owned/installed. Nessun pkexec: la lettura e' innocua.
-3. `qml/modules/SoftwareModule.qml` -> SOSTITUISCE lo stub esistente:
-   ricerca + install/rm via `PolkitHelper.execute("/usr/bin/rk", ...)`,
-   sync da lista, Flatpak delegato a kcmshell6 (comando NON privilegiato:
-   togliere pkexec — kcmshell6 va lanciato diretto, non come root).
+1. `src/PolkitHelper.{h,cpp}` sostituisce l'helper esistente.
+   - streaming riga-per-riga;
+   - gestione `QProcess::FailedToStart` e exit status;
+   - allowlist privilegiata: solo `/usr/bin/rk` e `/usr/bin/bootc`;
+   - `launchUnprivileged()` limitato a `/usr/bin/kcmshell6` per il KCM Flatpak.
+2. `src/PackageSearch.{h,cpp}` e' nuovo.
+   - ricerca read-only con `rpm` + `dnf5 repoquery`;
+   - completamente asincrona, senza `waitForFinished()` sul thread GUI;
+   - stato `searching`, cancellazione della ricerca precedente e segnale `searchError`;
+   - queryformat DNF5 con separatore tab e sequenza `\\n` esplicita.
+3. `qml/modules/SoftwareModule.qml` sostituisce lo stub Software.
+   - istanzia `PackageSearch { id: packageSearch }`;
+   - install/remove/sync passano da `PolkitHelper.execute("/usr/bin/rk", ...)`;
+   - `kcmshell6 kcm_flatpak` viene avviato senza `pkexec` tramite `launchUnprivileged()`.
 
-## Integrazione (4 tocchi)
+## Tocchi nel progetto base
 
-1. CMakeLists.txt: aggiungere `src/PackageSearch.cpp` e `src/PackageSearch.h`
-   a qt_add_qml_module(... SOURCES) (stesso blocco di BootcBackend ecc.).
-2. main.cpp / contesto: `qmlRegisterType<PackageSearch>("raku.cc", 1, 0, "PackageSearch");`
-   (PolkitHelper gia' registrato; verificare il nome modulo import in QML:
-   qui uso `import raku.cc` — allineare con l'URI reale del progetto).
-3. Nel software module: `kcmshell6` va lanciato SENZA pkexec (e' un'app
-   utente). Se serve un runner non privilegiato: `QProcess::startDetached`.
-4. Policy: invariata (2 action con exec.path /usr/bin/rk e /usr/bin/bootc).
-   Granularita' add-vs-rm non raggiungibile via pkexec (stesso binario):
-   accettabile, rk valida comunque ogni operazione.
+### 1. CMakeLists.txt
 
-## Da NON portare dalla bozza D-Bus
+Aggiungere almeno questi sorgenti allo stesso target/modulo che contiene gli altri backend QML:
 
-- helper Python org.raku.Control, unit Type=dbus, org.raku.Control.policy
-- registry.json (il catalogo compilato in ToolModel.cpp e' type-safe)
-- Kirigami (il Fusion dark di rakuCC e' portabile e gia' consistente)
+```cmake
+src/PackageSearch.cpp
+src/PackageSearch.h
+src/PolkitHelper.cpp
+src/PolkitHelper.h
+```
+
+`qml/modules/SoftwareModule.qml` deve inoltre essere incluso tra i QML_FILES del modulo.
+
+### 2. Registrazione QML
+
+Registrare `PackageSearch` come tipo istanziabile:
+
+```cpp
+#include "PackageSearch.h"
+
+qmlRegisterType<PackageSearch>("raku.cc", 1, 0, "PackageSearch");
+```
+
+Il QML corretto crea poi una propria istanza `PackageSearch`; non usa il nome del tipo come singleton.
+
+`PolkitHelper` deve restare esposto con la modalita' gia' usata dal progetto base (singleton/context property), perche' `SoftwareModule.qml` lo usa come oggetto globale.
+
+Verificare che l'URI reale coincida con `import raku.cc`; se il progetto base usa un URI diverso, allineare sia `qmlRegisterType()` sia l'import QML.
+
+### 3. Policy Polkit
+
+La policy deve autorizzare esclusivamente gli helper privilegiati previsti dal progetto, con `exec.path` per:
+
+- `/usr/bin/rk`
+- `/usr/bin/bootc`
+
+Non aggiungere una action catch-all per programmi arbitrari. `kcmshell6` non richiede privilegi e non deve comparire nella policy.
+
+### 4. Dipendenze runtime
+
+Il modulo Software presuppone la presenza di:
+
+- `/usr/bin/rpm`
+- `/usr/bin/dnf5`
+- `/usr/bin/pkexec`
+- `/usr/bin/rk`
+- `/usr/bin/kcmshell6` per il pulsante Flatpak
+- `/usr/share/raku-kris/owned-packages.txt` per marcare i pacchetti della base immutabile
+
+## Non portare dalla vecchia bozza D-Bus
+
+- helper Python `org.raku.Control`;
+- unit D-Bus dedicata;
+- `org.raku.Control.policy` separata;
+- `registry.json`;
+- dipendenze Kirigami non necessarie al Fusion dark del progetto base.
