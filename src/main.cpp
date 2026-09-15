@@ -2,6 +2,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QTimer>
 #include <QtQml/qqml.h>
 
 #include "BootcBackend.h"
@@ -34,5 +35,9 @@ int main(int argc, char *argv[])
                      &app, [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
 
     engine.loadFromModule(QStringLiteral("raku.cc"), QStringLiteral("Main"));
+
+    if (qEnvironmentVariableIsSet("KCONTROLC_SMOKE_TEST"))
+        QTimer::singleShot(750, &app, &QCoreApplication::quit);
+
     return app.exec();
 }

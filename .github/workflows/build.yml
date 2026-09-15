@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main, complete-standalone-app]
+    branches: [main, complete-standalone-app, runtime-smoke-test]
   pull_request:
     branches: [main]
 
@@ -18,3 +18,9 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build build
+      - name: QML runtime smoke test
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+          KCONTROLC_SMOKE_TEST: "1"
+        run: ./build/k-controlc
