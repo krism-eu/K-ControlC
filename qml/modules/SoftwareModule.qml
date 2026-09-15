@@ -12,7 +12,7 @@ ColumnLayout {
 
     PackageSearch {
         id: packageSearch
-        function onSearchError(message) { root.searchError = message }
+        onSearchError: function(message) { root.searchError = message }
     }
 
     Connections {

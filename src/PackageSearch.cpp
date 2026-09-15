@@ -174,7 +174,7 @@ void PackageSearch::startRepoQuery(const QString &term)
 
     process->start("/usr/bin/dnf5",
                    {"repoquery", "--available", "--search", term,
-                    "--queryformat", "%{name}\\t%{summary}\\n"});
+                    "--queryformat", "%{name}\t%{summary}\\n"});
 }
 
 void PackageSearch::clearResults()
