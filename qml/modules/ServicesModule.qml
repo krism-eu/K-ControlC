@@ -17,7 +17,17 @@ ColumnLayout {
             required property var modelData
             Layout.fillWidth: true; height: 82; radius: 10; color: "#131c38"; border.color: "#293761"
             RowLayout { anchors.fill: parent; anchors.margins: 12
-                ColumnLayout { Layout.fillWidth: true; Label { text: modelData.title; color: "#eef2ff"; font.bold: true } Label { text: { root.refreshToken; return SystemBackend.serviceState(modelData.id) } color: "#94a3b8" } }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Label { text: modelData.title; color: "#eef2ff"; font.bold: true }
+                    Label {
+                        text: {
+                            root.refreshToken
+                            return SystemBackend.serviceState(modelData.id)
+                        }
+                        color: "#94a3b8"
+                    }
+                }
                 Button { text: qsTr("Riavvia"); onClicked: SystemBackend.restartService(modelData.id) }
             }
         }
