@@ -53,7 +53,6 @@ void PackageSearch::search(const QString &term)
 {
     const QString sanitized = sanitizeTerm(term);
 
-    // Increment first: callbacks from any older process become stale immediately.
     ++m_generation;
     stopActiveProcess();
 
@@ -198,8 +197,6 @@ void PackageSearch::startRepoQuery(const QString &term)
         emit searchFinished();
     });
 
-    // repoquery has no --search option. A positional package-spec/glob is the
-    // supported form. The glob is built only from our sanitized term.
     const QString packageSpec = QStringLiteral("*") + term + QStringLiteral("*");
     rawProcess->start(QStringLiteral("/usr/bin/dnf5"),
                       {QStringLiteral("repoquery"),
@@ -232,22 +229,23 @@ void PackageSearch::stopActiveProcess()
         return;
 
     const QPointer<QProcess> process = m_process;
+    QProcess *const rawProcess = process.data();
     m_process = nullptr;
-    disconnect(process, nullptr, this, nullptr);
 
-    if (!process)
+    if (!rawProcess)
         return;
-    if (process->state() == QProcess::NotRunning) {
-        process->deleteLater();
+
+    disconnect(rawProcess, nullptr, this, nullptr);
+
+    if (rawProcess->state() == QProcess::NotRunning) {
+        rawProcess->deleteLater();
         return;
     }
 
-    // Give dnf5/rpm a chance to release their resources cleanly. Never block
-    // the GUI thread while waiting for cancellation.
-    process->terminate();
-    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
-            process, &QObject::deleteLater);
-    QTimer::singleShot(3000, process, [process]() {
+    rawProcess->terminate();
+    connect(rawProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
+            rawProcess, &QObject::deleteLater);
+    QTimer::singleShot(3000, rawProcess, [process]() {
         if (process && process->state() != QProcess::NotRunning)
             process->kill();
     });
@@ -294,7 +292,6 @@ QString PackageSearch::sanitizeTerm(const QString &term)
         } else if (ch.isSpace()) {
             pendingSeparator = true;
         }
-        // All user supplied glob/control/shell metacharacters are discarded.
     }
 
     return out.left(128);
