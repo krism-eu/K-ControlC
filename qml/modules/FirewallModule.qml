@@ -6,7 +6,14 @@ ColumnLayout {
     id: root; spacing: 16; property int refreshToken: 0
     Label { text: qsTr("Sicurezza / Firewall"); font.pixelSize: 26; font.bold: true; color: "#f8fafc" }
     Label { text: qsTr("Controllo firewalld con azioni runtime esplicite. Ogni modifica richiede una nuova autorizzazione Polkit."); color: "#94a3b8"; Layout.fillWidth: true; wrapMode: Text.Wrap }
-    Label { text: { root.refreshToken; return qsTr("firewalld: %1").arg(SystemBackend.serviceState("firewalld.service")) } color: "#e0e7ff"; font.bold: true }
+    Label {
+        text: {
+            root.refreshToken
+            return qsTr("firewalld: %1").arg(SystemBackend.serviceState("firewalld.service"))
+        }
+        color: "#e0e7ff"
+        font.bold: true
+    }
     BusyIndicator { visible: PolkitHelper.running; running: visible }
     GridLayout {
         Layout.fillWidth: true; columns: 3; columnSpacing: 8; rowSpacing: 8
