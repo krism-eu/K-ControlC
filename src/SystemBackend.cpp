@@ -3,6 +3,7 @@
 #include <QClipboard>
 #include <QDBusInterface>
 #include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
 #include <QDBusReply>
 #include <QDBusVariant>
 #include <QDir>
@@ -170,7 +171,6 @@ bool SystemBackend::launchTool(const QString &toolId) const
     if (desktopIt != m_desktopTools.cend())
         return launchDesktopEntry(desktopIt.value());
 
-    // Resolve once. Do not call toolAvailable(), which would repeat lookup.
     const QString program = toolProgram(toolId);
     if (program.isEmpty())
         return false;
@@ -282,8 +282,9 @@ bool SystemBackend::restartService(const QString &service)
         manager.asyncCall(QStringLiteral("RestartUnit"), service, QStringLiteral("replace")), this);
     connect(watcher, &QDBusPendingCallWatcher::finished, this,
             [this, service](QDBusPendingCallWatcher *call) {
-        if (call->isError())
-            notify(tr("Riavvio servizio non riuscito"), call->error().message());
+        const QDBusPendingReply<QDBusObjectPath> reply(*call);
+        if (reply.isError())
+            notify(tr("Riavvio servizio non riuscito"), reply.error().message());
         else
             notify(tr("Servizio riavviato"), service);
         call->deleteLater();
@@ -334,8 +335,9 @@ bool SystemBackend::setNtpEnabled(bool enabled)
         timedate.asyncCall(QStringLiteral("SetNTP"), enabled, true), this);
     connect(watcher, &QDBusPendingCallWatcher::finished, this,
             [this, enabled](QDBusPendingCallWatcher *call) {
-        notify(call->isError() ? tr("Impostazione NTP non riuscita") : tr("NTP aggiornato"),
-               call->isError() ? call->error().message()
+        const QDBusPendingReply<> reply(*call);
+        notify(reply.isError() ? tr("Impostazione NTP non riuscita") : tr("NTP aggiornato"),
+               reply.isError() ? reply.error().message()
                                : (enabled ? tr("Sincronizzazione automatica attivata")
                                           : tr("Sincronizzazione automatica disattivata")));
         call->deleteLater();
@@ -363,8 +365,9 @@ bool SystemBackend::sessionAction(const QString &action)
     auto *watcher = new QDBusPendingCallWatcher(login.asyncCall(methods.value(action), true), this);
     connect(watcher, &QDBusPendingCallWatcher::finished, this,
             [this](QDBusPendingCallWatcher *call) {
-        if (call->isError())
-            notify(tr("Azione di sessione non riuscita"), call->error().message());
+        const QDBusPendingReply<> reply(*call);
+        if (reply.isError())
+            notify(tr("Azione di sessione non riuscita"), reply.error().message());
         call->deleteLater();
     });
     return true;
@@ -475,7 +478,7 @@ void SystemBackend::scanDesktopEntries()
             tool.category = category;
             tool.icon = entry.value(QStringLiteral("Icon")).toString();
             tool.exec = exec;
-            m_desktopTools.insert(tool.id, tool); // user entries override system entries by id
+            m_desktopTools.insert(tool.id, tool);
         }
     }
 
@@ -501,8 +504,7 @@ bool SystemBackend::launchDesktopEntry(const DesktopTool &tool) const
     if (command.isEmpty())
         return false;
 
-    // Remove freedesktop field codes. No shell is involved.
-    static const QRegularExpression fieldCode(QStringLiteral("%[fFuUdDnNickvm]") );
+    static const QRegularExpression fieldCode(QStringLiteral("%[fFuUdDnNickvm]"));
     for (QString &token : command) {
         token.replace(QStringLiteral("%%"), QStringLiteral("%"));
         token.remove(fieldCode);
