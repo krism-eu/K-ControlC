@@ -8,6 +8,12 @@ ColumnLayout {
     spacing: 16
 
     property var progressLines: []
+    property string searchError: ""
+
+    PackageSearch {
+        id: packageSearch
+        function onSearchError(message) { root.searchError = message }
+    }
 
     Connections {
         target: PolkitHelper
@@ -23,6 +29,7 @@ ColumnLayout {
     Label { text: "Software"; font.pixelSize: 18; font.bold: true; color: "#e0e7ff" }
     Label { text: "Gestione pacchetti e applicazioni"; font.pixelSize: 12; color: "#6b7280" }
 
+    // ---- Ricerca RPM persistente (overlay rk) ----
     Rectangle {
         Layout.fillWidth: true
         radius: 12; color: "#1a1a3e"; border.color: "#6366f1"; border.width: 1
@@ -41,14 +48,14 @@ ColumnLayout {
                 onTextChanged: searchTimer.restart()
                 palette.base: "#252560"; palette.text: "#e0e7ff"
             }
-            Timer { id: searchTimer; interval: 350; onTriggered: PackageSearch.search(searchField.text) }
+            Timer { id: searchTimer; interval: 350; onTriggered: { root.searchError = ""; packageSearch.search(searchField.text) } }
 
-            BusyIndicator { visible: PolkitHelper.running; running: visible; Layout.preferredHeight: 24; Layout.preferredWidth: 24 }
+            BusyIndicator { visible: PolkitHelper.running || packageSearch.searching; running: visible; Layout.preferredHeight: 24; Layout.preferredWidth: 24 }
 
             ListView {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.min(contentHeight, 260)
-                model: PackageSearch
+                model: packageSearch
                 clip: true
                 spacing: 4
 
@@ -92,6 +99,16 @@ ColumnLayout {
                 }
             }
 
+            // progress streaming (operazioni lunghe)
+            Label {
+                visible: root.searchError.length > 0
+                text: root.searchError
+                color: "#f87171"
+                font.pixelSize: 11
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
+            }
+
             ColumnLayout {
                 visible: root.progressLines.length > 0
                 spacing: 1
@@ -103,6 +120,7 @@ ColumnLayout {
         }
     }
 
+    // ---- Overlay state + sync da lista ----
     Rectangle {
         Layout.fillWidth: true
         radius: 12; color: "#1a1a3e"; border.color: "#252560"; border.width: 1
@@ -131,6 +149,7 @@ ColumnLayout {
         }
     }
 
+    // ---- Flatpak (delega a Discover/KCM) ----
     Rectangle {
         Layout.fillWidth: true
         radius: 12; color: "#1a1a3e"; border.color: "#252560"; border.width: 1
@@ -142,7 +161,7 @@ ColumnLayout {
             Label { text: "Applicazioni sandboxed — gestione via Discover o kcmshell6"; font.pixelSize: 12; color: "#6b7280" }
             Button {
                 text: "Apri gestione Flatpak"; palette.button: "#1a1a3e"; palette.buttonText: "#a5b4fc"
-                onClicked: PolkitHelper.execute("/usr/bin/kcmshell6", ["kcm_flatpak"])
+                onClicked: PolkitHelper.launchUnprivileged("/usr/bin/kcmshell6", ["kcm_flatpak"])
             }
         }
     }

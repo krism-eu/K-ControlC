@@ -4,12 +4,6 @@
 #include <QProcess>
 #include <QStringList>
 
-// pkexec wrapper per operazioni privilegiate.
-// SOLO helper consentiti dalla policy org.raku.controlcenter.*:
-//   /usr/bin/rk, /usr/bin/bootc  (annotate exec.path nella policy).
-// Nessun executeRaw: pkexec con programma arbitrario non ha action
-// corrispondente e fallirebbe comunque; se mai aggiunta una policy
-// catch-all diventerebbe un buco. Rimosso per costruzione.
 class PolkitHelper : public QObject
 {
     Q_OBJECT
@@ -19,22 +13,28 @@ public:
     explicit PolkitHelper(QObject *parent = nullptr);
 
     Q_INVOKABLE void execute(const QString &program, const QStringList &args);
+    Q_INVOKABLE bool launchUnprivileged(const QString &program, const QStringList &args = {});
 
     bool running() const { return m_running; }
 
 signals:
     void runningChanged();
-    // Emesso riga per riga dallo stdout del processo (progress per
-    // operazioni lunghe: bootc upgrade, rk sync, rk add con download).
     void line(const QString &text);
     void finished(bool success, const QString &output);
 
 private slots:
     void onReadyRead();
     void onProcessFinished(int exitCode, QProcess::ExitStatus status);
+    void onProcessError(QProcess::ProcessError error);
 
 private:
+    bool isPrivilegedProgramAllowed(const QString &program) const;
+    bool isUnprivilegedProgramAllowed(const QString &program) const;
+    void consumeOutput(const QByteArray &data, bool flushPartial = false);
+    void finishWithError(const QString &message);
+
     bool m_running = false;
     QProcess *m_process = nullptr;
     QString m_allOutput;
+    QByteArray m_lineBuffer;
 };

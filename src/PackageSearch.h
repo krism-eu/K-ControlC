@@ -1,16 +1,14 @@
 #pragma once
 
 #include <QAbstractListModel>
-#include <QStringList>
+#include <QProcess>
+#include <QSet>
+#include <QString>
 
-// Ricerca pacchetti RPM disponibili (read-only, nessun pkexec):
-// dnf5 repoquery --search <term>, arricchito con
-//   - installed: presente nella rpmdb
-//   - owned:     nella base immutabile (owned-packages.txt) -> rk rifiuterebbe
-// Il modello alimenta la lista della pagina Software.
 class PackageSearch : public QAbstractListModel
 {
     Q_OBJECT
+    Q_PROPERTY(bool searching READ searching NOTIFY searchingChanged)
 
 public:
     enum Roles {
@@ -27,9 +25,12 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     Q_INVOKABLE void search(const QString &term);
+    bool searching() const { return m_searching; }
 
 signals:
+    void searchingChanged();
     void searchFinished();
+    void searchError(const QString &message);
 
 private:
     struct Entry {
@@ -38,7 +39,17 @@ private:
         bool installed = false;
         bool owned = false;
     };
+
+    void clearResults();
+    void setSearching(bool searching);
+    void startInstalledQuery(const QString &term);
+    void startRepoQuery(const QString &term);
+    void stopActiveProcess();
+
     QList<Entry> m_results;
-    QStringList m_owned;
-    QStringList m_installed;
+    QSet<QString> m_owned;
+    QSet<QString> m_installed;
+    QProcess *m_process = nullptr;
+    bool m_searching = false;
+    quint64 m_generation = 0;
 };
