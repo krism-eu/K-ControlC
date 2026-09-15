@@ -1,0 +1,7 @@
+build/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+*.user
+*.autosave
+compile_commands.json

@@ -28,8 +28,9 @@ private slots:
     void onProcessError(QProcess::ProcessError error);
 
 private:
-    bool isPrivilegedProgramAllowed(const QString &program) const;
-    bool isUnprivilegedProgramAllowed(const QString &program) const;
+    bool isPrivilegedInvocationAllowed(const QString &program, const QStringList &args) const;
+    bool isUnprivilegedInvocationAllowed(const QString &program, const QStringList &args) const;
+    bool isValidPackageName(const QString &package) const;
     void consumeOutput(const QByteArray &data, bool flushPartial = false);
     void finishWithError(const QString &message);
 

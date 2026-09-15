@@ -1,6 +1,7 @@
 #include "PolkitHelper.h"
 
 #include <QDebug>
+#include <QRegularExpression>
 
 PolkitHelper::PolkitHelper(QObject *parent)
     : QObject(parent)
@@ -14,8 +15,8 @@ void PolkitHelper::execute(const QString &program, const QStringList &args)
         return;
     }
 
-    if (!isPrivilegedProgramAllowed(program)) {
-        emit finished(false, tr("Programma privilegiato non consentito: %1").arg(program));
+    if (!isPrivilegedInvocationAllowed(program, args)) {
+        emit finished(false, tr("Operazione privilegiata non consentita."));
         return;
     }
 
@@ -35,13 +36,13 @@ void PolkitHelper::execute(const QString &program, const QStringList &args)
 
     QStringList fullArgs;
     fullArgs << program << args;
-    m_process->start("/usr/bin/pkexec", fullArgs);
+    m_process->start(QStringLiteral("/usr/bin/pkexec"), fullArgs);
 }
 
 bool PolkitHelper::launchUnprivileged(const QString &program, const QStringList &args)
 {
-    if (!isUnprivilegedProgramAllowed(program)) {
-        qWarning() << "PolkitHelper: programma non privilegiato non consentito:" << program;
+    if (!isUnprivilegedInvocationAllowed(program, args)) {
+        qWarning() << "PolkitHelper: avvio non consentito:" << program << args;
         return false;
     }
     return QProcess::startDetached(program, args);
@@ -60,7 +61,9 @@ void PolkitHelper::onProcessFinished(int exitCode, QProcess::ExitStatus status)
 
     consumeOutput(m_process->readAllStandardOutput(), true);
     const bool success = status == QProcess::NormalExit && exitCode == 0;
-    const QString output = m_allOutput.trimmed();
+    QString output = m_allOutput.trimmed();
+    if (output.isEmpty() && !success)
+        output = tr("Operazione terminata con codice %1.").arg(exitCode);
 
     m_process->deleteLater();
     m_process = nullptr;
@@ -76,15 +79,42 @@ void PolkitHelper::onProcessError(QProcess::ProcessError error)
     finishWithError(tr("Impossibile avviare pkexec: %1").arg(m_process->errorString()));
 }
 
-bool PolkitHelper::isPrivilegedProgramAllowed(const QString &program) const
+bool PolkitHelper::isValidPackageName(const QString &package) const
 {
-    return program == QStringLiteral("/usr/bin/rk")
-        || program == QStringLiteral("/usr/bin/bootc");
+    static const QRegularExpression pattern(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._+:-]{0,127}$"));
+    return pattern.match(package).hasMatch();
 }
 
-bool PolkitHelper::isUnprivilegedProgramAllowed(const QString &program) const
+bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const QStringList &args) const
 {
-    return program == QStringLiteral("/usr/bin/kcmshell6");
+    if (program == QStringLiteral("/usr/bin/rk")) {
+        if (args == QStringList{QStringLiteral("sync")})
+            return true;
+        if (args.size() == 2
+            && (args.at(0) == QStringLiteral("add") || args.at(0) == QStringLiteral("rm")))
+            return isValidPackageName(args.at(1));
+        return false;
+    }
+
+    if (program == QStringLiteral("/usr/bin/bootc")) {
+        static const QList<QStringList> allowed = {
+            {QStringLiteral("upgrade")},
+            {QStringLiteral("upgrade"), QStringLiteral("--check")},
+            {QStringLiteral("upgrade"), QStringLiteral("--download-only")},
+            {QStringLiteral("upgrade"), QStringLiteral("--apply")},
+            {QStringLiteral("rollback")},
+            {QStringLiteral("rollback"), QStringLiteral("--apply")}
+        };
+        return allowed.contains(args);
+    }
+
+    return false;
+}
+
+bool PolkitHelper::isUnprivilegedInvocationAllowed(const QString &program, const QStringList &args) const
+{
+    return program == QStringLiteral("/usr/bin/kcmshell6")
+        && args == QStringList{QStringLiteral("kcm_flatpak")};
 }
 
 void PolkitHelper::consumeOutput(const QByteArray &data, bool flushPartial)
