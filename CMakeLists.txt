@@ -27,6 +27,16 @@ qt_add_executable(k-controlc
     src/PolkitHelper.h
 )
 
+# Keep the repository organized under qml/components and qml/modules while
+# exposing all application types at the raku.cc module root.
+set_source_files_properties(qml/Main.qml PROPERTIES QT_RESOURCE_ALIAS Main.qml)
+set_source_files_properties(qml/components/ToolCard.qml PROPERTIES QT_RESOURCE_ALIAS ToolCard.qml)
+set_source_files_properties(qml/modules/DashboardModule.qml PROPERTIES QT_RESOURCE_ALIAS DashboardModule.qml)
+set_source_files_properties(qml/modules/SoftwareModule.qml PROPERTIES QT_RESOURCE_ALIAS SoftwareModule.qml)
+set_source_files_properties(qml/modules/BootcModule.qml PROPERTIES QT_RESOURCE_ALIAS BootcModule.qml)
+set_source_files_properties(qml/modules/SystemModule.qml PROPERTIES QT_RESOURCE_ALIAS SystemModule.qml)
+set_source_files_properties(qml/modules/ToolsModule.qml PROPERTIES QT_RESOURCE_ALIAS ToolsModule.qml)
+
 qt_add_qml_module(k-controlc
     URI raku.cc
     VERSION 1.0
