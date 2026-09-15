@@ -2,9 +2,9 @@
 
 Bundle di integrazione per **rakuCC**, Control Center destinato a Fedora BootC.
 
-Questo repository contiene gli innesti sorgente estratti dal pacchetto `cc-merge.zip` e organizzati direttamente nella struttura del progetto. Non è un'applicazione standalone completa: i file sono pensati per essere integrati nella base rakuCC esistente.
+Questo branch normalizza il contenuto di `cc-merge.zip` direttamente nella struttura del progetto. Il pacchetto è un bundle di integrazione, non un'applicazione standalone completa.
 
-## Struttura
+## Struttura materializzata
 
 ```text
 .
@@ -13,11 +13,12 @@ Questo repository contiene gli innesti sorgente estratti dal pacchetto `cc-merge
 │   └── modules/
 │       └── SoftwareModule.qml
 └── src/
-    ├── PackageSearch.cpp
     ├── PackageSearch.h
     ├── PolkitHelper.cpp
     └── PolkitHelper.h
 ```
+
+`src/PackageSearch.cpp` è presente nel pacchetto originale ma non è stato materializzato dal connettore GitHub: resta quindi conservato in `cc-merge.zip` finché non viene aggiunto esplicitamente. Nel file ZIP il suo nome presenta inoltre una discrepanza interna (`PackageSearcc.cpp` nell'indice locale contro `PackageSearch.cpp` nell'indice centrale); il nome canonico da usare nel repository è `PackageSearch.cpp`.
 
 ## Componenti
 
@@ -28,6 +29,4 @@ Questo repository contiene gli innesti sorgente estratti dal pacchetto `cc-merge
 
 ## Integrazione nella base rakuCC
 
-La guida completa è in [`INTEGRAZIONE.md`](INTEGRAZIONE.md). In sintesi servono l'aggiunta di `PackageSearch` al build CMake, la registrazione del tipo QML e l'allineamento con l'URI QML reale della base.
-
-> Nota: il pacchetto sorgente originale contiene alcuni punti da verificare prima del merge definitivo (registrazione/uso QML di `PackageSearch`, lancio non privilegiato di `kcmshell6` e robustezza dei processi). Sono mantenuti nel codice per una revisione esplicita invece di nasconderli nel riordino del repository.
+La guida completa è in [`INTEGRAZIONE.md`](INTEGRAZIONE.md). Prima del merge definitivo vanno risolti i punti emersi dalla revisione: registrazione/uso QML di `PackageSearch`, parsing dell'output DNF5, esecuzione non privilegiata di `kcmshell6` e gestione robusta degli errori dei processi.
