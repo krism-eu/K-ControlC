@@ -6,20 +6,25 @@ if grep -Eq '"--search"|QStringLiteral\("--search"\)' src/PackageSearch.cpp; the
   exit 1
 fi
 
-echo "Checking dnf5 repoquery positional package-spec..."
+if grep -q 'auth_admin_keep' data/org.raku.controlcenter.policy; then
+  echo "ERROR: Polkit policy must not retain admin authorization" >&2
+  exit 1
+fi
+
+grep -q 'org.kde.kirigami' qml/Main.qml
+grep -q 'config-manager' src/PolkitHelper.cpp
+
+echo "Checking DNF5 read-only package queries..."
 dnf5 repoquery --available --queryformat '%{name}\t%{summary}\n' 'bash*' | grep -q '^bash'
+dnf5 list --installed --json >/dev/null
+dnf5 list --upgrades --json >/dev/null
+dnf5 list --recent --json >/dev/null
+dnf5 repo list --all --json >/dev/null
+dnf5 config-manager --help >/dev/null
 
 if command -v bootc >/dev/null 2>&1; then
   echo "bootc detected; validating status JSON when available"
   bootc status --json --format-version=1 >/dev/null || bootc status --format=humanreadable >/dev/null
 else
   echo "bootc not available in this CI container; skipping host deployment probe"
-fi
-
-if command -v kcmshell6 >/dev/null 2>&1; then
-  if kcmshell6 --list 2>/dev/null | grep -qi kcm_flatpak; then
-    echo "kcm_flatpak available"
-  else
-    echo "kcm_flatpak absent: runtime fallback to plasma-discover will be used"
-  fi
 fi

@@ -4,8 +4,8 @@
   <vendor>raku</vendor>
   <vendor_url>https://github.com/krism-eu/K-ControlC</vendor_url>
 
-  <!-- No auth_admin_keep: every privileged invocation requires a fresh
-       authorization decision. argv1 narrows pkexec's path-only matching. -->
+  <!-- Fresh authentication: no auth_admin_keep. The C++ layer validates the
+       complete argument vector; exec.argv1 also narrows pkexec matching. -->
   <action id="org.raku.controlcenter.rk.sync">
     <description>Synchronize persistent raku packages</description>
     <message>Authentication is required to synchronize persistent packages</message>
@@ -46,48 +46,11 @@
     <annotate key="org.freedesktop.policykit.exec.argv1">rollback</annotate>
   </action>
 
-  <!-- Runtime-only firewalld quick actions. The C++ layer additionally checks
-       the complete argument vector; each policy action pins argv1 as well. -->
-  <action id="org.raku.controlcenter.firewall.ssh.add">
-    <description>Open SSH in the active firewall configuration</description>
-    <message>Authentication is required to open SSH</message>
+  <action id="org.raku.controlcenter.dnf5.config-manager">
+    <description>Enable or disable a DNF5 repository</description>
+    <message>Authentication is required to change repository state</message>
     <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/firewall-cmd</annotate>
-    <annotate key="org.freedesktop.policykit.exec.argv1">--add-service=ssh</annotate>
-  </action>
-  <action id="org.raku.controlcenter.firewall.ssh.remove">
-    <description>Close SSH in the active firewall configuration</description>
-    <message>Authentication is required to close SSH</message>
-    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/firewall-cmd</annotate>
-    <annotate key="org.freedesktop.policykit.exec.argv1">--remove-service=ssh</annotate>
-  </action>
-  <action id="org.raku.controlcenter.firewall.http.add">
-    <description>Open HTTP in the active firewall configuration</description>
-    <message>Authentication is required to open HTTP</message>
-    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/firewall-cmd</annotate>
-    <annotate key="org.freedesktop.policykit.exec.argv1">--add-service=http</annotate>
-  </action>
-  <action id="org.raku.controlcenter.firewall.http.remove">
-    <description>Close HTTP in the active firewall configuration</description>
-    <message>Authentication is required to close HTTP</message>
-    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/firewall-cmd</annotate>
-    <annotate key="org.freedesktop.policykit.exec.argv1">--remove-service=http</annotate>
-  </action>
-  <action id="org.raku.controlcenter.firewall.https.add">
-    <description>Open HTTPS in the active firewall configuration</description>
-    <message>Authentication is required to open HTTPS</message>
-    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/firewall-cmd</annotate>
-    <annotate key="org.freedesktop.policykit.exec.argv1">--add-service=https</annotate>
-  </action>
-  <action id="org.raku.controlcenter.firewall.https.remove">
-    <description>Close HTTPS in the active firewall configuration</description>
-    <message>Authentication is required to close HTTPS</message>
-    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/firewall-cmd</annotate>
-    <annotate key="org.freedesktop.policykit.exec.argv1">--remove-service=https</annotate>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/dnf5</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">config-manager</annotate>
   </action>
 </policyconfig>

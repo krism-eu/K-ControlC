@@ -13,28 +13,62 @@ jobs:
     container: fedora:44
     steps:
       - uses: actions/checkout@v4
+
       - name: Install build dependencies
-        run: dnf -y install gcc-c++ cmake ninja-build qt6-qtbase-devel qt6-qtdeclarative-devel dnf5 rpm rpm-build tar
+        run: >-
+          dnf -y install gcc-c++ cmake ninja-build git
+          qt6-qtbase-devel qt6-qtdeclarative-devel kf6-kirigami-devel
+          dnf5 dnf5-plugins rpm rpm-build tar
+
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
       - name: Build
         run: cmake --build build
+
       - name: QML runtime smoke test
         env:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
+          QT_QUICK_CONTROLS_STYLE: Basic
           KCONTROLC_SMOKE_TEST: "1"
         run: ./build/k-controlc
+
       - name: Read-only integration checks
         run: ./tests/e2e-readonly.sh
+
       - name: Validate RPM spec
         run: rpmspec -P packaging/k-controlc.spec >/dev/null
+
       - name: Stage install
         run: |
           DESTDIR="$PWD/stage" cmake --install build --prefix /usr
           tar -C stage -czf k-controlc-stage.tar.gz .
+
+      - name: Build RPM
+        run: |
+          mkdir -p "$HOME/rpmbuild"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          git archive --format=tar.gz --prefix=k-controlc-0.4.0/ \
+            -o "$HOME/rpmbuild/SOURCES/k-controlc-0.4.0.tar.gz" HEAD
+          cp packaging/k-controlc.spec "$HOME/rpmbuild/SPECS/"
+          rpmbuild -ba "$HOME/rpmbuild/SPECS/k-controlc.spec"
+          mkdir -p artifacts/rpm artifacts/srpm artifacts/stage
+          cp "$HOME"/rpmbuild/RPMS/*/k-controlc-*.rpm artifacts/rpm/
+          cp "$HOME"/rpmbuild/SRPMS/k-controlc-*.src.rpm artifacts/srpm/
+          cp k-controlc-stage.tar.gz artifacts/stage/
+
+      - name: Install built RPM and smoke test
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+          QT_QUICK_CONTROLS_STYLE: Basic
+          KCONTROLC_SMOKE_TEST: "1"
+        run: |
+          dnf -y install artifacts/rpm/k-controlc-*.rpm
+          /usr/bin/k-controlc
+
       - uses: actions/upload-artifact@v4
         with:
           name: k-controlc-${{ github.sha }}
-          path: k-controlc-stage.tar.gz
+          path: artifacts/
           if-no-files-found: error

@@ -1,14 +1,9 @@
 #pragma once
 
-#include <QDBusConnection>
-#include <QDBusObjectPath>
-#include <QHash>
 #include <QObject>
-#include <QSet>
+#include <QPointer>
+#include <QProcess>
 #include <QString>
-#include <QStringList>
-#include <QVariantList>
-#include <QVariantMap>
 
 class SystemBackend : public QObject
 {
@@ -20,8 +15,9 @@ class SystemBackend : public QObject
     Q_PROPERTY(QString memorySummary READ memorySummary CONSTANT)
     Q_PROPERTY(QString storageSummary READ storageSummary CONSTANT)
     Q_PROPERTY(QString desktopSession READ desktopSession CONSTANT)
-    Q_PROPERTY(QString timeZone READ timeZone CONSTANT)
-    Q_PROPERTY(QVariantList tools READ tools CONSTANT)
+    Q_PROPERTY(bool backupBusy READ backupBusy NOTIFY backupBusyChanged)
+    Q_PROPERTY(QString backupStatus READ backupStatus NOTIFY backupStatusChanged)
+    Q_PROPERTY(QString backupPath READ backupPath NOTIFY backupStatusChanged)
 
 public:
     explicit SystemBackend(QObject *parent = nullptr);
@@ -33,44 +29,38 @@ public:
     QString memorySummary() const;
     QString storageSummary() const;
     QString desktopSession() const;
-    QString timeZone() const;
-    QVariantList tools() const { return m_toolList; }
+
+    bool backupBusy() const { return m_backupBusy; }
+    QString backupStatus() const { return m_backupStatus; }
+    QString backupPath() const { return m_backupPath; }
 
     Q_INVOKABLE QString quickSystemInfo() const;
     Q_INVOKABLE void copyToClipboard(const QString &text) const;
     Q_INVOKABLE bool toolAvailable(const QString &toolId) const;
     Q_INVOKABLE bool launchTool(const QString &toolId) const;
-    Q_INVOKABLE bool launchKcm(const QString &kcmId) const;
     Q_INVOKABLE bool launchFlatpakManager() const;
     Q_INVOKABLE bool launchQuickAction(const QString &actionId) const;
     Q_INVOKABLE bool programAvailable(const QString &program) const;
-
     Q_INVOKABLE QString serviceState(const QString &service) const;
     Q_INVOKABLE bool restartService(const QString &service);
-    Q_INVOKABLE QString networkState() const;
-    Q_INVOKABLE bool ntpEnabled() const;
-    Q_INVOKABLE bool setNtpEnabled(bool enabled);
     Q_INVOKABLE bool sessionAction(const QString &action);
     Q_INVOKABLE void notify(const QString &summary, const QString &body = QString()) const;
+    Q_INVOKABLE bool createSnapshot(const QString &kind);
+    Q_INVOKABLE bool openBackupFolder() const;
+
+signals:
+    void backupBusyChanged();
+    void backupStatusChanged();
 
 private:
-    struct DesktopTool {
-        QString id;
-        QString title;
-        QString description;
-        QString category;
-        QString icon;
-        QString exec;
-    };
-
     QString readOsName() const;
     QString toolProgram(const QString &toolId) const;
     QString resolveExecutable(const QString &program) const;
-    void scanDesktopEntries();
-    bool desktopEntryVisible(const QString &path) const;
-    bool launchDesktopEntry(const DesktopTool &tool) const;
-    static QStringList splitDesktopList(const QString &value);
+    void setBackupBusy(bool busy);
+    void setBackupResult(const QString &status, const QString &path = QString());
 
-    QVariantList m_toolList;
-    QHash<QString, DesktopTool> m_desktopTools;
+    QPointer<QProcess> m_backupProcess;
+    bool m_backupBusy = false;
+    QString m_backupStatus;
+    QString m_backupPath;
 };

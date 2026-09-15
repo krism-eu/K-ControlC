@@ -1,26 +1,27 @@
 #include "SystemBackend.h"
 
 #include <QClipboard>
+#include <QDateTime>
 #include <QDBusInterface>
+#include <QDBusObjectPath>
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
 #include <QDBusReply>
 #include <QDBusVariant>
+#include <QDesktopServices>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QHash>
 #include <QProcess>
-#include <QRegularExpression>
-#include <QSettings>
+#include <QSet>
 #include <QStandardPaths>
 #include <QStorageInfo>
 #include <QSysInfo>
 #include <QTextStream>
 #include <QTimeZone>
 #include <QUrl>
-
-#include <algorithm>
 
 namespace {
 QString humanGiB(quint64 bytes)
@@ -43,7 +44,6 @@ const QSet<QString> &allowedServices()
 SystemBackend::SystemBackend(QObject *parent)
     : QObject(parent)
 {
-    scanDesktopEntries();
 }
 
 QString SystemBackend::osName() const
@@ -102,11 +102,6 @@ QString SystemBackend::desktopSession() const
     return desktop + QStringLiteral(" · ") + session;
 }
 
-QString SystemBackend::timeZone() const
-{
-    return QString::fromUtf8(QTimeZone::systemTimeZoneId());
-}
-
 QString SystemBackend::quickSystemInfo() const
 {
     QString text;
@@ -119,8 +114,7 @@ QString SystemBackend::quickSystemInfo() const
     out << "RAM: " << memorySummary() << '\n';
     out << "Storage /: " << storageSummary() << '\n';
     out << "Desktop: " << desktopSession() << '\n';
-    out << "Timezone: " << timeZone() << '\n';
-    out << "Network: " << networkState() << '\n';
+    out << "Timezone: " << QString::fromUtf8(QTimeZone::systemTimeZoneId()) << '\n';
     out << "Qt: " << qVersion() << '\n';
     return text.trimmed();
 }
@@ -148,11 +142,9 @@ QString SystemBackend::toolProgram(const QString &toolId) const
         {QStringLiteral("systemsettings"), QStringLiteral("systemsettings")},
         {QStringLiteral("kinfocenter"), QStringLiteral("kinfocenter")},
         {QStringLiteral("partitionmanager"), QStringLiteral("partitionmanager")},
-        {QStringLiteral("firewall"), QStringLiteral("firewall-config")},
-        {QStringLiteral("printer"), QStringLiteral("system-config-printer")},
         {QStringLiteral("discover"), QStringLiteral("plasma-discover")},
-        {QStringLiteral("virtmanager"), QStringLiteral("virt-manager")},
         {QStringLiteral("ksystemlog"), QStringLiteral("ksystemlog")},
+        {QStringLiteral("systemmonitor"), QStringLiteral("plasma-systemmonitor")},
         {QStringLiteral("konsole"), QStringLiteral("konsole")}
     };
     return resolveExecutable(names.value(toolId));
@@ -160,55 +152,20 @@ QString SystemBackend::toolProgram(const QString &toolId) const
 
 bool SystemBackend::toolAvailable(const QString &toolId) const
 {
-    if (m_desktopTools.contains(toolId))
-        return true;
     return !toolProgram(toolId).isEmpty();
 }
 
 bool SystemBackend::launchTool(const QString &toolId) const
 {
-    const auto desktopIt = m_desktopTools.constFind(toolId);
-    if (desktopIt != m_desktopTools.cend())
-        return launchDesktopEntry(desktopIt.value());
-
     const QString program = toolProgram(toolId);
     if (program.isEmpty())
         return false;
     const QFileInfo info(program);
-    if (!info.exists() || !info.isExecutable())
-        return false;
-    return QProcess::startDetached(program, {});
-}
-
-bool SystemBackend::launchKcm(const QString &kcmId) const
-{
-    static const QSet<QString> allowed = {
-        QStringLiteral("kcm_users"),
-        QStringLiteral("kcm_clock"),
-        QStringLiteral("kcm_networkmanagement"),
-        QStringLiteral("kcm_bluetooth"),
-        QStringLiteral("kcm_printer_manager"),
-        QStringLiteral("kcm_flatpak")
-    };
-    if (!allowed.contains(kcmId))
-        return false;
-
-    const QString kcmshell = resolveExecutable(QStringLiteral("kcmshell6"));
-    return !kcmshell.isEmpty() && QProcess::startDetached(kcmshell, {kcmId});
+    return info.exists() && info.isExecutable() && QProcess::startDetached(program, {});
 }
 
 bool SystemBackend::launchFlatpakManager() const
 {
-    const QString kcmshell = resolveExecutable(QStringLiteral("kcmshell6"));
-    if (!kcmshell.isEmpty()) {
-        QProcess probe;
-        probe.start(kcmshell, {QStringLiteral("--list")});
-        if (probe.waitForFinished(1500)
-            && QString::fromUtf8(probe.readAllStandardOutput()).contains(QStringLiteral("kcm_flatpak"))) {
-            return QProcess::startDetached(kcmshell, {QStringLiteral("kcm_flatpak")});
-        }
-    }
-
     const QString discover = resolveExecutable(QStringLiteral("plasma-discover"));
     return !discover.isEmpty() && QProcess::startDetached(discover, {});
 }
@@ -225,17 +182,31 @@ bool SystemBackend::launchQuickAction(const QString &actionId) const
             && QProcess::startDetached(konsole, {QStringLiteral("-e"), flatpak,
                                                  QStringLiteral("uninstall"), QStringLiteral("--unused")});
     }
-    if (actionId == QStringLiteral("journal")) {
+    if (actionId == QStringLiteral("journal-errors")) {
         const QString journalctl = resolveExecutable(QStringLiteral("journalctl"));
         return !journalctl.isEmpty()
             && QProcess::startDetached(konsole, {QStringLiteral("-e"), journalctl,
                                                  QStringLiteral("-b"), QStringLiteral("-p"), QStringLiteral("warning")});
+    }
+    if (actionId == QStringLiteral("unneeded")) {
+        const QString dnf5 = resolveExecutable(QStringLiteral("dnf5"));
+        return !dnf5.isEmpty()
+            && QProcess::startDetached(konsole, {QStringLiteral("-e"), dnf5,
+                                                 QStringLiteral("repoquery"), QStringLiteral("--installed"),
+                                                 QStringLiteral("--unneeded")});
     }
     if (actionId == QStringLiteral("firmware")) {
         const QString fwupdmgr = resolveExecutable(QStringLiteral("fwupdmgr"));
         return !fwupdmgr.isEmpty()
             && QProcess::startDetached(konsole, {QStringLiteral("-e"), fwupdmgr,
                                                  QStringLiteral("get-updates")});
+    }
+    if (actionId == QStringLiteral("disks")) {
+        const QString lsblk = resolveExecutable(QStringLiteral("lsblk"));
+        return !lsblk.isEmpty()
+            && QProcess::startDetached(konsole, {QStringLiteral("-e"), lsblk,
+                                                 QStringLiteral("-o"),
+                                                 QStringLiteral("NAME,SIZE,FSTYPE,FSUSE%,MOUNTPOINTS,MODEL")});
     }
     return false;
 }
@@ -247,7 +218,7 @@ bool SystemBackend::programAvailable(const QString &program) const
 
 QString SystemBackend::serviceState(const QString &service) const
 {
-    if (!allowedServices().contains(service) && service != QStringLiteral("firewalld.service"))
+    if (!allowedServices().contains(service))
         return tr("non consentito");
 
     QDBusInterface manager(QStringLiteral("org.freedesktop.systemd1"),
@@ -283,63 +254,8 @@ bool SystemBackend::restartService(const QString &service)
     connect(watcher, &QDBusPendingCallWatcher::finished, this,
             [this, service](QDBusPendingCallWatcher *call) {
         const QDBusPendingReply<QDBusObjectPath> reply(*call);
-        if (reply.isError())
-            notify(tr("Riavvio servizio non riuscito"), reply.error().message());
-        else
-            notify(tr("Servizio riavviato"), service);
-        call->deleteLater();
-    });
-    return true;
-}
-
-QString SystemBackend::networkState() const
-{
-    QDBusInterface nm(QStringLiteral("org.freedesktop.NetworkManager"),
-                      QStringLiteral("/org/freedesktop/NetworkManager"),
-                      QStringLiteral("org.freedesktop.NetworkManager"),
-                      QDBusConnection::systemBus());
-    if (!nm.isValid())
-        return tr("NetworkManager non disponibile");
-
-    switch (nm.property("State").toUInt()) {
-    case 70: return tr("connesso");
-    case 60: return tr("connettività sito");
-    case 50: return tr("connettività locale");
-    case 40: return tr("connessione in corso");
-    case 30: return tr("disconnesso");
-    case 20: return tr("disconnessione in corso");
-    case 10: return tr("sospeso");
-    default: return tr("stato sconosciuto");
-    }
-}
-
-bool SystemBackend::ntpEnabled() const
-{
-    QDBusInterface timedate(QStringLiteral("org.freedesktop.timedate1"),
-                            QStringLiteral("/org/freedesktop/timedate1"),
-                            QStringLiteral("org.freedesktop.timedate1"),
-                            QDBusConnection::systemBus());
-    return timedate.isValid() && timedate.property("NTP").toBool();
-}
-
-bool SystemBackend::setNtpEnabled(bool enabled)
-{
-    QDBusInterface timedate(QStringLiteral("org.freedesktop.timedate1"),
-                            QStringLiteral("/org/freedesktop/timedate1"),
-                            QStringLiteral("org.freedesktop.timedate1"),
-                            QDBusConnection::systemBus());
-    if (!timedate.isValid())
-        return false;
-
-    auto *watcher = new QDBusPendingCallWatcher(
-        timedate.asyncCall(QStringLiteral("SetNTP"), enabled, true), this);
-    connect(watcher, &QDBusPendingCallWatcher::finished, this,
-            [this, enabled](QDBusPendingCallWatcher *call) {
-        const QDBusPendingReply<> reply(*call);
-        notify(reply.isError() ? tr("Impostazione NTP non riuscita") : tr("NTP aggiornato"),
-               reply.isError() ? reply.error().message()
-                               : (enabled ? tr("Sincronizzazione automatica attivata")
-                                          : tr("Sincronizzazione automatica disattivata")));
+        notify(reply.isError() ? tr("Riavvio servizio non riuscito") : tr("Servizio riavviato"),
+               reply.isError() ? reply.error().message() : service);
         call->deleteLater();
     });
     return true;
@@ -381,10 +297,123 @@ void SystemBackend::notify(const QString &summary, const QString &body) const
                                  QDBusConnection::sessionBus());
     if (!notifications.isValid())
         return;
-
     notifications.asyncCall(QStringLiteral("Notify"), QStringLiteral("K-ControlC"), 0u,
                             QStringLiteral("k-controlc"), summary, body,
                             QStringList(), QVariantMap(), 5000);
+}
+
+bool SystemBackend::createSnapshot(const QString &kind)
+{
+    if (m_backupBusy)
+        return false;
+
+    const QString tar = resolveExecutable(QStringLiteral("tar"));
+    if (tar.isEmpty()) {
+        setBackupResult(tr("tar non disponibile."));
+        return false;
+    }
+
+    const QString home = QDir::homePath();
+    QDir backupDir(home + QStringLiteral("/K-ControlC Backups"));
+    if (!backupDir.exists() && !backupDir.mkpath(QStringLiteral("."))) {
+        setBackupResult(tr("Impossibile creare la cartella dei backup."));
+        return false;
+    }
+
+    const QString stamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"));
+    const QString label = kind == QStringLiteral("home") ? QStringLiteral("home") : QStringLiteral("config");
+    const QString output = backupDir.filePath(QStringLiteral("%1-%2.tar.gz").arg(label, stamp));
+
+    QStringList args = {QStringLiteral("-czf"), output};
+    if (kind == QStringLiteral("home")) {
+        args << QStringLiteral("--exclude=./.cache")
+             << QStringLiteral("--exclude=./.local/share/Trash")
+             << QStringLiteral("--exclude=./K-ControlC Backups")
+             << QStringLiteral("-C") << home << QStringLiteral(".");
+    } else if (kind == QStringLiteral("config")) {
+        QStringList entries;
+        const QStringList candidates = {
+            QStringLiteral(".config"),
+            QStringLiteral(".local/share/applications"),
+            QStringLiteral(".local/share/konsole"),
+            QStringLiteral(".local/share/kxmlgui5"),
+            QStringLiteral(".local/share/plasma"),
+            QStringLiteral(".local/share/kwin")
+        };
+        for (const QString &candidate : candidates) {
+            if (QFileInfo::exists(home + QLatin1Char('/') + candidate))
+                entries << candidate;
+        }
+        if (entries.isEmpty()) {
+            setBackupResult(tr("Nessuna cartella di configurazione trovata."));
+            return false;
+        }
+        args << QStringLiteral("-C") << home;
+        args << entries;
+    } else {
+        setBackupResult(tr("Tipo di snapshot non consentito."));
+        return false;
+    }
+
+    auto *process = new QProcess(this);
+    m_backupProcess = process;
+    process->setProcessChannelMode(QProcess::MergedChannels);
+    setBackupBusy(true);
+    setBackupResult(tr("Creazione snapshot in corso…"), output);
+
+    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+            [this, output](int exitCode, QProcess::ExitStatus status) {
+        if (!m_backupProcess)
+            return;
+        const QString details = QString::fromUtf8(m_backupProcess->readAllStandardOutput()).trimmed();
+        const bool ok = status == QProcess::NormalExit && exitCode == 0;
+        m_backupProcess->deleteLater();
+        m_backupProcess = nullptr;
+        setBackupBusy(false);
+        if (ok) {
+            setBackupResult(tr("Snapshot creato correttamente."), output);
+            notify(tr("Backup completato"), output);
+        } else {
+            QFile::remove(output);
+            setBackupResult(details.isEmpty() ? tr("Snapshot non riuscito (codice %1).").arg(exitCode) : details);
+        }
+    });
+    connect(process, &QProcess::errorOccurred, this,
+            [this, output](QProcess::ProcessError error) {
+        if (!m_backupProcess || error != QProcess::FailedToStart)
+            return;
+        const QString message = m_backupProcess->errorString();
+        m_backupProcess->deleteLater();
+        m_backupProcess = nullptr;
+        QFile::remove(output);
+        setBackupBusy(false);
+        setBackupResult(tr("Impossibile avviare il backup: %1").arg(message));
+    });
+
+    process->start(tar, args);
+    return true;
+}
+
+bool SystemBackend::openBackupFolder() const
+{
+    const QString path = QDir::homePath() + QStringLiteral("/K-ControlC Backups");
+    QDir().mkpath(path);
+    return QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+}
+
+void SystemBackend::setBackupBusy(bool busy)
+{
+    if (m_backupBusy == busy)
+        return;
+    m_backupBusy = busy;
+    emit backupBusyChanged();
+}
+
+void SystemBackend::setBackupResult(const QString &status, const QString &path)
+{
+    m_backupStatus = status;
+    m_backupPath = path;
+    emit backupStatusChanged();
 }
 
 QString SystemBackend::readOsName() const
@@ -403,116 +432,4 @@ QString SystemBackend::readOsName() const
         return value;
     }
     return QSysInfo::prettyProductName();
-}
-
-QStringList SystemBackend::splitDesktopList(const QString &value)
-{
-    return value.split(QLatin1Char(';'), Qt::SkipEmptyParts);
-}
-
-bool SystemBackend::desktopEntryVisible(const QString &path) const
-{
-    QSettings entry(path, QSettings::IniFormat);
-    entry.beginGroup(QStringLiteral("Desktop Entry"));
-    if (entry.value(QStringLiteral("Type")).toString() != QStringLiteral("Application")
-        || entry.value(QStringLiteral("Hidden"), false).toBool()
-        || entry.value(QStringLiteral("NoDisplay"), false).toBool()) {
-        return false;
-    }
-
-    const QStringList categories = splitDesktopList(entry.value(QStringLiteral("Categories")).toString());
-    if (!categories.contains(QStringLiteral("System")) && !categories.contains(QStringLiteral("Settings")))
-        return false;
-
-    const QString currentDesktop = qEnvironmentVariable("XDG_CURRENT_DESKTOP");
-    const QStringList desktops = currentDesktop.split(QLatin1Char(':'), Qt::SkipEmptyParts);
-    const QStringList onlyShow = splitDesktopList(entry.value(QStringLiteral("OnlyShowIn")).toString());
-    const QStringList notShow = splitDesktopList(entry.value(QStringLiteral("NotShowIn")).toString());
-    if (!onlyShow.isEmpty()) {
-        bool matched = false;
-        for (const QString &desktop : desktops)
-            matched = matched || onlyShow.contains(desktop);
-        if (!matched)
-            return false;
-    }
-    for (const QString &desktop : desktops) {
-        if (notShow.contains(desktop))
-            return false;
-    }
-
-    const QString tryExec = entry.value(QStringLiteral("TryExec")).toString();
-    return tryExec.isEmpty() || !resolveExecutable(tryExec).isEmpty();
-}
-
-void SystemBackend::scanDesktopEntries()
-{
-    QStringList directories = {QStringLiteral("/usr/share/applications")};
-    const QString userApplications = QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation);
-    if (!userApplications.isEmpty())
-        directories << userApplications;
-
-    for (const QString &directory : directories) {
-        QDir dir(directory);
-        const QFileInfoList files = dir.entryInfoList({QStringLiteral("*.desktop")}, QDir::Files | QDir::Readable);
-        for (const QFileInfo &file : files) {
-            if (!desktopEntryVisible(file.absoluteFilePath()))
-                continue;
-
-            QSettings entry(file.absoluteFilePath(), QSettings::IniFormat);
-            entry.beginGroup(QStringLiteral("Desktop Entry"));
-            const QString exec = entry.value(QStringLiteral("Exec")).toString().trimmed();
-            const QString title = entry.value(QStringLiteral("Name")).toString().trimmed();
-            if (exec.isEmpty() || title.isEmpty())
-                continue;
-
-            const QStringList categories = splitDesktopList(entry.value(QStringLiteral("Categories")).toString());
-            QString category = tr("Sistema");
-            if (categories.contains(QStringLiteral("Network"))) category = tr("Rete");
-            else if (categories.contains(QStringLiteral("Security"))) category = tr("Sicurezza");
-            else if (categories.contains(QStringLiteral("HardwareSettings"))) category = tr("Hardware");
-
-            DesktopTool tool;
-            tool.id = QStringLiteral("desktop:") + file.fileName();
-            tool.title = title;
-            tool.description = entry.value(QStringLiteral("Comment")).toString().trimmed();
-            tool.category = category;
-            tool.icon = entry.value(QStringLiteral("Icon")).toString();
-            tool.exec = exec;
-            m_desktopTools.insert(tool.id, tool);
-        }
-    }
-
-    QList<DesktopTool> sorted = m_desktopTools.values();
-    std::sort(sorted.begin(), sorted.end(), [](const DesktopTool &a, const DesktopTool &b) {
-        return a.title.localeAwareCompare(b.title) < 0;
-    });
-
-    for (const DesktopTool &tool : sorted) {
-        QVariantMap map;
-        map.insert(QStringLiteral("toolId"), tool.id);
-        map.insert(QStringLiteral("title"), tool.title);
-        map.insert(QStringLiteral("description"), tool.description);
-        map.insert(QStringLiteral("category"), tool.category);
-        map.insert(QStringLiteral("icon"), tool.icon);
-        m_toolList.append(map);
-    }
-}
-
-bool SystemBackend::launchDesktopEntry(const DesktopTool &tool) const
-{
-    QStringList command = QProcess::splitCommand(tool.exec);
-    if (command.isEmpty())
-        return false;
-
-    static const QRegularExpression fieldCode(QStringLiteral("%[fFuUdDnNickvm]"));
-    for (QString &token : command) {
-        token.replace(QStringLiteral("%%"), QStringLiteral("%"));
-        token.remove(fieldCode);
-    }
-    command.removeAll(QString());
-    if (command.isEmpty())
-        return false;
-
-    const QString program = resolveExecutable(command.takeFirst());
-    return !program.isEmpty() && QProcess::startDetached(program, command);
 }

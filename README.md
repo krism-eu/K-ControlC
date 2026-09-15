@@ -1,74 +1,49 @@
 # K-ControlC / rakuCC
 
-K-ControlC è un **Control Center standalone Qt 6/QML per sistemi Fedora bootc/raku**. Unisce navigazione modulare in stile YaST/Mageia e utility pratiche nello spirito di MX Tools, mantenendo però il modello image-based di bootc.
+K-ControlC è un **Control Center personale Kirigami per Fedora bootc/raku**. Non vuole sostituire Plasma System Settings: rete, utenti, firewall, display, audio e preferenze desktop restano agli strumenti KDE già presenti.
 
-## Moduli
+## Cosa gestisce
 
-- Panoramica e Quick System Info
-- Software persistente via `rk` + Flatpak
-- Deployment BootC: JSON status, staged/booted/rollback, upgrade e rollback
-- Sistema: data/ora, NTP e sessione via systemd-logind
-- Rete e NetworkManager
-- Utenti tramite KCM Plasma
-- Servizi: NetworkManager, CUPS, Bluetooth
-- Hardware
-- Storage
-- Sicurezza/Firewall con azioni runtime SSH/HTTP/HTTPS
-- Diagnostica e log
-- Firmware/fwupd
-- Recovery
-- Strumenti dinamici da file `.desktop` System/Settings
-- Ricerca globale su moduli, strumenti installati e pacchetti RPM
+- **Panoramica**: sistema, BootC, storage, pacchetti persistenti e Quick System Info.
+- **Software**: ricerca RPM, installati, aggiornabili, pacchetti recenti, repository DNF5 e layer persistente `rk`.
+- **Discover**: applicazioni grafiche e Flatpak vengono delegati a Plasma Discover.
+- **BootC**: stato deployment JSON, upgrade, download/apply e rollback.
+- **Strumenti**: pulizia Flatpak, analisi RPM non necessari, log dell'ultimo boot, firmware, dischi, monitor e restart rapido di NetworkManager/CUPS/Bluetooth.
+- **Recovery e backup**: rollback BootC, `rk sync`, azioni di sessione e snapshot `tar.gz` della configurazione o della home.
 
-## Scelte tecniche e sicurezza
+Gli snapshot vengono salvati in `~/K-ControlC Backups`. Il backup della home esclude cache, cestino e la cartella stessa dei backup; resta comunque un archivio di dati personali e va trattato come tale.
 
-`PackageSearch` usa `dnf5 repoquery` con package-spec posizionale (`*term*`): `repoquery --search` non esiste. I caratteri glob forniti dall'utente vengono scartati e l'elenco RPM installato viene riusato finché non cambia il mtime del database RPM (`/usr/lib/sysimage/rpm/rpmdb.sqlite`, con fallback `/var/lib/rpm/rpmdb.sqlite`). Le ricerche obsolete vengono invalidate con una generation id; i processi vengono prima terminati gentilmente e solo dopo 3 secondi eventualmente uccisi.
+## Sicurezza
 
-Le operazioni privilegiate passano da `pkexec`, ma la GUI mantiene una allowlist esatta di programma+argomenti. La policy non usa `auth_admin_keep`: ogni invocazione richiede una decisione fresca e le azioni `rk`/`bootc` sono separate con `org.freedesktop.policykit.exec.argv1`. Anche le azioni rapide firewalld sono limitate a un singolo `argv1` previsto.
+Le modifiche privilegiate passano da `pkexec` con una allowlist C++ stretta. La policy non usa `auth_admin_keep`. Sono ammesse soltanto le combinazioni previste per `rk`, `bootc` e l'abilitazione/disabilitazione dei repository tramite `dnf5 config-manager`. Non vengono eseguite shell root generiche.
 
-Il sistema base non usa `dnf distro-sync`: aggiornamento e recovery della base passano da `bootc`; `rk sync` riguarda il layer persistente. Flatpak resta separato.
+Le query DNF5 sono read-only. La ricerca usa `dnf5 repoquery --available ... '*term*'`; inventario, aggiornamenti e pacchetti recenti usano `dnf5 list --installed/--upgrades/--recent --json`.
 
-## Build
+## Build locale
+
+Dipendenze Fedora:
 
 ```bash
+dnf install gcc-c++ cmake ninja-build qt6-qtbase-devel qt6-qtdeclarative-devel kf6-kirigami-devel
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ./build/k-controlc
 ```
 
-Installazione:
+## RPM
+
+Lo spec è in `packaging/k-controlc.spec`. La CI Fedora 44 costruisce automaticamente sia il binario/staging sia l'RPM `k-controlc-0.4.0-*.rpm`, installa l'RPM nel container e riesegue lo smoke test. L'RPM prodotto è disponibile come artifact del workflow e può essere copiato direttamente nel build context dell'immagine raku.
+
+Esempio manuale:
 
 ```bash
-sudo cmake --install build --prefix /usr
+mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+git archive --format=tar.gz --prefix=k-controlc-0.4.0/ \
+  -o ~/rpmbuild/SOURCES/k-controlc-0.4.0.tar.gz HEAD
+cp packaging/k-controlc.spec ~/rpmbuild/SPECS/
+rpmbuild -ba ~/rpmbuild/SPECS/k-controlc.spec
 ```
 
-È presente anche `packaging/k-controlc.spec` per la costruzione RPM nell'immagine raku.
+## Test reale
 
-## CI e test
-
-GitHub Actions usa Fedora 44 e verifica:
-
-1. configurazione CMake e compilazione C++/QML;
-2. avvio QML headless;
-3. `dnf5 repoquery` reale con package-spec posizionale;
-4. assenza del vecchio `--search` nel sorgente;
-5. parsing dello spec RPM;
-6. install staging e pubblicazione dell'artifact.
-
-`tests/e2e-readonly.sh` esegue inoltre probe read-only di bootc quando disponibile. Le operazioni mutanti (`rk add/rm`, `bootc upgrade/rollback`, firewall, reboot) devono essere collaudate nell'immagine raku reale prima della release finale.
-
-## Flatpak
-
-K-ControlC verifica `kcmshell6 --list` quando si apre la gestione Flatpak. Se `kcm_flatpak` non è presente su Plasma 6, usa `plasma-discover` come fallback.
-
-## i18n
-
-Le nuove stringhe QML usano `qsTr()` e il C++ usa `tr()`: il codice è predisposto per cataloghi Qt Translation. Vedi `i18n/README.md`.
-
-## Licenza
-
-MIT, vedi `LICENSE`.
-
-## Stato 0.3.0
-
-La CI non è più un passo futuro: è parte del repository. Il gate finale prima del tag `v0.3.0` è l'E2E sull'immagine bootc raku di destinazione, in particolare PolicyKit, logind, KCM Plasma, fwupd, firewalld e le operazioni mutanti bootc/rk.
+La CI verifica compilazione, caricamento QML/Kirigami, query DNF5, spec RPM, installazione di staging e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina raku reale: `rk add/rm/sync`, autenticazione Polkit, repository enable/disable, upgrade/rollback BootC, restart servizi e backup della home/configurazione.

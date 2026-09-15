@@ -2,6 +2,9 @@
 
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QTimer>
 #include <QTextStream>
 
@@ -13,10 +16,11 @@ PackageSearch::PackageSearch(QObject *parent)
         QTextStream in(&file);
         while (!in.atEnd()) {
             const QString name = in.readLine().trimmed();
-            if (!name.isEmpty())
+            if (!name.isEmpty() && !name.startsWith(QLatin1Char('#')))
                 m_owned.insert(name);
         }
     }
+    refreshPersistentSet();
 }
 
 int PackageSearch::rowCount(const QModelIndex &parent) const
@@ -31,11 +35,15 @@ QVariant PackageSearch::data(const QModelIndex &index, int role) const
 
     const Entry &entry = m_results.at(index.row());
     switch (role) {
-    case NameRole:      return entry.name;
-    case SummaryRole:   return entry.summary;
-    case InstalledRole: return entry.installed;
-    case OwnedRole:     return entry.owned;
-    default:            return {};
+    case NameRole:       return entry.name;
+    case SummaryRole:    return entry.summary;
+    case InstalledRole:  return entry.installed;
+    case OwnedRole:      return entry.owned;
+    case PersistentRole: return entry.persistent;
+    case VersionRole:    return entry.version;
+    case RepositoryRole: return entry.repository;
+    case ArchRole:       return entry.arch;
+    default:             return {};
     }
 }
 
@@ -46,13 +54,17 @@ QHash<int, QByteArray> PackageSearch::roleNames() const
         {SummaryRole, "summary"},
         {InstalledRole, "installed"},
         {OwnedRole, "owned"},
+        {PersistentRole, "persistent"},
+        {VersionRole, "version"},
+        {RepositoryRole, "repository"},
+        {ArchRole, "arch"}
     };
 }
 
 void PackageSearch::search(const QString &term)
 {
     const QString sanitized = sanitizeTerm(term);
-
+    refreshPersistentSet();
     ++m_generation;
     stopActiveProcess();
 
@@ -68,6 +80,30 @@ void PackageSearch::search(const QString &term)
         startRepoQuery(sanitized);
     else
         startInstalledQuery(sanitized);
+}
+
+void PackageSearch::loadInstalled()
+{
+    refreshPersistentSet();
+    ++m_generation;
+    stopActiveProcess();
+    startListQuery(QStringLiteral("--installed"), true);
+}
+
+void PackageSearch::loadUpgrades()
+{
+    refreshPersistentSet();
+    ++m_generation;
+    stopActiveProcess();
+    startListQuery(QStringLiteral("--upgrades"), true);
+}
+
+void PackageSearch::loadRecent()
+{
+    refreshPersistentSet();
+    ++m_generation;
+    stopActiveProcess();
+    startListQuery(QStringLiteral("--recent"), false);
 }
 
 void PackageSearch::startInstalledQuery(const QString &term)
@@ -150,9 +186,7 @@ void PackageSearch::startRepoQuery(const QString &term)
         if (status != QProcess::NormalExit || exitCode != 0) {
             clearResults();
             setSearching(false);
-            emit searchError(stderrText.isEmpty()
-                                 ? tr("La ricerca dnf5 non e' riuscita.")
-                                 : stderrText);
+            emit searchError(stderrText.isEmpty() ? tr("La ricerca dnf5 non e' riuscita.") : stderrText);
             emit searchFinished();
             return;
         }
@@ -173,12 +207,13 @@ void PackageSearch::startRepoQuery(const QString &term)
             entry.summary = (tab < 0 ? QString() : line.mid(tab + 1)).simplified().left(512);
             entry.installed = m_installed.contains(name);
             entry.owned = m_owned.contains(name);
+            entry.persistent = m_persistent.contains(name);
             m_results.append(entry);
-
             if (m_results.size() >= 200)
                 break;
         }
         endResetModel();
+        emit countChanged();
 
         setSearching(false);
         emit searchFinished();
@@ -199,11 +234,107 @@ void PackageSearch::startRepoQuery(const QString &term)
 
     const QString packageSpec = QStringLiteral("*") + term + QStringLiteral("*");
     rawProcess->start(QStringLiteral("/usr/bin/dnf5"),
-                      {QStringLiteral("repoquery"),
-                       QStringLiteral("--available"),
-                       QStringLiteral("--queryformat"),
-                       QStringLiteral("%{name}\t%{summary}\\n"),
+                      {QStringLiteral("repoquery"), QStringLiteral("--available"),
+                       QStringLiteral("--queryformat"), QStringLiteral("%{name}\t%{summary}\\n"),
                        packageSpec});
+}
+
+void PackageSearch::startListQuery(const QString &filter, bool installedEntries)
+{
+    const quint64 generation = m_generation;
+    setSearching(true);
+    clearResults();
+
+    auto *rawProcess = new QProcess(this);
+    const QPointer<QProcess> process(rawProcess);
+    m_process = rawProcess;
+    rawProcess->setProcessChannelMode(QProcess::SeparateChannels);
+
+    connect(rawProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+            [this, process, generation, installedEntries](int exitCode, QProcess::ExitStatus status) {
+        if (!process)
+            return;
+        if (process != m_process || generation != m_generation) {
+            process->deleteLater();
+            return;
+        }
+
+        const QByteArray stdoutData = process->readAllStandardOutput();
+        const QString stderrText = QString::fromUtf8(process->readAllStandardError()).trimmed();
+        m_process = nullptr;
+        process->deleteLater();
+
+        if (status != QProcess::NormalExit || exitCode != 0) {
+            setSearching(false);
+            emit searchError(stderrText.isEmpty() ? tr("Impossibile leggere l'elenco pacchetti DNF5.") : stderrText);
+            emit searchFinished();
+            return;
+        }
+
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(stdoutData, &parseError);
+        if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+            setSearching(false);
+            emit searchError(tr("Output JSON DNF5 non valido: %1").arg(parseError.errorString()));
+            emit searchFinished();
+            return;
+        }
+
+        QList<Entry> entries;
+        QSet<QString> seen;
+        const QJsonObject root = document.object();
+        for (auto it = root.constBegin(); it != root.constEnd(); ++it) {
+            if (!it.value().isArray())
+                continue;
+            for (const QJsonValue &value : it.value().toArray()) {
+                const QJsonObject object = value.toObject();
+                const QString name = object.value(QStringLiteral("name")).toString();
+                const QString arch = object.value(QStringLiteral("arch")).toString();
+                if (name.isEmpty())
+                    continue;
+                const QString key = name + QLatin1Char('\x1f') + arch;
+                if (seen.contains(key))
+                    continue;
+                seen.insert(key);
+
+                Entry entry;
+                entry.name = name;
+                entry.arch = arch;
+                entry.version = object.value(QStringLiteral("evr")).toString();
+                entry.repository = object.value(QStringLiteral("repository")).toString();
+                entry.installed = installedEntries || m_installed.contains(name);
+                entry.owned = m_owned.contains(name);
+                entry.persistent = m_persistent.contains(name);
+                entries.append(entry);
+                if (entries.size() >= 500)
+                    break;
+            }
+            if (entries.size() >= 500)
+                break;
+        }
+
+        beginResetModel();
+        m_results = entries;
+        endResetModel();
+        emit countChanged();
+        setSearching(false);
+        emit searchFinished();
+    });
+
+    connect(rawProcess, &QProcess::errorOccurred, this,
+            [this, process, generation](QProcess::ProcessError error) {
+        if (!process || process != m_process || generation != m_generation
+            || error != QProcess::FailedToStart)
+            return;
+        m_process = nullptr;
+        process->deleteLater();
+        setSearching(false);
+        emit searchError(tr("Impossibile avviare dnf5."));
+        emit searchFinished();
+    });
+
+    rawProcess->start(QStringLiteral("/usr/bin/dnf5"),
+                      {QStringLiteral("list"), filter, QStringLiteral("--json")});
 }
 
 void PackageSearch::clearResults()
@@ -213,6 +344,7 @@ void PackageSearch::clearResults()
     beginResetModel();
     m_results.clear();
     endResetModel();
+    emit countChanged();
 }
 
 void PackageSearch::setSearching(bool searching)
@@ -231,12 +363,10 @@ void PackageSearch::stopActiveProcess()
     const QPointer<QProcess> process = m_process;
     QProcess *const rawProcess = process.data();
     m_process = nullptr;
-
     if (!rawProcess)
         return;
 
     disconnect(rawProcess, nullptr, this, nullptr);
-
     if (rawProcess->state() == QProcess::NotRunning) {
         rawProcess->deleteLater();
         return;
@@ -251,15 +381,26 @@ void PackageSearch::stopActiveProcess()
     });
 }
 
+void PackageSearch::refreshPersistentSet()
+{
+    m_persistent.clear();
+    QFile file(QStringLiteral("/var/lib/raku-kris/packages.list"));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return;
+    while (!file.atEnd()) {
+        const QString line = QString::fromUtf8(file.readLine()).trimmed();
+        if (!line.isEmpty() && !line.startsWith(QLatin1Char('#')))
+            m_persistent.insert(line);
+    }
+}
+
 bool PackageSearch::installedCacheCurrent() const
 {
     if (!m_installedCacheValid)
         return false;
-
     const QString dbPath = rpmDatabasePath();
     if (dbPath.isEmpty() || dbPath != m_installedCacheDbPath)
         return false;
-
     const QFileInfo info(dbPath);
     return info.exists() && info.lastModified() == m_installedCacheMtime;
 }
@@ -293,6 +434,5 @@ QString PackageSearch::sanitizeTerm(const QString &term)
             pendingSeparator = true;
         }
     }
-
     return out.left(128);
 }

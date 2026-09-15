@@ -1,66 +1,321 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Controls as Controls
+import org.kde.kirigami as Kirigami
 import raku.cc
 
-ColumnLayout {
+Kirigami.ScrollablePage {
     id: root
-    spacing: 16
+    title: qsTr("Software")
+    property bool ownOperation: false
     property var progressLines: []
     property string searchError: ""
+    property string listError: ""
 
-    PackageSearch { id: packageSearch; onSearchError: function(message) { root.searchError = message } }
+    function runPrivileged(program, args) {
+        root.ownOperation = true
+        root.progressLines = []
+        PolkitHelper.execute(program, args)
+    }
+
+    function refreshCurrent() {
+        root.listError = ""
+        if (tabs.currentIndex === 1) installedModel.loadInstalled()
+        else if (tabs.currentIndex === 2) upgradesModel.loadUpgrades()
+        else if (tabs.currentIndex === 3) recentModel.loadRecent()
+        else if (tabs.currentIndex === 4) SoftwareBackend.refreshRepositories()
+    }
+
+    Component.onCompleted: SoftwareBackend.refreshRepositories()
+
+    PackageSearch {
+        id: searchModel
+        onSearchError: function(message) { root.searchError = message }
+    }
+    PackageSearch {
+        id: installedModel
+        onSearchError: function(message) { root.listError = message }
+    }
+    PackageSearch {
+        id: upgradesModel
+        onSearchError: function(message) { root.listError = message }
+    }
+    PackageSearch {
+        id: recentModel
+        onSearchError: function(message) { root.listError = message }
+    }
+
     Connections {
         target: PolkitHelper
-        function onLine(text) { root.progressLines = root.progressLines.concat([text]).slice(-10) }
+        function onLine(text) {
+            if (root.ownOperation)
+                root.progressLines = root.progressLines.concat([text]).slice(-12)
+        }
         function onFinished(ok, output) {
-            root.progressLines = root.progressLines.concat([ok ? qsTr("--- completato ---") : qsTr("--- FALLITO ---")]).slice(-10)
+            if (!root.ownOperation)
+                return
+            root.ownOperation = false
+            root.progressLines = root.progressLines.concat([ok ? qsTr("--- completato ---") : qsTr("--- fallito ---")]).slice(-12)
             BootcBackend.refreshPackages()
-            if (searchField.text.trim().length >= 2) packageSearch.search(searchField.text)
+            SoftwareBackend.refreshRepositories()
+            if (searchField.text.trim().length >= 2)
+                searchModel.search(searchField.text)
+            root.refreshCurrent()
         }
     }
 
-    Label { text: qsTr("Software"); font.pixelSize: 26; font.bold: true; color: "#f8fafc" }
-    Label { text: qsTr("Pacchetti RPM persistenti gestiti da rk e applicazioni Flatpak separate dall'immagine."); color: "#94a3b8"; wrapMode: Text.Wrap; Layout.fillWidth: true }
+    ColumnLayout {
+        width: parent.width
+        spacing: Kirigami.Units.largeSpacing
 
-    Rectangle {
-        Layout.fillWidth: true; radius: 12; color: "#131c38"; border.color: "#4f46e5"; implicitHeight: searchCol.implicitHeight + 28
-        ColumnLayout {
-            id: searchCol; anchors.fill: parent; anchors.margins: 14; spacing: 8
-            Label { text: qsTr("Cerca per nome pacchetto"); font.pixelSize: 14; font.bold: true; color: "#e0e7ff" }
-            TextField { id: searchField; Layout.fillWidth: true; placeholderText: qsTr("es. btop, krita, lutris…"); onTextChanged: searchTimer.restart() }
-            Timer { id: searchTimer; interval: 350; onTriggered: { root.searchError = ""; packageSearch.search(searchField.text) } }
-            BusyIndicator { visible: PolkitHelper.running || packageSearch.searching; running: visible; Layout.preferredHeight: 24; Layout.preferredWidth: 24 }
-            Label { visible: root.searchError.length > 0; text: root.searchError; color: "#f87171"; font.pixelSize: 11; wrapMode: Text.Wrap; Layout.fillWidth: true }
-            ListView {
-                Layout.fillWidth: true; Layout.preferredHeight: Math.min(contentHeight, 310); model: packageSearch; clip: true; spacing: 4
-                delegate: Rectangle {
-                    width: ListView.view.width; height: row.implicitHeight + 14; radius: 8; color: model.owned ? "#111831" : "#1a2450"; opacity: model.owned ? 0.60 : 1.0
-                    RowLayout { id: row; anchors.fill: parent; anchors.margins: 7; spacing: 8
-                        ColumnLayout { Layout.fillWidth: true; spacing: 1
-                            Label { text: model.name + (model.owned ? qsTr("  [base · immutabile]") : model.installed ? qsTr("  [installato]") : ""); color: model.installed ? "#34d399" : "#e0e7ff"; font.bold: true; font.pixelSize: 12 }
-                            Label { text: model.summary; color: "#94a3b8"; font.pixelSize: 11; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight; Layout.fillWidth: true }
+        Controls.Label {
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            text: qsTr("Gestione del layer RPM persistente raku e consultazione DNF5. Gli aggiornamenti della base immutabile restano nella pagina BootC; Flatpak e applicazioni grafiche restano in Discover.")
+        }
+
+        Controls.TabBar {
+            id: tabs
+            Layout.fillWidth: true
+            onCurrentIndexChanged: root.refreshCurrent()
+            Controls.TabButton { text: qsTr("Cerca") }
+            Controls.TabButton { text: qsTr("Installati") }
+            Controls.TabButton { text: qsTr("Aggiornabili") }
+            Controls.TabButton { text: qsTr("Recenti") }
+            Controls.TabButton { text: qsTr("Repository") }
+            Controls.TabButton { text: qsTr("Discover") }
+        }
+
+        Kirigami.InlineMessage {
+            Layout.fillWidth: true
+            visible: root.listError.length > 0
+            type: Kirigami.MessageType.Error
+            text: root.listError
+        }
+
+        StackLayout {
+            Layout.fillWidth: true
+            currentIndex: tabs.currentIndex
+
+            ColumnLayout {
+                spacing: Kirigami.Units.smallSpacing
+                Controls.TextField {
+                    id: searchField
+                    Layout.fillWidth: true
+                    placeholderText: qsTr("Cerca un pacchetto, es. btop, krita, lutris…")
+                    onTextChanged: searchTimer.restart()
+                }
+                Timer {
+                    id: searchTimer
+                    interval: 350
+                    onTriggered: {
+                        root.searchError = ""
+                        searchModel.search(searchField.text)
+                    }
+                }
+                Controls.BusyIndicator { visible: searchModel.searching; running: visible }
+                Kirigami.InlineMessage {
+                    Layout.fillWidth: true
+                    visible: root.searchError.length > 0
+                    type: Kirigami.MessageType.Error
+                    text: root.searchError
+                }
+                ListView {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.min(contentHeight, 420)
+                    model: searchModel
+                    clip: true
+                    spacing: Kirigami.Units.smallSpacing
+                    delegate: Controls.ItemDelegate {
+                        width: ListView.view.width
+                        contentItem: RowLayout {
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Controls.Label {
+                                    Layout.fillWidth: true
+                                    font.bold: true
+                                    text: model.name
+                                          + (model.owned ? qsTr("  [base]")
+                                             : model.persistent ? qsTr("  [persistente]")
+                                             : model.installed ? qsTr("  [installato]") : "")
+                                }
+                                Controls.Label {
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                    maximumLineCount: 2
+                                    elide: Text.ElideRight
+                                    text: model.summary
+                                }
+                            }
+                            Controls.Button {
+                                visible: model.persistent || (!model.installed && !model.owned)
+                                enabled: !PolkitHelper.running
+                                text: model.persistent ? qsTr("Rimuovi") : qsTr("Installa")
+                                onClicked: root.runPrivileged("/usr/bin/rk", model.persistent ? ["rm", model.name] : ["add", model.name])
+                            }
                         }
-                        Button { visible: !model.owned; enabled: !PolkitHelper.running; text: model.installed ? qsTr("Rimuovi") : qsTr("Installa"); onClicked: { root.progressLines = []; PolkitHelper.execute("/usr/bin/rk", model.installed ? ["rm", model.name] : ["add", model.name]) } }
+                    }
+                }
+                Kirigami.InlineMessage {
+                    Layout.fillWidth: true
+                    visible: searchField.text.trim().length >= 2 && !searchModel.searching && searchModel.count === 0
+                    type: Kirigami.MessageType.Information
+                    text: qsTr("Nessun risultato.")
+                }
+            }
+
+            ColumnLayout {
+                Controls.BusyIndicator { visible: installedModel.searching; running: visible }
+                RowLayout {
+                    Controls.Label { Layout.fillWidth: true; text: qsTr("Pacchetti RPM presenti nel sistema. Solo quelli nella lista persistente raku sono rimovibili da qui."); wrapMode: Text.WordWrap }
+                    Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: installedModel.loadInstalled() }
+                }
+                ListView {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.min(contentHeight, 480)
+                    model: installedModel
+                    clip: true
+                    delegate: Controls.ItemDelegate {
+                        width: ListView.view.width
+                        contentItem: RowLayout {
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Controls.Label { Layout.fillWidth: true; font.bold: true; text: model.name + (model.arch ? "." + model.arch : "") }
+                                Controls.Label { Layout.fillWidth: true; text: (model.version || "") + (model.repository ? " · " + model.repository : ""); elide: Text.ElideRight }
+                            }
+                            Controls.Label { text: model.owned ? qsTr("base") : model.persistent ? qsTr("persistente") : qsTr("sistema") }
+                            Controls.Button {
+                                visible: model.persistent
+                                enabled: !PolkitHelper.running
+                                text: qsTr("Rimuovi")
+                                onClicked: root.runPrivileged("/usr/bin/rk", ["rm", model.name])
+                            }
+                        }
                     }
                 }
             }
-        }
-    }
 
-    Rectangle {
-        Layout.fillWidth: true; radius: 12; color: "#111831"; border.color: "#253158"; implicitHeight: pkgCol.implicitHeight + 28
-        ColumnLayout { id: pkgCol; anchors.fill: parent; anchors.margins: 14; spacing: 8
-            Label { text: qsTr("Pacchetti persistenti"); font.bold: true; color: "#e0e7ff" }
-            Label { text: BootcBackend.persistentPackages; color: "#94a3b8"; wrapMode: Text.Wrap; Layout.fillWidth: true }
-            RowLayout { Button { text: qsTr("Sincronizza lista"); enabled: !PolkitHelper.running; onClicked: PolkitHelper.execute("/usr/bin/rk", ["sync"]) } Button { text: qsTr("Gestione Flatpak"); onClicked: SystemBackend.launchFlatpakManager() } }
-        }
-    }
+            ColumnLayout {
+                RowLayout {
+                    Controls.Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: qsTr("Versioni più recenti viste dai repository DNF5. Questo pannello è informativo: la base si aggiorna con BootC e il layer persistente con rk.")
+                    }
+                    Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: upgradesModel.loadUpgrades() }
+                }
+                Controls.BusyIndicator { visible: upgradesModel.searching; running: visible }
+                ListView {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.min(contentHeight, 480)
+                    model: upgradesModel
+                    clip: true
+                    delegate: Controls.ItemDelegate {
+                        width: ListView.view.width
+                        contentItem: RowLayout {
+                            Controls.Label { Layout.fillWidth: true; font.bold: true; text: model.name + (model.arch ? "." + model.arch : "") }
+                            Controls.Label { text: model.version || "" }
+                            Controls.Label { text: model.repository || "" }
+                        }
+                    }
+                }
+                Kirigami.InlineMessage {
+                    Layout.fillWidth: true
+                    visible: !upgradesModel.searching && upgradesModel.count === 0 && root.listError.length === 0
+                    type: Kirigami.MessageType.Positive
+                    text: qsTr("Nessun aggiornamento RPM segnalato dai repository.")
+                }
+            }
 
-    Rectangle {
-        Layout.fillWidth: true; visible: root.progressLines.length > 0; radius: 10; color: "#0d152b"; border.color: "#253158"; implicitHeight: progressCol.implicitHeight + 22
-        ColumnLayout { id: progressCol; anchors.fill: parent; anchors.margins: 11; spacing: 2
-            Repeater { model: root.progressLines; Label { required property string modelData; text: modelData; color: "#a5b4fc"; font.pixelSize: 10; font.family: "monospace"; wrapMode: Text.WrapAnywhere; Layout.fillWidth: true } }
+            ColumnLayout {
+                RowLayout {
+                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Pacchetti cambiati di recente nei repository configurati, secondo la finestra recent di DNF5.") }
+                    Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: recentModel.loadRecent() }
+                }
+                Controls.BusyIndicator { visible: recentModel.searching; running: visible }
+                ListView {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.min(contentHeight, 480)
+                    model: recentModel
+                    clip: true
+                    delegate: Controls.ItemDelegate {
+                        width: ListView.view.width
+                        contentItem: RowLayout {
+                            Controls.Label { Layout.fillWidth: true; font.bold: true; text: model.name + (model.arch ? "." + model.arch : "") }
+                            Controls.Label { text: model.version || "" }
+                            Controls.Label { text: model.repository || "" }
+                        }
+                    }
+                }
+            }
+
+            ColumnLayout {
+                RowLayout {
+                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Repository DNF5 configurati. Abilitazione e disabilitazione usano config-manager e richiedono autenticazione amministrativa fresca.") }
+                    Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: SoftwareBackend.refreshRepositories() }
+                }
+                Controls.BusyIndicator { visible: SoftwareBackend.busy; running: visible }
+                Kirigami.InlineMessage {
+                    Layout.fillWidth: true
+                    visible: SoftwareBackend.errorText.length > 0
+                    type: Kirigami.MessageType.Error
+                    text: SoftwareBackend.errorText
+                }
+                Repeater {
+                    model: SoftwareBackend.repositories
+                    delegate: Kirigami.AbstractCard {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        contentItem: RowLayout {
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Controls.Label { font.bold: true; text: modelData.name }
+                                Controls.Label { text: modelData.id; opacity: 0.7 }
+                            }
+                            Controls.Label { text: modelData.enabled ? qsTr("attivo") : qsTr("disattivo") }
+                            Controls.Button {
+                                enabled: !PolkitHelper.running
+                                text: modelData.enabled ? qsTr("Disabilita") : qsTr("Abilita")
+                                onClicked: root.runPrivileged("/usr/bin/dnf5", ["config-manager", modelData.enabled ? "disable" : "enable", modelData.id])
+                            }
+                        }
+                    }
+                }
+            }
+
+            ColumnLayout {
+                spacing: Kirigami.Units.largeSpacing
+                Kirigami.Heading { level: 2; text: qsTr("Applicazioni e Flatpak") }
+                Controls.Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: qsTr("Per applicazioni grafiche, Flatpak, recensioni e aggiornamenti applicativi usiamo Discover invece di duplicarne le funzioni in K-ControlC.")
+                }
+                Controls.Button {
+                    text: qsTr("Apri Discover")
+                    icon.name: "plasmadiscover"
+                    enabled: SystemBackend.toolAvailable("discover")
+                    onClicked: SystemBackend.launchFlatpakManager()
+                }
+            }
+        }
+
+        Kirigami.AbstractCard {
+            Layout.fillWidth: true
+            visible: root.progressLines.length > 0
+            contentItem: ColumnLayout {
+                Kirigami.Heading { level: 2; text: qsTr("Operazione") }
+                Repeater {
+                    model: root.progressLines
+                    delegate: Controls.Label {
+                        required property string modelData
+                        Layout.fillWidth: true
+                        wrapMode: Text.WrapAnywhere
+                        font.family: "monospace"
+                        text: modelData
+                    }
+                }
+            }
         }
     }
 }

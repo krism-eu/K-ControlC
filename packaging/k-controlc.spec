@@ -1,7 +1,7 @@
 Name:           k-controlc
-Version:        0.3.0
+Version:        0.4.0
 Release:        1%{?dist}
-Summary:        raku Control Center for Fedora bootc
+Summary:        Personal raku Control Center for Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/K-ControlC
 Source0:        %{name}-%{version}.tar.gz
@@ -11,18 +11,23 @@ BuildRequires:  cmake
 BuildRequires:  ninja-build
 BuildRequires:  qt6-qtbase-devel
 BuildRequires:  qt6-qtdeclarative-devel
+BuildRequires:  kf6-kirigami-devel
 
 Requires:       qt6-qtbase
 Requires:       qt6-qtdeclarative
+Requires:       kf6-kirigami
 Requires:       polkit
 Requires:       rpm
 Requires:       dnf5
+Requires:       dnf5-plugins
 Requires:       bootc
+Requires:       tar
 
 %description
-K-ControlC is a Qt 6/QML control center for raku systems based on Fedora bootc.
-It integrates image deployment management, persistent packages, networking,
-services, firewall, diagnostics, firmware, recovery and desktop tools.
+K-ControlC is a compact personal Kirigami control center for raku systems
+based on Fedora bootc. It focuses on persistent software management, bootc
+deployments, practical maintenance tools, diagnostics, recovery and local
+configuration/home backups without duplicating Plasma System Settings.
 
 %prep
 %autosetup -n %{name}-%{version}
@@ -44,5 +49,10 @@ services, firewall, diagnostics, firmware, recovery and desktop tools.
 %{_datadir}/icons/hicolor/scalable/apps/k-controlc.svg
 
 %changelog
+* Wed Sep 16 2026 krism-eu - 0.4.0-1
+- Move the UI to Kirigami and remove Plasma configuration duplication
+- Add package inventory, upgrades, recent packages and repository management
+- Add personal maintenance tools and local config/home backup snapshots
+
 * Tue Sep 15 2026 krism-eu - 0.3.0-1
 - Initial standalone K-ControlC package

@@ -27,10 +27,8 @@ void PolkitHelper::execute(const QString &program, const QStringList &args)
 
     m_process = new QProcess(this);
     m_process->setProcessChannelMode(QProcess::MergedChannels);
-    connect(m_process, &QProcess::readyReadStandardOutput,
-            this, &PolkitHelper::onReadyRead);
-    connect(m_process, &QProcess::errorOccurred,
-            this, &PolkitHelper::onProcessError);
+    connect(m_process, &QProcess::readyReadStandardOutput, this, &PolkitHelper::onReadyRead);
+    connect(m_process, &QProcess::errorOccurred, this, &PolkitHelper::onProcessError);
     connect(m_process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
             this, &PolkitHelper::onProcessFinished);
 
@@ -117,16 +115,13 @@ bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const Q
         return allowed.contains(args);
     }
 
-    if (program == QStringLiteral("/usr/bin/firewall-cmd")) {
-        static const QList<QStringList> allowed = {
-            {QStringLiteral("--add-service=ssh")},
-            {QStringLiteral("--remove-service=ssh")},
-            {QStringLiteral("--add-service=http")},
-            {QStringLiteral("--remove-service=http")},
-            {QStringLiteral("--add-service=https")},
-            {QStringLiteral("--remove-service=https")}
-        };
-        return allowed.contains(args);
+    if (program == QStringLiteral("/usr/bin/dnf5")) {
+        if (args.size() != 3 || args.at(0) != QStringLiteral("config-manager"))
+            return false;
+        if (args.at(1) != QStringLiteral("enable") && args.at(1) != QStringLiteral("disable"))
+            return false;
+        static const QRegularExpression repoId(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._+:-]{0,127}$"));
+        return repoId.match(args.at(2)).hasMatch();
     }
 
     return false;
@@ -134,8 +129,6 @@ bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const Q
 
 bool PolkitHelper::isUnprivilegedInvocationAllowed(const QString &program, const QStringList &args) const
 {
-    if (program == QStringLiteral("/usr/bin/kcmshell6"))
-        return args == QStringList{QStringLiteral("kcm_flatpak")};
     if (program == QStringLiteral("/usr/bin/plasma-discover"))
         return args.isEmpty();
     return false;

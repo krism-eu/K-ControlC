@@ -1,32 +1,50 @@
 # Integrazione K-ControlC nell'immagine raku
 
-K-ControlC è un'applicazione standalone Qt 6/QML. Va installata nell'immagine bootc insieme alla desktop entry, all'icona e alla policy Polkit.
+K-ControlC 0.4 è un'applicazione standalone Qt 6/Kirigami pensata per uso personale su raku/Fedora bootc. Non duplica Plasma System Settings: integra solo le funzioni specifiche del sistema e gli strumenti di manutenzione che è utile avere in un unico posto.
 
-## Runtime richiesto
+## Runtime
 
 - Qt 6 Core/Gui/Qml/Quick/DBus
-- `bootc`, `rpm`, `dnf5`, `pkexec`
+- KF6 Kirigami
+- `bootc`, `rpm`, `dnf5`, `dnf5-plugins`, `pkexec`, `tar`
 - `/usr/bin/rk` e `/var/lib/raku-kris/packages.list`
-- systemd/logind e NetworkManager per i moduli integrati
+- systemd/logind per sessione e restart servizi
 
-Strumenti come Plasma System Settings, Info Center, Partition Manager, firewall-config, Discover, KSystemLog, virt-manager, fwupd e Konsole sono opzionali. Il catalogo Strumenti viene generato dai file `.desktop` effettivamente installati.
+Discover, Info Center, Partition Manager, KSystemLog, System Monitor, Konsole, Flatpak e fwupd sono opzionali: i relativi pulsanti vengono disabilitati se il programma non è disponibile.
+
+## Modello software
+
+La base del sistema resta image-based e si aggiorna esclusivamente tramite BootC. K-ControlC usa DNF5 in lettura per catalogo, inventario, aggiornamenti disponibili, pacchetti recenti e repository; `rk` resta il punto di modifica del layer persistente.
+
+L'abilitazione/disabilitazione dei repository usa `dnf5 config-manager`, che richiede il pacchetto `dnf5-plugins`.
 
 ## Privilegi
 
-Non aggiungere wrapper shell generici. `PolkitHelper` consente soltanto combinazioni esplicite per `rk`, `bootc` e le sei azioni runtime firewalld. La policy usa `exec.path` + `exec.argv1` e `auth_admin` senza retention.
+Non aggiungere wrapper shell generici. `PolkitHelper` valida programma e argomenti completi. La policy usa `auth_admin` senza retention e restringe le azioni tramite `exec.path`/`exec.argv1` per `rk`, `bootc` e `dnf5 config-manager`.
 
-## BootC
+## Backup personali
 
-Lo stato viene richiesto con `bootc status --json --format-version=1`; se la versione installata non lo supporta, l'interfaccia ripiega sul formato human-readable. Upgrade e rollback sono sempre eseguiti dal binario bootc.
+Gli snapshot config/home sono archivi `tar.gz` eseguiti come utente e salvati in `~/K-ControlC Backups`. Non fanno parte del deployment BootC e non richiedono privilegi. Non viene effettuato ripristino automatico: l'archivio resta ispezionabile e ripristinabile manualmente.
 
-## Verifica immagine
+## Pipeline immagine
 
-Prima di creare il tag di release eseguire almeno:
+Il workflow del repository produce un RPM testato. Nella pipeline raku il flusso consigliato è:
 
-```bash
-./tests/e2e-readonly.sh
-kcmshell6 --list | grep -i flatpak || true
-bootc status --json --format-version=1
+```text
+K-ControlC source -> CI/test -> RPM -> build context raku -> immagine BootC
 ```
 
-Poi verificare manualmente autenticazione Polkit, `rk sync/add/rm`, upgrade/rollback bootc, session actions logind, restart servizi e quick actions firewalld.
+Il Containerfile dell'immagine può copiare l'RPM nel build context e installarlo con DNF5. Se l'RPM non viene prodotto, la build deve fallire invece di creare un'immagine senza K-ControlC.
+
+## Verifica reale prima del tag
+
+Provare sulla macchina raku:
+
+```bash
+bootc status --json --format-version=1
+kcmshell6 --list || true
+dnf5 repo list --all --json
+dnf5 config-manager --help
+```
+
+Poi verificare manualmente `rk sync/add/rm`, repository enable/disable, upgrade/rollback BootC, restart NetworkManager/CUPS/Bluetooth, Discover e creazione dei due tipi di backup.
