@@ -6,7 +6,7 @@ if grep -Eq '"--search"|QStringLiteral\("--search"\)' src/PackageSearch.cpp; the
   exit 1
 fi
 
-if grep -q 'auth_admin_keep' data/org.raku.controlcenter.policy; then
+if grep -Eq '<allow_(any|inactive|active)>auth_admin_keep</allow_' data/org.raku.controlcenter.policy; then
   echo "ERROR: Polkit policy must not retain admin authorization" >&2
   exit 1
 fi
