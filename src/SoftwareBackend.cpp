@@ -5,6 +5,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
+#include <algorithm>
+
 SoftwareBackend::SoftwareBackend(QObject *parent)
     : QObject(parent)
 {
@@ -64,6 +66,18 @@ void SoftwareBackend::refreshRepositories()
             repo.insert(QStringLiteral("enabled"), object.value(QStringLiteral("is_enabled")).toBool());
             repos.append(repo);
         }
+
+        std::sort(repos.begin(), repos.end(), [](const QVariant &left, const QVariant &right) {
+            const QVariantMap a = left.toMap();
+            const QVariantMap b = right.toMap();
+            const bool aEnabled = a.value(QStringLiteral("enabled")).toBool();
+            const bool bEnabled = b.value(QStringLiteral("enabled")).toBool();
+            if (aEnabled != bEnabled)
+                return aEnabled > bEnabled;
+            return a.value(QStringLiteral("id")).toString().localeAwareCompare(
+                       b.value(QStringLiteral("id")).toString()) < 0;
+        });
+
         m_repositories = repos;
         emit repositoriesChanged();
     });
