@@ -1,6 +1,6 @@
 Name:           krisCC
 Version:        0.4.0
-Release:        8%{?dist}
+Release:        9%{?dist}
 Summary:        krisCC personal control center for KrisOS and Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/KCC
@@ -55,6 +55,10 @@ Settings.
 %{_datadir}/icons/hicolor/scalable/apps/krisCC.svg
 
 %changelog
+* Wed Sep 16 2026 krism-eu - 0.4.0-9
+- Preserve --background startup mode after the krisCC technical rename
+- Keep KrisOS session autostart from opening the main window
+
 * Wed Sep 16 2026 krism-eu - 0.4.0-8
 - Rename the package and executable to krisCC to avoid Fedora kcc collisions
 - Rename QML, Polkit, desktop, icon and AppStream identities to krisCC/org.kriscc
