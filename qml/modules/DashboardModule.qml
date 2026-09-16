@@ -15,7 +15,7 @@ Kirigami.ScrollablePage {
         Kirigami.Heading {
             Layout.fillWidth: true
             level: 1
-            text: qsTr("raku Control Center")
+            text: qsTr("K-ControlC")
         }
         Controls.Label {
             Layout.fillWidth: true
