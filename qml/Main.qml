@@ -67,14 +67,14 @@ Kirigami.ApplicationWindow {
                         else pageStack.replace(dashboardPage)
                     }
                 }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("Panoramica") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("RPM") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("Flatpak") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("Container") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("BootC") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("Strumenti") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("Comandi") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("Backup") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("Panoramica") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("RPM") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("Flatpak") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("Container") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("BootC") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("Strumenti") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("Comandi") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("Backup") }
             }
         }
     }
