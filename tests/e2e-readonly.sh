@@ -47,6 +47,12 @@ grep -q '/usr/share/raku-kris/owned-packages.txt' src/PackageSearch.cpp
 grep -q '/var/lib/raku-kris/packages.list' src/PackageSearch.cpp
 grep -q '/var/lib/raku-kris/packages.list' src/BootcBackend.cpp
 
+# The visible product identity is KCC; technical IDs stay compatible for now.
+grep -q 'title: qsTr("KCC")' qml/Main.qml
+grep -q '^Name=KCC$' data/k-controlc.desktop
+grep -q '<name>KCC</name>' data/org.kcontrolc.KControlC.metainfo.xml
+grep -q '<vendor>KCC</vendor>' data/org.kcontrolc.controlcenter.policy
+
 grep -q 'org.kde.kirigami' qml/Main.qml
 grep -q 'import org.kcontrolc' qml/Main.qml
 grep -q 'config-manager' src/PolkitHelper.cpp
