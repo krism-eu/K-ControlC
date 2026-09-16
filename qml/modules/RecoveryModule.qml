@@ -41,7 +41,7 @@ Kirigami.ScrollablePage {
                 Controls.Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                    text: qsTr("Un solo flusso per configurazioni o cartelle personali. I backup sono normali archivi tar.gz in ~/KCC Backups, non richiedono root e non toccano i deployment BootC.")
+                    text: qsTr("Un solo flusso per configurazioni o cartelle personali. I backup sono normali archivi tar.gz in ~/krisCC Backups, non richiedono root e non toccano i deployment BootC.")
                 }
 
                 RowLayout {
@@ -74,7 +74,7 @@ Kirigami.ScrollablePage {
                             opacity: 0.75
                             text: backupProfile.currentIndex === 0
                                   ? qsTr("Include ~/.config e le cartelle Plasma/Konsole supportate quando presenti. È pensato per salvare preferenze e configurazioni, non i documenti personali.")
-                                  : qsTr("Include la home personale ed esclude cache, cestino e la cartella KCC Backups. Può contenere documenti, chiavi, token e altri dati sensibili.")
+                                  : qsTr("Include la home personale ed esclude cache, cestino e la cartella krisCC Backups. Può contenere documenti, chiavi, token e altri dati sensibili.")
                         }
                         RowLayout {
                             Layout.fillWidth: true
@@ -106,7 +106,7 @@ Kirigami.ScrollablePage {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    Controls.Label { Layout.fillWidth: true; opacity: 0.65; text: qsTr("Destinazione: ~/KCC Backups") }
+                    Controls.Label { Layout.fillWidth: true; opacity: 0.65; text: qsTr("Destinazione: ~/krisCC Backups") }
                     Controls.Label { opacity: 0.65; text: qsTr("Formato: tar.gz") }
                 }
             }
