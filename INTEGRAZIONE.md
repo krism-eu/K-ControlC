@@ -38,23 +38,29 @@ L'abilitazione/disabilitazione dei repository usa `dnf5 config-manager`, che ric
 
 Non aggiungere wrapper shell generici. `PolkitHelper` valida programma e argomenti completi. La policy usa `auth_admin` senza retention e restringe le azioni tramite `exec.path`/`exec.argv1` per `rk`, `bootc` e `dnf5 config-manager`.
 
-## Backup personali
-
-Gli snapshot config/home sono normali archivi `tar.gz` eseguiti come utente. Non fanno parte del deployment BootC e non richiedono privilegi. Prima di avviare lo snapshot KCC richiede almeno 1 GiB libero per la configurazione e 5 GiB per la home. Non viene effettuato ripristino automatico: l'archivio resta ispezionabile e ripristinabile manualmente.
-
 ## Pipeline immagine
 
-Il repository KCC produce un RPM testato. Il flusso consigliato è:
+Il repository KCC produce l'RPM `kcc`. Il flusso consigliato è:
 
 ```text
-KCC source -> CI/test -> RPM -> build context KrisOS -> immagine BootC
+KCC source -> CI/test -> kcc RPM -> build context KrisOS -> immagine BootC
 ```
 
-La build KrisOS può pescare l'RPM prodotto separatamente e installarlo nella base. L'ordine è importante: **KCC deve essere installato prima che KrisOS generi `/usr/share/krisos/owned-packages.txt` e `owned-nevra.txt`**. In questo modo KCC viene classificato correttamente come pacchetto della base immutabile e `rk` non proverà mai a trattarlo come pacchetto persistente dell'overlay.
+La build KrisOS può pescare l'RPM prodotto separatamente e installarlo nella base. L'ordine è importante: **`kcc` deve essere installato prima che KrisOS generi `/usr/share/krisos/owned-packages.txt` e `owned-nevra.txt`**. In questo modo KCC viene classificato correttamente come pacchetto della base immutabile e `rk` non proverà mai a trattarlo come pacchetto persistente dell'overlay.
 
-La build deve fallire se l'RPM richiesto non è disponibile o non si installa correttamente; non è consigliato continuare creando un'immagine parziale. Dopo l'installazione dell'RPM, eseguire almeno `rpm -q`, `rpm -V` e lo smoke test dell'eseguibile prima dello snapshot finale dei pacchetti owned.
+La build deve fallire se l'RPM richiesto non è disponibile o non si installa correttamente. Dopo l'installazione dell'RPM, eseguire almeno:
 
-Per compatibilità con installazioni esistenti, il nome tecnico del pacchetto/eseguibile resta temporaneamente `k-controlc` mentre l'identità utente è già `KCC`. Una rinomina tecnica del NEVRA va fatta solo insieme a `Provides/Obsoletes` e alla pipeline KrisOS, così l'upgrade non lascia due pacchetti concorrenti.
+```bash
+rpm -q kcc
+rpm -V kcc
+/usr/bin/kcc
+```
+
+Lo spec dichiara `Provides: k-controlc` e `Obsoletes: k-controlc`, quindi un sistema che avesse ancora installato il vecchio pacchetto può essere aggiornato senza lasciare due RPM concorrenti.
+
+## Identità tecnica
+
+Il NEVRA e l'eseguibile sono ora `kcc`. Gli identificatori interni `org.kcontrolc` restano temporaneamente invariati perché non incidono sul nome del pacchetto KrisOS e cambiarli nello stesso passaggio aggiungerebbe rischio senza beneficio funzionale. Potranno essere rinominati in un secondo passaggio, dopo la validazione reale dell'RPM `kcc` nella nuova immagine.
 
 ## Verifica reale prima del tag
 
@@ -64,8 +70,10 @@ Provare sulla macchina reale:
 sudo bootc status --format json | head -c 500
 dnf5 repo list --all --json
 dnf5 config-manager --help
-rpm -q k-controlc
-rpm -V k-controlc
+rpm -q kcc
+rpm -V kcc
 ```
 
 Poi verificare manualmente `rk sync/add/rm`, ricerca RPM con dimensioni e preview dipendenze, Flatpak, Podman, repository enable/disable, upgrade/rollback BootC, restart NetworkManager/CUPS/Bluetooth e creazione dei backup.
+
+Repository: https://github.com/krism-eu/KCC
