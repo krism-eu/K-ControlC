@@ -44,7 +44,7 @@ Kirigami.ScrollablePage {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
                 opacity: 0.72
-                text: qsTr("Ricerca e gestione delle applicazioni Flatpak senza uscire da K-ControlC.")
+                text: qsTr("Ricerca e gestione delle applicazioni Flatpak senza uscire da KCC.")
             }
         }
 
