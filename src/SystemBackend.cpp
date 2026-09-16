@@ -320,6 +320,17 @@ bool SystemBackend::createSnapshot(const QString &kind)
         return false;
     }
 
+    const QStorageInfo backupStorage(backupDir.absolutePath());
+    if (backupStorage.isValid() && backupStorage.isReady()) {
+        const quint64 oneGiB = 1024ULL * 1024ULL * 1024ULL;
+        const quint64 minimumFree = kind == QStringLiteral("home") ? 5ULL * oneGiB : oneGiB;
+        if (backupStorage.bytesAvailable() < minimumFree) {
+            setBackupResult(tr("Spazio libero insufficiente per lo snapshot: disponibili %1, richiesti almeno %2.")
+                                .arg(humanGiB(backupStorage.bytesAvailable()), humanGiB(minimumFree)));
+            return false;
+        }
+    }
+
     const QString stamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"));
     const QString label = kind == QStringLiteral("home") ? QStringLiteral("home") : QStringLiteral("config");
     const QString output = backupDir.filePath(QStringLiteral("%1-%2.tar.gz").arg(label, stamp));
