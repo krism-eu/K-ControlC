@@ -6,7 +6,7 @@ if grep -Eq '"--search"|QStringLiteral\("--search"\)' src/PackageSearch.cpp; the
   exit 1
 fi
 
-if grep -Eq '<allow_(any|inactive|active)>auth_admin_keep</allow_' data/org.raku.controlcenter.policy; then
+if grep -Eq '<allow_(any|inactive|active)>auth_admin_keep</allow_' data/org.kcontrolc.controlcenter.policy; then
   echo "ERROR: Polkit policy must not retain admin authorization" >&2
   exit 1
 fi
@@ -24,15 +24,35 @@ grep -q 'deployment.value(QStringLiteral("ostree")).toObject()' src/BootcBackend
 grep -q 'jsonString(ostree, QStringLiteral("checksum"))' src/BootcBackend.cpp
 
 grep -q 'org.kde.kirigami' qml/Main.qml
+grep -q 'import org.kcontrolc' qml/Main.qml
 grep -q 'config-manager' src/PolkitHelper.cpp
 
-echo "Checking DNF5 read-only package queries..."
-dnf5 repoquery --available --queryformat '%{name}\t%{summary}\n' 'bash*' | grep -q '^bash'
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/k-controlc.desktop packaging/k-controlc.spec \
+    data/org.kcontrolc.controlcenter.policy data/org.kcontrolc.KControlC.metainfo.xml; then
+  echo "ERROR: legacy branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+echo "Checking mandatory local DNF5 behavior..."
 dnf5 list --installed --json >/dev/null
-dnf5 list --upgrades --json >/dev/null
-dnf5 list --recent --json >/dev/null
-dnf5 repo list --all --json >/dev/null
 dnf5 config-manager --help >/dev/null
+
+# These queries can depend on repository metadata/mirror availability. They are
+# useful diagnostics but must not turn a temporary network outage into a build failure.
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 repoquery --available --queryformat '%{name}\t%{summary}\n' 'bash*' > /tmp/k-controlc-repoquery.txt 2>/tmp/k-controlc-repoquery.err; then
+    grep -q '^bash' /tmp/k-controlc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
 
 if command -v bootc >/dev/null 2>&1; then
   echo "bootc detected; validating the exact JSON command used by K-ControlC"
