@@ -28,7 +28,7 @@ KCC usa in via primaria il layout corrente di KrisOS:
 
 Per la fase di migrazione mantiene un fallback in sola lettura verso i vecchi percorsi `/var/lib/raku-kris` e `/usr/share/raku-kris`. Il layout KrisOS ha sempre precedenza.
 
-Il pacchetto RPM e l'eseguibile si chiamano ora **`kcc`**. Lo spec dichiara `Provides/Obsoletes` per il precedente pacchetto `k-controlc`, così DNF può sostituirlo senza lasciare due pacchetti installati. Gli ID interni `org.kcontrolc` restano stabili per ora perché non entrano nel NEVRA e non sono necessari alla pipeline KrisOS.
+Il pacchetto RPM e l'eseguibile si chiamano **`kcc`**. Lo spec dichiara `Provides/Obsoletes` per il precedente pacchetto `k-controlc`, così DNF può sostituirlo senza lasciare due pacchetti installati. Gli ID interni `org.kcontrolc` restano stabili per ora perché non entrano nel NEVRA e non sono necessari alla pipeline KrisOS.
 
 ## Build locale
 
@@ -43,7 +43,7 @@ cmake --build build
 
 ## RPM e integrazione nell'immagine
 
-Lo spec è ancora nel file `packaging/k-controlc.spec` durante questa transizione, ma produce l'RPM **`kcc-0.4.0-*.rpm`**. La CI Fedora 44 costruisce l'RPM, lo installa nel container e riesegue lo smoke test con `/usr/bin/kcc`.
+Lo spec RPM è `packaging/kcc.spec` e produce **`kcc-0.4.0-*.rpm`**. La CI Fedora 44 costruisce l'RPM, lo installa nel container, verifica la sostituzione di un vecchio pacchetto `k-controlc` e riesegue lo smoke test con `/usr/bin/kcc`.
 
 Il flusso previsto per KrisOS è:
 
@@ -59,7 +59,7 @@ Esempio manuale:
 mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 git archive --format=tar.gz --prefix=kcc-0.4.0/ \
   -o ~/rpmbuild/SOURCES/kcc-0.4.0.tar.gz HEAD
-cp packaging/k-controlc.spec ~/rpmbuild/SPECS/kcc.spec
+cp packaging/kcc.spec ~/rpmbuild/SPECS/kcc.spec
 rpmbuild -ba ~/rpmbuild/SPECS/kcc.spec
 ```
 
@@ -67,4 +67,4 @@ Repository: https://github.com/krism-eu/KCC
 
 ## Test reale
 
-La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk add/rm/sync`, autenticazione Polkit, ricerca RPM con dimensioni e dipendenze, Flatpak, Podman, repository enable/disable, upgrade/rollback BootC, restart servizi e backup della home/configurazione.
+La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging, sostituzione `k-controlc` → `kcc` e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk add/rm/sync`, autenticazione Polkit, ricerca RPM con dimensioni e dipendenze, Flatpak, Podman, repository enable/disable, upgrade/rollback BootC, restart servizi e backup della home/configurazione.
