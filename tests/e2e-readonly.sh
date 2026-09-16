@@ -36,13 +36,16 @@ grep -q 'deployment.value(QStringLiteral("ostree")).toObject()' src/BootcBackend
 grep -q 'jsonString(ostree, QStringLiteral("checksum"))' src/BootcBackend.cpp
 
 # KrisOS is primary. The Raku paths remain only as read-only compatibility
-# fallbacks for machines that have not yet booted the renamed image.
+# fallbacks for machines that have not yet booted the renamed image, and using
+# one must be visible in the application log.
 grep -q '/usr/share/krisos/owned-packages.txt' src/PackageSearch.cpp
 grep -q '/var/lib/krisos/packages.list' src/PackageSearch.cpp
 grep -q '/var/lib/krisos/packages.list' src/BootcBackend.cpp
 grep -q '/usr/share/raku-kris/owned-packages.txt' src/PackageSearch.cpp
 grep -q '/var/lib/raku-kris/packages.list' src/PackageSearch.cpp
 grep -q '/var/lib/raku-kris/packages.list' src/BootcBackend.cpp
+grep -q 'using legacy compatibility path' src/PackageSearch.cpp
+grep -q 'using legacy compatibility path' src/BootcBackend.cpp
 
 # krisCC must have a unique technical identity and must not claim Fedora's kcc.
 test -f packaging/krisCC.spec
@@ -109,7 +112,7 @@ if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
   exit 1
 fi
 
-if grep -R -n 'github.com/krism-eu/K-ControlC' \
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
     CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
   echo "ERROR: old repository URL remains" >&2
   exit 1
