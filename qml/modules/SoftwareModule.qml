@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import org.kde.kirigami as Kirigami
-import org.kcontrolc
+import org.kriscc
 
 Kirigami.ScrollablePage {
     id: root
@@ -145,11 +145,11 @@ Kirigami.ScrollablePage {
             id: tabs
             Layout.fillWidth: true
             onCurrentIndexChanged: root.refreshCurrent()
-            Controls.TabButton { text: qsTr("Cerca") }
-            Controls.TabButton { text: qsTr("Installati") }
-            Controls.TabButton { text: qsTr("Aggiornabili") }
-            Controls.TabButton { text: qsTr("Recenti") }
-            Controls.TabButton { text: qsTr("Repository") }
+            Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Cerca") }
+            Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Installati") }
+            Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Aggiornabili") }
+            Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Recenti") }
+            Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Repository") }
         }
 
         Kirigami.InlineMessage {
@@ -531,7 +531,7 @@ Kirigami.ScrollablePage {
         title: qsTr("Aggiungi repository RPM")
         standardButtons: Controls.Dialog.Ok | Controls.Dialog.Cancel
         contentItem: ColumnLayout {
-            Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Inserisci l'URL HTTPS di un file .repo. KCC non rimuove repository esistenti automaticamente.") }
+            Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Inserisci l'URL HTTPS di un file .repo. krisCC non rimuove repository esistenti automaticamente.") }
             Controls.TextField { id: repoUrl; Layout.fillWidth: true; placeholderText: "https://example.org/repository.repo" }
         }
         onAccepted: {
