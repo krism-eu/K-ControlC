@@ -1,7 +1,7 @@
 Name:           k-controlc
 Version:        0.4.0
 Release:        1%{?dist}
-Summary:        Personal raku Control Center for Fedora bootc
+Summary:        Personal Control Center for Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/K-ControlC
 Source0:        %{name}-%{version}.tar.gz
@@ -24,10 +24,10 @@ Requires:       bootc
 Requires:       tar
 
 %description
-K-ControlC is a compact personal Kirigami control center for raku systems
-based on Fedora bootc. It focuses on persistent software management, bootc
-deployments, practical maintenance tools, diagnostics, recovery and local
-configuration/home backups without duplicating Plasma System Settings.
+K-ControlC is a compact personal Kirigami control center for Fedora bootc
+systems. It focuses on persistent software management, bootc deployments,
+practical maintenance tools, diagnostics, recovery and local configuration/home
+backups without duplicating Plasma System Settings.
 
 %prep
 %autosetup -n %{name}-%{version}
@@ -44,8 +44,8 @@ configuration/home backups without duplicating Plasma System Settings.
 %doc README.md
 %{_bindir}/k-controlc
 %{_datadir}/applications/k-controlc.desktop
-%{_datadir}/polkit-1/actions/org.raku.controlcenter.policy
-%{_datadir}/metainfo/org.raku.KControlC.metainfo.xml
+%{_datadir}/polkit-1/actions/org.kcontrolc.controlcenter.policy
+%{_datadir}/metainfo/org.kcontrolc.KControlC.metainfo.xml
 %{_datadir}/icons/hicolor/scalable/apps/k-controlc.svg
 
 %changelog
