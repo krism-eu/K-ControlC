@@ -51,9 +51,16 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/artifacts/logs"
           (
             set -euxo pipefail
+            test -f "$GITHUB_WORKSPACE/CMakeLists.txt"
             mkdir -p "$HOME/rpmbuild"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-            git -C "$GITHUB_WORKSPACE" archive --format=tar --prefix=k-controlc-0.4.0/ HEAD \
-              | gzip -n > "$HOME/rpmbuild/SOURCES/k-controlc-0.4.0.tar.gz"
+            tar -C "$GITHUB_WORKSPACE" \
+              --exclude='./.git' \
+              --exclude='./build' \
+              --exclude='./stage' \
+              --exclude='./artifacts' \
+              --exclude='./k-controlc-stage.tar.gz' \
+              --transform='s,^\./,k-controlc-0.4.0/,' \
+              -czf "$HOME/rpmbuild/SOURCES/k-controlc-0.4.0.tar.gz" .
             cp "$GITHUB_WORKSPACE/packaging/k-controlc.spec" "$HOME/rpmbuild/SPECS/"
             rpmbuild -ba "$HOME/rpmbuild/SPECS/k-controlc.spec"
             mkdir -p "$GITHUB_WORKSPACE/artifacts/rpm" "$GITHUB_WORKSPACE/artifacts/srpm" "$GITHUB_WORKSPACE/artifacts/stage"
