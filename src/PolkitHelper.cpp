@@ -118,10 +118,22 @@ bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const Q
     if (program == QStringLiteral("/usr/bin/dnf5")) {
         if (args.size() != 3 || args.at(0) != QStringLiteral("config-manager"))
             return false;
-        if (args.at(1) != QStringLiteral("enable") && args.at(1) != QStringLiteral("disable"))
-            return false;
+
         static const QRegularExpression repoId(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._+:-]{0,127}$"));
-        return repoId.match(args.at(2)).hasMatch();
+        if ((args.at(1) == QStringLiteral("enable") || args.at(1) == QStringLiteral("disable"))
+            && repoId.match(args.at(2)).hasMatch())
+            return true;
+
+        if (args.at(1) == QStringLiteral("addrepo")) {
+            const QString prefix = QStringLiteral("--from-repofile=");
+            if (!args.at(2).startsWith(prefix))
+                return false;
+            const QString url = args.at(2).mid(prefix.size());
+            static const QRegularExpression httpsRepo(QStringLiteral("^https://[^\\s]{1,1000}\\.repo(?:[?#][^\\s]*)?$"),
+                                                      QRegularExpression::CaseInsensitiveOption);
+            return httpsRepo.match(url).hasMatch();
+        }
+        return false;
     }
 
     return false;

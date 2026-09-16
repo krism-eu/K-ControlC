@@ -6,11 +6,13 @@ import org.kcontrolc
 
 Kirigami.ScrollablePage {
     id: root
-    title: qsTr("Software")
+    title: qsTr("Software RPM")
     property bool ownOperation: false
     property var progressLines: []
     property string searchError: ""
     property string listError: ""
+    property string installFilter: "all"
+    property var detailPackage: null
 
     function humanSize(bytes) {
         if (!bytes || bytes <= 0)
@@ -22,6 +24,28 @@ Kirigami.ScrollablePage {
         if (bytes >= 1024)
             return (bytes / 1024).toFixed(1) + " KiB"
         return bytes + " B"
+    }
+
+    function packageState(model) {
+        if (model.owned)
+            return qsTr("BASE")
+        if (model.persistent)
+            return qsTr("PERSISTENTE")
+        if (model.installed)
+            return qsTr("LOCALE")
+        return ""
+    }
+
+    function visibleForFilter(model) {
+        if (root.installFilter === "base") return model.owned
+        if (root.installFilter === "persistent") return model.persistent
+        if (root.installFilter === "local") return model.installed && !model.owned && !model.persistent
+        return true
+    }
+
+    function isAdvancedRepo(id) {
+        var x = (id || "").toLowerCase()
+        return x.indexOf("debuginfo") >= 0 || x.indexOf("source") >= 0 || x.indexOf("testing") >= 0 || x.indexOf("archive") >= 0
     }
 
     function runPrivileged(program, args) {
@@ -40,22 +64,10 @@ Kirigami.ScrollablePage {
 
     Component.onCompleted: SoftwareBackend.refreshRepositories()
 
-    PackageSearch {
-        id: searchModel
-        onSearchError: function(message) { root.searchError = message }
-    }
-    PackageSearch {
-        id: installedModel
-        onSearchError: function(message) { root.listError = message }
-    }
-    PackageSearch {
-        id: upgradesModel
-        onSearchError: function(message) { root.listError = message }
-    }
-    PackageSearch {
-        id: recentModel
-        onSearchError: function(message) { root.listError = message }
-    }
+    PackageSearch { id: searchModel; onSearchError: function(message) { root.searchError = message } }
+    PackageSearch { id: installedModel; onSearchError: function(message) { root.listError = message } }
+    PackageSearch { id: upgradesModel; onSearchError: function(message) { root.listError = message } }
+    PackageSearch { id: recentModel; onSearchError: function(message) { root.listError = message } }
 
     Connections {
         target: PolkitHelper
@@ -80,10 +92,16 @@ Kirigami.ScrollablePage {
         width: parent.width
         spacing: Kirigami.Units.largeSpacing
 
-        Controls.Label {
+        ColumnLayout {
             Layout.fillWidth: true
-            wrapMode: Text.WordWrap
-            text: qsTr("Gestione del layer RPM persistente e consultazione DNF5. Gli aggiornamenti della base immutabile restano nella pagina BootC; Flatpak e applicazioni grafiche possono essere gestiti separatamente.")
+            spacing: 2
+            Kirigami.Heading { level: 2; text: qsTr("Pacchetti RPM") }
+            Controls.Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                opacity: 0.72
+                text: qsTr("Base immutabile, pacchetti persistenti gestiti da rk e pacchetti locali vengono distinti chiaramente.")
+            }
         }
 
         Controls.TabBar {
@@ -95,7 +113,6 @@ Kirigami.ScrollablePage {
             Controls.TabButton { text: qsTr("Aggiornabili") }
             Controls.TabButton { text: qsTr("Recenti") }
             Controls.TabButton { text: qsTr("Repository") }
-            Controls.TabButton { text: qsTr("Discover") }
         }
 
         Kirigami.InlineMessage {
@@ -115,6 +132,7 @@ Kirigami.ScrollablePage {
                     id: searchField
                     Layout.fillWidth: true
                     placeholderText: qsTr("Cerca un pacchetto, es. btop, krita, lutris…")
+                    selectByMouse: true
                     onTextChanged: searchTimer.restart()
                 }
                 Timer {
@@ -125,59 +143,78 @@ Kirigami.ScrollablePage {
                         searchModel.search(searchField.text)
                     }
                 }
-                Controls.BusyIndicator { visible: searchModel.searching; running: visible }
-                Kirigami.InlineMessage {
-                    Layout.fillWidth: true
-                    visible: root.searchError.length > 0
-                    type: Kirigami.MessageType.Error
-                    text: root.searchError
-                }
+                Controls.BusyIndicator { visible: searchModel.searching; running: visible; Layout.alignment: Qt.AlignHCenter }
+                Kirigami.InlineMessage { Layout.fillWidth: true; visible: root.searchError.length > 0; type: Kirigami.MessageType.Error; text: root.searchError }
+
                 ListView {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.min(contentHeight, 460)
+                    Layout.preferredHeight: Math.min(contentHeight, 520)
                     model: searchModel
                     clip: true
                     spacing: Kirigami.Units.smallSpacing
-                    delegate: Controls.ItemDelegate {
+                    delegate: Kirigami.AbstractCard {
                         width: ListView.view.width
-                        contentItem: RowLayout {
-                            ColumnLayout {
+                        contentItem: ColumnLayout {
+                            RowLayout {
                                 Layout.fillWidth: true
                                 Controls.Label {
                                     Layout.fillWidth: true
                                     font.bold: true
+                                    font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
                                     text: model.name
-                                          + (model.owned ? qsTr("  [base]")
-                                             : model.persistent ? qsTr("  [persistente]")
-                                             : model.installed ? qsTr("  [installato]") : "")
-                                }
-                                Controls.Label {
-                                    Layout.fillWidth: true
-                                    wrapMode: Text.WordWrap
-                                    maximumLineCount: 2
                                     elide: Text.ElideRight
-                                    text: model.summary
                                 }
                                 Controls.Label {
-                                    Layout.fillWidth: true
+                                    visible: root.packageState(model).length > 0
+                                    text: root.packageState(model)
+                                    font.bold: true
                                     opacity: 0.7
-                                    elide: Text.ElideRight
-                                    text: {
-                                        var parts = []
-                                        if (model.version) parts.push(model.version)
-                                        if (model.arch) parts.push(model.arch)
-                                        if (model.repository) parts.push(model.repository)
-                                        if (model.downloadSize > 0) parts.push(qsTr("download %1").arg(root.humanSize(model.downloadSize)))
-                                        if (model.installSize > 0) parts.push(qsTr("installato %1").arg(root.humanSize(model.installSize)))
-                                        return parts.join(" · ")
-                                    }
                                 }
                             }
-                            Controls.Button {
-                                visible: model.persistent || (!model.installed && !model.owned)
-                                enabled: !PolkitHelper.running
-                                text: model.persistent ? qsTr("Rimuovi") : qsTr("Installa")
-                                onClicked: root.runPrivileged("/usr/bin/rk", model.persistent ? ["rm", model.name] : ["add", model.name])
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                visible: model.summary.length > 0
+                                wrapMode: Text.WordWrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                                text: model.summary
+                            }
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                opacity: 0.62
+                                elide: Text.ElideRight
+                                text: [model.version, model.arch, model.repository].filter(function(x) { return !!x }).join(" · ")
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Controls.Label { visible: model.downloadSize > 0; opacity: 0.72; text: qsTr("Download: %1").arg(root.humanSize(model.downloadSize)) }
+                                Controls.Label { visible: model.installSize > 0; opacity: 0.72; text: qsTr("Installato: %1").arg(root.humanSize(model.installSize)) }
+                                Item { Layout.fillWidth: true }
+                                Controls.Button {
+                                    text: qsTr("Dettagli")
+                                    icon.name: "documentinfo"
+                                    onClicked: {
+                                        root.detailPackage = {
+                                            name: model.name,
+                                            summary: model.summary,
+                                            version: model.version,
+                                            arch: model.arch,
+                                            repository: model.repository,
+                                            downloadSize: model.downloadSize,
+                                            installSize: model.installSize,
+                                            state: root.packageState(model)
+                                        }
+                                        UtilityBackend.previewRpmInstall(model.name)
+                                        packageDialog.open()
+                                    }
+                                }
+                                Controls.Button {
+                                    visible: model.persistent || (!model.installed && !model.owned)
+                                    enabled: !PolkitHelper.running
+                                    text: model.persistent ? qsTr("Rimuovi") : qsTr("Installa")
+                                    icon.name: model.persistent ? "edit-delete" : "list-add"
+                                    onClicked: root.runPrivileged("/usr/bin/rk", model.persistent ? ["rm", model.name] : ["add", model.name])
+                                }
                             }
                         }
                     }
@@ -191,29 +228,42 @@ Kirigami.ScrollablePage {
             }
 
             ColumnLayout {
-                Controls.BusyIndicator { visible: installedModel.searching; running: visible }
                 RowLayout {
-                    Controls.Label { Layout.fillWidth: true; text: qsTr("Pacchetti RPM presenti nel sistema. Solo quelli nella lista persistente sono rimovibili da qui."); wrapMode: Text.WordWrap }
+                    Layout.fillWidth: true
+                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Pacchetti presenti nel sistema, filtrabili per provenienza.") }
                     Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: installedModel.loadInstalled() }
                 }
+                Controls.ButtonGroup { id: installFilterGroup }
+                RowLayout {
+                    Controls.RadioButton { text: qsTr("Tutti"); checked: true; Controls.ButtonGroup.group: installFilterGroup; onClicked: root.installFilter = "all" }
+                    Controls.RadioButton { text: qsTr("Base"); Controls.ButtonGroup.group: installFilterGroup; onClicked: root.installFilter = "base" }
+                    Controls.RadioButton { text: qsTr("Persistenti"); Controls.ButtonGroup.group: installFilterGroup; onClicked: root.installFilter = "persistent" }
+                    Controls.RadioButton { text: qsTr("Locali"); Controls.ButtonGroup.group: installFilterGroup; onClicked: root.installFilter = "local" }
+                    Item { Layout.fillWidth: true }
+                }
+                Controls.BusyIndicator { visible: installedModel.searching; running: visible; Layout.alignment: Qt.AlignHCenter }
                 ListView {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.min(contentHeight, 480)
+                    Layout.preferredHeight: Math.min(contentHeight, 500)
                     model: installedModel
                     clip: true
-                    delegate: Controls.ItemDelegate {
+                    spacing: Kirigami.Units.smallSpacing
+                    delegate: Kirigami.AbstractCard {
                         width: ListView.view.width
+                        visible: root.visibleForFilter(model)
+                        height: visible ? implicitHeight : 0
                         contentItem: RowLayout {
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 Controls.Label { Layout.fillWidth: true; font.bold: true; text: model.name + (model.arch ? "." + model.arch : "") }
-                                Controls.Label { Layout.fillWidth: true; text: (model.version || "") + (model.repository ? " · " + model.repository : ""); elide: Text.ElideRight }
+                                Controls.Label { Layout.fillWidth: true; opacity: 0.65; text: (model.version || "") + (model.repository ? " · " + model.repository : ""); elide: Text.ElideRight }
                             }
-                            Controls.Label { text: model.owned ? qsTr("base") : model.persistent ? qsTr("persistente") : qsTr("sistema") }
+                            Controls.Label { text: root.packageState(model); opacity: 0.7; font.bold: model.persistent || model.owned }
                             Controls.Button {
                                 visible: model.persistent
                                 enabled: !PolkitHelper.running
                                 text: qsTr("Rimuovi")
+                                icon.name: "edit-delete"
                                 onClicked: root.runPrivileged("/usr/bin/rk", ["rm", model.name])
                             }
                         }
@@ -223,53 +273,45 @@ Kirigami.ScrollablePage {
 
             ColumnLayout {
                 RowLayout {
-                    Controls.Label {
-                        Layout.fillWidth: true
-                        wrapMode: Text.WordWrap
-                        text: qsTr("Versioni più recenti viste dai repository DNF5. Questo pannello è informativo: la base si aggiorna con BootC e il layer persistente con rk.")
-                    }
+                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Aggiornamenti RPM disponibili. La base resta aggiornata tramite BootC.") }
                     Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: upgradesModel.loadUpgrades() }
                 }
-                Controls.BusyIndicator { visible: upgradesModel.searching; running: visible }
+                Controls.BusyIndicator { visible: upgradesModel.searching; running: visible; Layout.alignment: Qt.AlignHCenter }
                 ListView {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.min(contentHeight, 480)
+                    Layout.preferredHeight: Math.min(contentHeight, 500)
                     model: upgradesModel
                     clip: true
-                    delegate: Controls.ItemDelegate {
+                    spacing: Kirigami.Units.smallSpacing
+                    delegate: Kirigami.AbstractCard {
                         width: ListView.view.width
                         contentItem: RowLayout {
                             Controls.Label { Layout.fillWidth: true; font.bold: true; text: model.name + (model.arch ? "." + model.arch : "") }
-                            Controls.Label { text: model.version || "" }
-                            Controls.Label { text: model.repository || "" }
+                            Controls.Label { text: model.version || ""; opacity: 0.72 }
+                            Controls.Label { text: model.repository || ""; opacity: 0.62 }
                         }
                     }
-                }
-                Kirigami.InlineMessage {
-                    Layout.fillWidth: true
-                    visible: !upgradesModel.searching && upgradesModel.count === 0 && root.listError.length === 0
-                    type: Kirigami.MessageType.Positive
-                    text: qsTr("Nessun aggiornamento RPM segnalato dai repository.")
                 }
             }
 
             ColumnLayout {
                 RowLayout {
-                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Pacchetti cambiati di recente nei repository configurati, secondo la finestra recent di DNF5.") }
+                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Pacchetti cambiati di recente nei repository configurati.") }
                     Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: recentModel.loadRecent() }
                 }
-                Controls.BusyIndicator { visible: recentModel.searching; running: visible }
+                Controls.BusyIndicator { visible: recentModel.searching; running: visible; Layout.alignment: Qt.AlignHCenter }
                 ListView {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.min(contentHeight, 480)
+                    Layout.preferredHeight: Math.min(contentHeight, 500)
                     model: recentModel
                     clip: true
-                    delegate: Controls.ItemDelegate {
+                    spacing: Kirigami.Units.smallSpacing
+                    delegate: Kirigami.AbstractCard {
                         width: ListView.view.width
                         contentItem: RowLayout {
                             Controls.Label { Layout.fillWidth: true; font.bold: true; text: model.name + (model.arch ? "." + model.arch : "") }
-                            Controls.Label { text: model.version || "" }
-                            Controls.Label { text: model.repository || "" }
+                            Controls.Label { text: model.version || ""; opacity: 0.72 }
+                            Controls.Label { text: model.repository || ""; opacity: 0.62 }
                         }
                     }
                 }
@@ -277,61 +319,50 @@ Kirigami.ScrollablePage {
 
             ColumnLayout {
                 RowLayout {
-                    Controls.Label {
-                        Layout.fillWidth: true
-                        wrapMode: Text.WordWrap
-                        text: qsTr("Repository DNF5 configurati. Quelli abilitati sono mostrati per primi; i disabilitati restano visibili ma attenuati.")
-                    }
+                    Layout.fillWidth: true
+                    Controls.Button { text: qsTr("Aggiungi repository…"); icon.name: "list-add"; onClicked: addRepoDialog.open() }
+                    Controls.CheckBox { id: showAdvanced; text: qsTr("Mostra debug/source/testing/archive") }
+                    Item { Layout.fillWidth: true }
                     Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: SoftwareBackend.refreshRepositories() }
                 }
-                Controls.BusyIndicator { visible: SoftwareBackend.busy; running: visible }
-                Kirigami.InlineMessage {
-                    Layout.fillWidth: true
-                    visible: SoftwareBackend.errorText.length > 0
-                    type: Kirigami.MessageType.Error
-                    text: SoftwareBackend.errorText
-                }
+                Controls.BusyIndicator { visible: SoftwareBackend.busy; running: visible; Layout.alignment: Qt.AlignHCenter }
+                Kirigami.InlineMessage { Layout.fillWidth: true; visible: SoftwareBackend.errorText.length > 0; type: Kirigami.MessageType.Error; text: SoftwareBackend.errorText }
+
+                Kirigami.Heading { level: 3; text: qsTr("Abilitati") }
                 Repeater {
-                    model: SoftwareBackend.repositories
+                    model: SoftwareBackend.repositories.filter(function(repo) { return repo.enabled && (showAdvanced.checked || !root.isAdvancedRepo(repo.id)) })
                     delegate: Kirigami.AbstractCard {
                         required property var modelData
                         Layout.fillWidth: true
-                        opacity: modelData.enabled ? 1.0 : 0.58
                         contentItem: RowLayout {
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 Controls.Label { font.bold: true; text: modelData.name }
-                                Controls.Label { text: modelData.id; opacity: 0.7 }
+                                Controls.Label { text: modelData.id; opacity: 0.62 }
                             }
-                            Controls.Label {
-                                font.bold: modelData.enabled
-                                text: modelData.enabled ? qsTr("ABILITATO") : qsTr("disabilitato")
-                            }
-                            Controls.Button {
-                                enabled: !PolkitHelper.running
-                                text: modelData.enabled ? qsTr("Disabilita") : qsTr("Abilita")
-                                onClicked: root.runPrivileged("/usr/bin/dnf5", ["config-manager", modelData.enabled ? "disable" : "enable", modelData.id])
-                            }
+                            Controls.Label { text: qsTr("attivo"); font.bold: true }
+                            Controls.Button { Layout.preferredWidth: 120; enabled: !PolkitHelper.running; text: qsTr("Disabilita"); onClicked: root.runPrivileged("/usr/bin/dnf5", ["config-manager", "disable", modelData.id]) }
                         }
                     }
                 }
-            }
 
-            ColumnLayout {
-                spacing: Kirigami.Units.largeSpacing
-                Kirigami.Heading { level: 2; text: qsTr("Applicazioni e Flatpak") }
-                Controls.Label {
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                    text: SystemBackend.toolAvailable("discover")
-                          ? qsTr("Discover è disponibile per applicazioni grafiche e Flatpak. La gestione Flatpak essenziale potrà essere integrata direttamente qui senza dipendere da Discover.")
-                          : qsTr("Discover non è installato. Flatpak è indipendente da Discover: la gestione essenziale verrà integrata direttamente in K-ControlC.")
-                }
-                Controls.Button {
-                    visible: SystemBackend.toolAvailable("discover")
-                    text: qsTr("Apri Discover")
-                    icon.name: "plasmadiscover"
-                    onClicked: SystemBackend.launchFlatpakManager()
+                Kirigami.Heading { level: 3; text: qsTr("Disabilitati"); opacity: 0.72 }
+                Repeater {
+                    model: SoftwareBackend.repositories.filter(function(repo) { return !repo.enabled && (showAdvanced.checked || !root.isAdvancedRepo(repo.id)) })
+                    delegate: Kirigami.AbstractCard {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        opacity: 0.68
+                        contentItem: RowLayout {
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Controls.Label { font.bold: true; text: modelData.name }
+                                Controls.Label { text: modelData.id; opacity: 0.62 }
+                            }
+                            Controls.Label { text: qsTr("inattivo") }
+                            Controls.Button { Layout.preferredWidth: 120; enabled: !PolkitHelper.running; text: qsTr("Abilita"); onClicked: root.runPrivileged("/usr/bin/dnf5", ["config-manager", "enable", modelData.id]) }
+                        }
+                    }
                 }
             }
         }
@@ -340,7 +371,7 @@ Kirigami.ScrollablePage {
             Layout.fillWidth: true
             visible: root.progressLines.length > 0
             contentItem: ColumnLayout {
-                Kirigami.Heading { level: 2; text: qsTr("Operazione") }
+                Kirigami.Heading { level: 3; text: qsTr("Operazione") }
                 Repeater {
                     model: root.progressLines
                     delegate: Controls.Label {
@@ -352,6 +383,55 @@ Kirigami.ScrollablePage {
                     }
                 }
             }
+        }
+    }
+
+    Controls.Dialog {
+        id: packageDialog
+        modal: true
+        width: Math.min(root.width - 48, 760)
+        title: root.detailPackage ? root.detailPackage.name : qsTr("Dettagli pacchetto")
+        standardButtons: Controls.Dialog.Close
+        contentItem: ColumnLayout {
+            Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: root.detailPackage ? root.detailPackage.summary : "" }
+            Controls.Label {
+                Layout.fillWidth: true
+                opacity: 0.7
+                wrapMode: Text.WordWrap
+                text: root.detailPackage ? [root.detailPackage.version, root.detailPackage.arch, root.detailPackage.repository, root.detailPackage.state].filter(function(x) { return !!x }).join(" · ") : ""
+            }
+            Controls.Label {
+                Layout.fillWidth: true
+                visible: root.detailPackage && (root.detailPackage.downloadSize > 0 || root.detailPackage.installSize > 0)
+                text: root.detailPackage ? qsTr("Download %1 · installato %2").arg(root.humanSize(root.detailPackage.downloadSize)).arg(root.humanSize(root.detailPackage.installSize)) : ""
+            }
+            Kirigami.Separator { Layout.fillWidth: true }
+            Controls.Label { text: qsTr("Anteprima transazione DNF5"); font.bold: true }
+            Controls.BusyIndicator { visible: UtilityBackend.busy; running: visible }
+            Controls.TextArea {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 260
+                readOnly: true
+                wrapMode: TextEdit.Wrap
+                font.family: "monospace"
+                text: UtilityBackend.output
+            }
+        }
+    }
+
+    Controls.Dialog {
+        id: addRepoDialog
+        modal: true
+        title: qsTr("Aggiungi repository RPM")
+        standardButtons: Controls.Dialog.Ok | Controls.Dialog.Cancel
+        contentItem: ColumnLayout {
+            Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Inserisci l'URL HTTPS di un file .repo. K-ControlC non rimuove repository esistenti automaticamente.") }
+            Controls.TextField { id: repoUrl; Layout.fillWidth: true; placeholderText: "https://example.org/repository.repo" }
+        }
+        onAccepted: {
+            if (repoUrl.text.indexOf("https://") === 0 && repoUrl.text.endsWith(".repo"))
+                root.runPrivileged("/usr/bin/dnf5", ["config-manager", "addrepo", "--from-repofile=" + repoUrl.text])
+            repoUrl.text = ""
         }
     }
 }

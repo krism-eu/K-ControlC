@@ -6,6 +6,14 @@ if grep -Eq '"--search"|QStringLiteral\("--search"\)' src/PackageSearch.cpp; the
   exit 1
 fi
 
+# DNF5 repoquery does not translate a literal backslash+t for us. The C++
+# queryformat must contain escaped C++ tabs (\t), not a double-escaped \\t
+# sequence that reaches DNF5 as visible text.
+if grep -Fq '%{name}\\\\t%{summary}' src/PackageSearch.cpp; then
+  echo "ERROR: PackageSearch queryformat contains literal backslash-t separators" >&2
+  exit 1
+fi
+
 if grep -Eq '<allow_(any|inactive|active)>auth_admin_keep</allow_' data/org.kcontrolc.controlcenter.policy; then
   echo "ERROR: Polkit policy must not retain admin authorization" >&2
   exit 1
@@ -51,9 +59,13 @@ echo "Checking repository-backed DNF5 queries when metadata is available..."
 if dnf5 repo list --all --json >/dev/null 2>&1; then
   dnf5 repo list --all --json >/dev/null
   if dnf5 repoquery --available \
-      --queryformat '%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
       'bash*' > /tmp/k-controlc-repoquery.txt 2>/tmp/k-controlc-repoquery.err; then
     grep -q '^bash' /tmp/k-controlc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/k-controlc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/k-controlc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
   else
     echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
   fi

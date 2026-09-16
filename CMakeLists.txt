@@ -22,14 +22,17 @@ qt_add_executable(k-controlc
     src/SoftwareBackend.cpp src/SoftwareBackend.h
     src/PackageSearch.cpp src/PackageSearch.h
     src/PolkitHelper.cpp src/PolkitHelper.h
+    src/UtilityBackend.cpp src/UtilityBackend.h
 )
 
 set(KCONTROLC_QML_FILES
     qml/Main.qml
     qml/modules/DashboardModule.qml
     qml/modules/SoftwareModule.qml
+    qml/modules/FlatpakModule.qml
     qml/modules/BootcModule.qml
     qml/modules/ToolsModule.qml
+    qml/modules/CommandsModule.qml
     qml/modules/RecoveryModule.qml
 )
 

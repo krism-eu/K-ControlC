@@ -5,7 +5,7 @@ import org.kde.kirigami as Kirigami
 
 Kirigami.ScrollablePage {
     id: root
-    title: qsTr("Recovery e backup")
+    title: qsTr("Backup e recovery")
     property bool ownOperation: false
     property var progressLines: []
 
@@ -18,12 +18,10 @@ Kirigami.ScrollablePage {
     Connections {
         target: PolkitHelper
         function onLine(text) {
-            if (root.ownOperation)
-                root.progressLines = root.progressLines.concat([text]).slice(-12)
+            if (root.ownOperation) root.progressLines = root.progressLines.concat([text]).slice(-12)
         }
         function onFinished(ok, output) {
-            if (!root.ownOperation)
-                return
+            if (!root.ownOperation) return
             root.ownOperation = false
             root.progressLines = root.progressLines.concat([ok ? qsTr("--- completato ---") : qsTr("--- fallito ---")]).slice(-12)
             BootcBackend.refreshStatus()
@@ -38,35 +36,66 @@ Kirigami.ScrollablePage {
         Kirigami.AbstractCard {
             Layout.fillWidth: true
             contentItem: ColumnLayout {
-                Kirigami.Heading { level: 2; text: qsTr("Snapshot dei tuoi dati") }
+                spacing: Kirigami.Units.largeSpacing
+                Kirigami.Heading { level: 2; text: qsTr("Backup locale") }
                 Controls.Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                    text: qsTr("Gli snapshot sono normali archivi tar.gz nella cartella ~/K-ControlC Backups. Non richiedono root e sono indipendenti dai deployment BootC.")
+                    text: qsTr("Un solo flusso per configurazioni o cartelle personali. I backup sono normali archivi tar.gz in ~/K-ControlC Backups, non richiedono root e non toccano i deployment BootC.")
                 }
+
                 RowLayout {
-                    Controls.Button {
-                        text: qsTr("Snapshot configurazione")
-                        icon.name: "document-save-all"
-                        enabled: !SystemBackend.backupBusy
-                        onClicked: SystemBackend.createSnapshot("config")
+                    Layout.fillWidth: true
+                    Controls.Label { text: qsTr("Profilo:"); font.bold: true }
+                    Controls.ComboBox {
+                        id: backupProfile
+                        Layout.preferredWidth: 250
+                        model: [qsTr("Configurazione utente"), qsTr("Home personale")]
                     }
-                    Controls.Button {
-                        text: qsTr("Snapshot home")
-                        icon.name: "user-home"
-                        enabled: !SystemBackend.backupBusy
-                        onClicked: homeDialog.open()
-                    }
+                    Item { Layout.fillWidth: true }
                     Controls.Button {
                         text: qsTr("Apri cartella backup")
                         icon.name: "folder-open"
                         onClicked: SystemBackend.openBackupFolder()
                     }
-                    Controls.BusyIndicator {
-                        visible: SystemBackend.backupBusy
-                        running: visible
+                }
+
+                Kirigami.AbstractCard {
+                    Layout.fillWidth: true
+                    contentItem: ColumnLayout {
+                        Controls.Label {
+                            Layout.fillWidth: true
+                            font.bold: true
+                            text: backupProfile.currentIndex === 0 ? qsTr("Configurazione utente") : qsTr("Home personale")
+                        }
+                        Controls.Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            opacity: 0.75
+                            text: backupProfile.currentIndex === 0
+                                  ? qsTr("Include ~/.config e le cartelle Plasma/Konsole supportate quando presenti. È pensato per salvare preferenze e configurazioni, non i documenti personali.")
+                                  : qsTr("Include la home personale ed esclude cache, cestino e la cartella K-ControlC Backups. Può contenere documenti, chiavi, token e altri dati sensibili.")
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                opacity: 0.68
+                                text: backupProfile.currentIndex === 0
+                                      ? qsTr("Spazio minimo richiesto: 1 GiB libero")
+                                      : qsTr("Spazio minimo richiesto: 5 GiB liberi")
+                            }
+                            Controls.Button {
+                                text: qsTr("Crea backup")
+                                icon.name: "document-save-all"
+                                enabled: !SystemBackend.backupBusy
+                                onClicked: backupProfile.currentIndex === 0 ? SystemBackend.createSnapshot("config") : homeDialog.open()
+                            }
+                            Controls.BusyIndicator { visible: SystemBackend.backupBusy; running: visible }
+                        }
                     }
                 }
+
                 Kirigami.InlineMessage {
                     Layout.fillWidth: true
                     visible: SystemBackend.backupStatus.length > 0
@@ -74,11 +103,11 @@ Kirigami.ScrollablePage {
                           ? Kirigami.MessageType.Positive : Kirigami.MessageType.Information
                     text: SystemBackend.backupStatus + (SystemBackend.backupPath.length > 0 ? "\n" + SystemBackend.backupPath : "")
                 }
-                Controls.Label {
+
+                RowLayout {
                     Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                    opacity: 0.7
-                    text: qsTr("Lo snapshot configurazione include ~/.config e alcune cartelle Plasma/Konsole presenti. Lo snapshot home esclude cache, cestino e la cartella dei backup. K-ControlC richiede almeno 1 GiB libero per la configurazione e 5 GiB per la home.")
+                    Controls.Label { Layout.fillWidth: true; opacity: 0.65; text: qsTr("Destinazione: ~/K-ControlC Backups") }
+                    Controls.Label { opacity: 0.65; text: qsTr("Formato: tar.gz") }
                 }
             }
         }
@@ -87,6 +116,12 @@ Kirigami.ScrollablePage {
             Layout.fillWidth: true
             contentItem: ColumnLayout {
                 Kirigami.Heading { level: 2; text: qsTr("Recovery BootC") }
+                Controls.Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.72
+                    text: qsTr("Rollback dell'immagine e risincronizzazione del layer persistente restano separati dai backup dei tuoi file.")
+                }
                 Repeater {
                     model: BootcBackend.deployments
                     delegate: Controls.Label {
@@ -97,21 +132,9 @@ Kirigami.ScrollablePage {
                     }
                 }
                 RowLayout {
-                    Controls.Button {
-                        text: qsTr("Prepara rollback")
-                        enabled: BootcBackend.bootcAvailable && !PolkitHelper.running
-                        onClicked: rollbackDialog.open()
-                    }
-                    Controls.Button {
-                        text: qsTr("Rollback + apply")
-                        enabled: BootcBackend.bootcAvailable && !PolkitHelper.running
-                        onClicked: rollbackApplyDialog.open()
-                    }
-                    Controls.Button {
-                        text: qsTr("Risincronizza rk")
-                        enabled: !PolkitHelper.running
-                        onClicked: root.runPrivileged("/usr/bin/rk", ["sync"])
-                    }
+                    Controls.Button { text: qsTr("Prepara rollback"); enabled: BootcBackend.bootcAvailable && !PolkitHelper.running; onClicked: rollbackDialog.open() }
+                    Controls.Button { text: qsTr("Rollback + apply"); enabled: BootcBackend.bootcAvailable && !PolkitHelper.running; onClicked: rollbackApplyDialog.open() }
+                    Controls.Button { text: qsTr("Risincronizza rk"); enabled: !PolkitHelper.running; onClicked: root.runPrivileged("/usr/bin/rk", ["sync"]) }
                 }
             }
         }
@@ -132,16 +155,10 @@ Kirigami.ScrollablePage {
             Layout.fillWidth: true
             visible: root.progressLines.length > 0
             contentItem: ColumnLayout {
-                Kirigami.Heading { level: 2; text: qsTr("Operazione") }
+                Kirigami.Heading { level: 3; text: qsTr("Operazione") }
                 Repeater {
                     model: root.progressLines
-                    delegate: Controls.Label {
-                        required property string modelData
-                        Layout.fillWidth: true
-                        wrapMode: Text.WrapAnywhere
-                        font.family: "monospace"
-                        text: modelData
-                    }
+                    delegate: Controls.Label { required property string modelData; Layout.fillWidth: true; wrapMode: Text.WrapAnywhere; font.family: "monospace"; text: modelData }
                 }
             }
         }
@@ -150,40 +167,16 @@ Kirigami.ScrollablePage {
     Controls.Dialog {
         id: homeDialog
         modal: true
-        title: qsTr("Creare uno snapshot della home?")
+        title: qsTr("Creare il backup della home?")
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
             wrapMode: Text.WordWrap
-            text: qsTr("Può essere molto grande e può contenere documenti, chiavi, token e altri dati personali. Cache, cestino e backup precedenti vengono esclusi. Se restano meno di 5 GiB liberi, K-ControlC non avvia il backup.")
+            text: qsTr("La home può essere molto grande e può contenere dati sensibili. Cache, cestino e backup precedenti vengono esclusi. L'operazione non parte con meno di 5 GiB liberi.")
         }
         onAccepted: SystemBackend.createSnapshot("home")
     }
-    Controls.Dialog {
-        id: rollbackDialog
-        modal: true
-        title: qsTr("Preparare il rollback BootC?")
-        standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
-        onAccepted: root.runPrivileged("/usr/bin/bootc", ["rollback"])
-    }
-    Controls.Dialog {
-        id: rollbackApplyDialog
-        modal: true
-        title: qsTr("Rollback e applicazione immediata?")
-        standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
-        onAccepted: root.runPrivileged("/usr/bin/bootc", ["rollback", "--apply"])
-    }
-    Controls.Dialog {
-        id: rebootDialog
-        modal: true
-        title: qsTr("Riavviare il sistema?")
-        standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
-        onAccepted: SystemBackend.sessionAction("reboot")
-    }
-    Controls.Dialog {
-        id: powerDialog
-        modal: true
-        title: qsTr("Spegnere il sistema?")
-        standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
-        onAccepted: SystemBackend.sessionAction("poweroff")
-    }
+    Controls.Dialog { id: rollbackDialog; modal: true; title: qsTr("Preparare il rollback BootC?"); standardButtons: Controls.Dialog.Yes | Controls.Dialog.No; onAccepted: root.runPrivileged("/usr/bin/bootc", ["rollback"]) }
+    Controls.Dialog { id: rollbackApplyDialog; modal: true; title: qsTr("Rollback e applicazione immediata?"); standardButtons: Controls.Dialog.Yes | Controls.Dialog.No; onAccepted: root.runPrivileged("/usr/bin/bootc", ["rollback", "--apply"]) }
+    Controls.Dialog { id: rebootDialog; modal: true; title: qsTr("Riavviare il sistema?"); standardButtons: Controls.Dialog.Yes | Controls.Dialog.No; onAccepted: SystemBackend.sessionAction("reboot") }
+    Controls.Dialog { id: powerDialog; modal: true; title: qsTr("Spegnere il sistema?"); standardButtons: Controls.Dialog.Yes | Controls.Dialog.No; onAccepted: SystemBackend.sessionAction("poweroff") }
 }
