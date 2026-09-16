@@ -8,10 +8,25 @@
 #include <QTimer>
 #include <QTextStream>
 
+namespace {
+QString firstExistingPath(const QStringList &paths)
+{
+    for (const QString &path : paths) {
+        if (QFileInfo::exists(path))
+            return path;
+    }
+    return paths.isEmpty() ? QString() : paths.constFirst();
+}
+}
+
 PackageSearch::PackageSearch(QObject *parent)
     : QAbstractListModel(parent)
 {
-    QFile file(QStringLiteral("/usr/share/raku-kris/owned-packages.txt"));
+    const QString ownedPath = firstExistingPath({
+        QStringLiteral("/usr/share/krisos/owned-packages.txt"),
+        QStringLiteral("/usr/share/raku-kris/owned-packages.txt")
+    });
+    QFile file(ownedPath);
     if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QTextStream in(&file);
         while (!in.atEnd()) {
@@ -394,7 +409,11 @@ void PackageSearch::stopActiveProcess()
 void PackageSearch::refreshPersistentSet()
 {
     m_persistent.clear();
-    QFile file(QStringLiteral("/var/lib/raku-kris/packages.list"));
+    const QString statePath = firstExistingPath({
+        QStringLiteral("/var/lib/krisos/packages.list"),
+        QStringLiteral("/var/lib/raku-kris/packages.list")
+    });
+    QFile file(statePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
     while (!file.atEnd()) {
