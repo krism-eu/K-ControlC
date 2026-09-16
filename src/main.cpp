@@ -15,13 +15,11 @@
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
-    QCoreApplication::setOrganizationName(QStringLiteral("KCC"));
-    QCoreApplication::setApplicationName(QStringLiteral("KCC"));
-    QCoreApplication::setApplicationVersion(QStringLiteral(KCC_VERSION));
+    QCoreApplication::setOrganizationName(QStringLiteral("krisCC"));
+    QCoreApplication::setApplicationName(QStringLiteral("krisCC"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(KRISCC_VERSION));
 
-    // Keep the QML module URI stable for this package-name transition. It is
-    // internal to the application and does not affect the RPM or executable name.
-    qmlRegisterType<PackageSearch>("org.kcontrolc", 1, 0, "PackageSearch");
+    qmlRegisterType<PackageSearch>("org.kriscc", 1, 0, "PackageSearch");
 
     PolkitHelper polkitHelper;
     BootcBackend bootcBackend;
@@ -47,9 +45,9 @@ int main(int argc, char *argv[])
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
                      &app, [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
 
-    engine.loadFromModule(QStringLiteral("org.kcontrolc"), QStringLiteral("Main"));
+    engine.loadFromModule(QStringLiteral("org.kriscc"), QStringLiteral("Main"));
 
-    if (qEnvironmentVariableIsSet("KCC_SMOKE_TEST"))
+    if (qEnvironmentVariableIsSet("KRISCC_SMOKE_TEST"))
         QTimer::singleShot(900, &app, &QCoreApplication::quit);
 
     return app.exec();
