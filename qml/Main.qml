@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import org.kde.kirigami as Kirigami
-import org.kcontrolc
+import org.kriscc
 
 Kirigami.ApplicationWindow {
     id: root
@@ -11,7 +11,7 @@ Kirigami.ApplicationWindow {
     minimumWidth: 800
     minimumHeight: 580
     visible: true
-    title: qsTr("KCC")
+    title: qsTr("krisCC")
 
     function showIndex(index) {
         topTabs.currentIndex = index
@@ -44,7 +44,7 @@ Kirigami.ApplicationWindow {
                     Layout.fillWidth: true
                     font.bold: true
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize + 2
-                    text: qsTr("KCC")
+                    text: qsTr("krisCC")
                 }
                 Controls.Label {
                     opacity: 0.62
