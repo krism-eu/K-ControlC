@@ -11,6 +11,12 @@ if grep -Eq '<allow_(any|inactive|active)>auth_admin_keep</allow_' data/org.kcon
   exit 1
 fi
 
+# Read-only bootc status must be available to the active local session without
+# an authentication prompt; write operations remain protected separately.
+grep -q 'org.kcontrolc.controlcenter.bootc.status' data/org.kcontrolc.controlcenter.policy
+grep -A6 'org.kcontrolc.controlcenter.bootc.status' data/org.kcontrolc.controlcenter.policy \
+  | grep -q '<allow_active>yes</allow_active>'
+
 # Guard the exact bootc JSON invocation and schema traversal used by the UI.
 if grep -Eq 'QStringLiteral\("--json"\)|QStringLiteral\("--format-version' src/BootcBackend.cpp; then
   echo "ERROR: BootcBackend must use bootc status --format json without legacy JSON flags" >&2
@@ -19,6 +25,7 @@ fi
 
 grep -q 'QStringLiteral("--format")' src/BootcBackend.cpp
 grep -q 'QStringLiteral("json")' src/BootcBackend.cpp
+grep -q 'QStringLiteral("/usr/bin/pkexec")' src/BootcBackend.cpp
 grep -q 'imageStatus.value(QStringLiteral("image")).toObject()' src/BootcBackend.cpp
 grep -q 'deployment.value(QStringLiteral("ostree")).toObject()' src/BootcBackend.cpp
 grep -q 'jsonString(ostree, QStringLiteral("checksum"))' src/BootcBackend.cpp
@@ -43,7 +50,9 @@ dnf5 config-manager --help >/dev/null
 echo "Checking repository-backed DNF5 queries when metadata is available..."
 if dnf5 repo list --all --json >/dev/null 2>&1; then
   dnf5 repo list --all --json >/dev/null
-  if dnf5 repoquery --available --queryformat '%{name}\t%{summary}\n' 'bash*' > /tmp/k-controlc-repoquery.txt 2>/tmp/k-controlc-repoquery.err; then
+  if dnf5 repoquery --available \
+      --queryformat '%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/k-controlc-repoquery.txt 2>/tmp/k-controlc-repoquery.err; then
     grep -q '^bash' /tmp/k-controlc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
   else
     echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
