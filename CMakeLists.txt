@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 
 project(KControlC
     VERSION 0.4.0
-    DESCRIPTION "Personal raku Control Center for Fedora bootc"
+    DESCRIPTION "Personal Control Center for Fedora bootc"
     LANGUAGES CXX
 )
 
@@ -43,7 +43,7 @@ endforeach()
 set_source_files_properties(qml/modules/SoftwareModule.qml PROPERTIES QT_QML_SKIP_CACHEGEN ON)
 
 qt_add_qml_module(k-controlc
-    URI raku.cc
+    URI org.kcontrolc
     VERSION 1.0
     RESOURCE_PREFIX /qt/qml
     QML_FILES ${KCONTROLC_QML_FILES}
@@ -57,6 +57,6 @@ target_compile_definitions(k-controlc PRIVATE KCONTROLC_VERSION="${PROJECT_VERSI
 
 install(TARGETS k-controlc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES data/k-controlc.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
-install(FILES data/org.raku.controlcenter.policy DESTINATION ${CMAKE_INSTALL_DATADIR}/polkit-1/actions)
-install(FILES data/org.raku.KControlC.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
+install(FILES data/org.kcontrolc.controlcenter.policy DESTINATION ${CMAKE_INSTALL_DATADIR}/polkit-1/actions)
+install(FILES data/org.kcontrolc.KControlC.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
 install(FILES data/icons/hicolor/scalable/apps/k-controlc.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
