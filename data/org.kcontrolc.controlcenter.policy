@@ -2,7 +2,7 @@
 <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
 <policyconfig>
   <vendor>KCC</vendor>
-  <vendor_url>https://github.com/krism-eu/K-ControlC</vendor_url>
+  <vendor_url>https://github.com/krism-eu/KCC</vendor_url>
 
   <!-- Read-only bootc status is allowed for the active local session so the
        UI never asks for a password just to display system state. Mutating
