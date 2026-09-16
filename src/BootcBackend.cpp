@@ -15,6 +15,15 @@ QString jsonString(const QJsonObject &object, const QString &key)
     return value.isString() ? value.toString() : QString();
 }
 
+QString firstExistingPath(const QStringList &paths)
+{
+    for (const QString &path : paths) {
+        if (QFileInfo::exists(path))
+            return path;
+    }
+    return paths.isEmpty() ? QString() : paths.constFirst();
+}
+
 QVariantMap deploymentMap(const QString &role, const QJsonObject &deployment)
 {
     QVariantMap map;
@@ -231,7 +240,11 @@ void BootcBackend::setBusy(bool busy)
 
 void BootcBackend::loadPackages()
 {
-    QFile file(QStringLiteral("/var/lib/raku-kris/packages.list"));
+    const QString statePath = firstExistingPath({
+        QStringLiteral("/var/lib/krisos/packages.list"),
+        QStringLiteral("/var/lib/raku-kris/packages.list")
+    });
+    QFile file(statePath);
     QStringList packages;
     if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         while (!file.atEnd()) {
