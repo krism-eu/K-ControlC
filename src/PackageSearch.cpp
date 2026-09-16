@@ -35,15 +35,17 @@ QVariant PackageSearch::data(const QModelIndex &index, int role) const
 
     const Entry &entry = m_results.at(index.row());
     switch (role) {
-    case NameRole:       return entry.name;
-    case SummaryRole:    return entry.summary;
-    case InstalledRole:  return entry.installed;
-    case OwnedRole:      return entry.owned;
-    case PersistentRole: return entry.persistent;
-    case VersionRole:    return entry.version;
-    case RepositoryRole: return entry.repository;
-    case ArchRole:       return entry.arch;
-    default:             return {};
+    case NameRole:         return entry.name;
+    case SummaryRole:      return entry.summary;
+    case InstalledRole:    return entry.installed;
+    case OwnedRole:        return entry.owned;
+    case PersistentRole:   return entry.persistent;
+    case VersionRole:      return entry.version;
+    case RepositoryRole:   return entry.repository;
+    case ArchRole:         return entry.arch;
+    case DownloadSizeRole: return QVariant::fromValue<qulonglong>(entry.downloadSize);
+    case InstallSizeRole:  return QVariant::fromValue<qulonglong>(entry.installSize);
+    default:               return {};
     }
 }
 
@@ -57,7 +59,9 @@ QHash<int, QByteArray> PackageSearch::roleNames() const
         {PersistentRole, "persistent"},
         {VersionRole, "version"},
         {RepositoryRole, "repository"},
-        {ArchRole, "arch"}
+        {ArchRole, "arch"},
+        {DownloadSizeRole, "downloadSize"},
+        {InstallSizeRole, "installSize"}
     };
 }
 
@@ -196,15 +200,20 @@ void PackageSearch::startRepoQuery(const QString &term)
         QSet<QString> seen;
         const auto lines = QString::fromUtf8(stdoutData).split('\n', Qt::SkipEmptyParts);
         for (const QString &line : lines) {
-            const int tab = line.indexOf('\t');
-            const QString name = (tab < 0 ? line : line.left(tab)).trimmed();
+            const QStringList parts = line.split(QLatin1Char('\t'));
+            const QString name = parts.value(0).trimmed();
             if (name.isEmpty() || seen.contains(name))
                 continue;
 
             seen.insert(name);
             Entry entry;
             entry.name = name;
-            entry.summary = (tab < 0 ? QString() : line.mid(tab + 1)).simplified().left(512);
+            entry.summary = parts.value(1).simplified().left(512);
+            entry.version = parts.value(2).trimmed();
+            entry.repository = parts.value(3).trimmed();
+            entry.arch = parts.value(4).trimmed();
+            entry.downloadSize = parts.value(5).toULongLong();
+            entry.installSize = parts.value(6).toULongLong();
             entry.installed = m_installed.contains(name);
             entry.owned = m_owned.contains(name);
             entry.persistent = m_persistent.contains(name);
@@ -235,7 +244,8 @@ void PackageSearch::startRepoQuery(const QString &term)
     const QString packageSpec = QStringLiteral("*") + term + QStringLiteral("*");
     rawProcess->start(QStringLiteral("/usr/bin/dnf5"),
                       {QStringLiteral("repoquery"), QStringLiteral("--available"),
-                       QStringLiteral("--queryformat"), QStringLiteral("%{name}\t%{summary}\\n"),
+                       QStringLiteral("--queryformat"),
+                       QStringLiteral("%{name}\\t%{summary}\\t%{evr}\\t%{repoid}\\t%{arch}\\t%{downloadsize}\\t%{installsize}\\n"),
                        packageSpec});
 }
 

@@ -22,7 +22,9 @@ public:
         PersistentRole,
         VersionRole,
         RepositoryRole,
-        ArchRole
+        ArchRole,
+        DownloadSizeRole,
+        InstallSizeRole
     };
 
     explicit PackageSearch(QObject *parent = nullptr);
@@ -51,6 +53,8 @@ private:
         QString version;
         QString repository;
         QString arch;
+        quint64 downloadSize = 0;
+        quint64 installSize = 0;
         bool installed = false;
         bool owned = false;
         bool persistent = false;

@@ -23,11 +23,19 @@
 #include <QTimeZone>
 #include <QUrl>
 
+#include <sys/sysinfo.h>
+
 namespace {
 QString humanGiB(quint64 bytes)
 {
     return QString::number(double(bytes) / (1024.0 * 1024.0 * 1024.0), 'f', 1)
          + QStringLiteral(" GiB");
+}
+
+QString systemTimeZoneName()
+{
+    const QByteArray id = QTimeZone::systemTimeZoneId();
+    return id.isEmpty() ? QStringLiteral("UTC") : QString::fromUtf8(id);
 }
 
 const QSet<QString> &allowedServices()
@@ -68,15 +76,22 @@ QString SystemBackend::hostName() const
 
 QString SystemBackend::memorySummary() const
 {
+    struct sysinfo info {};
+    if (::sysinfo(&info) == 0) {
+        const quint64 total = quint64(info.totalram) * quint64(info.mem_unit);
+        if (total > 0)
+            return humanGiB(total);
+    }
+
     QFile file(QStringLiteral("/proc/meminfo"));
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         return tr("Non disponibile");
 
     while (!file.atEnd()) {
-        const QByteArray line = file.readLine();
+        const QByteArray line = file.readLine().simplified();
         if (!line.startsWith("MemTotal:"))
             continue;
-        const QList<QByteArray> parts = line.simplified().split(' ');
+        const QList<QByteArray> parts = line.split(' ');
         if (parts.size() >= 2) {
             bool ok = false;
             const quint64 kib = parts.at(1).toULongLong(&ok);
@@ -89,10 +104,12 @@ QString SystemBackend::memorySummary() const
 
 QString SystemBackend::storageSummary() const
 {
-    const QStorageInfo root(QDir::rootPath());
-    if (!root.isValid() || !root.isReady())
+    QStorageInfo storage(QDir::homePath());
+    if (!storage.isValid() || !storage.isReady() || storage.bytesTotal() == 0)
+        storage = QStorageInfo(QStringLiteral("/var"));
+    if (!storage.isValid() || !storage.isReady() || storage.bytesTotal() == 0)
         return tr("Non disponibile");
-    return tr("%1 liberi su %2").arg(humanGiB(root.bytesAvailable()), humanGiB(root.bytesTotal()));
+    return tr("%1 liberi su %2").arg(humanGiB(storage.bytesAvailable()), humanGiB(storage.bytesTotal()));
 }
 
 QString SystemBackend::desktopSession() const
@@ -112,9 +129,9 @@ QString SystemBackend::quickSystemInfo() const
     out << "Kernel: " << kernelVersion() << '\n';
     out << "Arch: " << architecture() << '\n';
     out << "RAM: " << memorySummary() << '\n';
-    out << "Storage /: " << storageSummary() << '\n';
+    out << "Storage dati: " << storageSummary() << '\n';
     out << "Desktop: " << desktopSession() << '\n';
-    out << "Timezone: " << QString::fromUtf8(QTimeZone::systemTimeZoneId()) << '\n';
+    out << "Timezone: " << systemTimeZoneName() << '\n';
     out << "Qt: " << qVersion() << '\n';
     return text.trimmed();
 }

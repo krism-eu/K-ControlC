@@ -12,6 +12,18 @@ Kirigami.ScrollablePage {
     property string searchError: ""
     property string listError: ""
 
+    function humanSize(bytes) {
+        if (!bytes || bytes <= 0)
+            return ""
+        if (bytes >= 1024 * 1024 * 1024)
+            return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GiB"
+        if (bytes >= 1024 * 1024)
+            return (bytes / (1024 * 1024)).toFixed(1) + " MiB"
+        if (bytes >= 1024)
+            return (bytes / 1024).toFixed(1) + " KiB"
+        return bytes + " B"
+    }
+
     function runPrivileged(program, args) {
         root.ownOperation = true
         root.progressLines = []
@@ -71,7 +83,7 @@ Kirigami.ScrollablePage {
         Controls.Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: qsTr("Gestione del layer RPM persistente e consultazione DNF5. Gli aggiornamenti della base immutabile restano nella pagina BootC; Flatpak e applicazioni grafiche restano in Discover.")
+            text: qsTr("Gestione del layer RPM persistente e consultazione DNF5. Gli aggiornamenti della base immutabile restano nella pagina BootC; Flatpak e applicazioni grafiche possono essere gestiti separatamente.")
         }
 
         Controls.TabBar {
@@ -122,7 +134,7 @@ Kirigami.ScrollablePage {
                 }
                 ListView {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.min(contentHeight, 420)
+                    Layout.preferredHeight: Math.min(contentHeight, 460)
                     model: searchModel
                     clip: true
                     spacing: Kirigami.Units.smallSpacing
@@ -145,6 +157,20 @@ Kirigami.ScrollablePage {
                                     maximumLineCount: 2
                                     elide: Text.ElideRight
                                     text: model.summary
+                                }
+                                Controls.Label {
+                                    Layout.fillWidth: true
+                                    opacity: 0.7
+                                    elide: Text.ElideRight
+                                    text: {
+                                        var parts = []
+                                        if (model.version) parts.push(model.version)
+                                        if (model.arch) parts.push(model.arch)
+                                        if (model.repository) parts.push(model.repository)
+                                        if (model.downloadSize > 0) parts.push(qsTr("download %1").arg(root.humanSize(model.downloadSize)))
+                                        if (model.installSize > 0) parts.push(qsTr("installato %1").arg(root.humanSize(model.installSize)))
+                                        return parts.join(" · ")
+                                    }
                                 }
                             }
                             Controls.Button {
@@ -251,7 +277,11 @@ Kirigami.ScrollablePage {
 
             ColumnLayout {
                 RowLayout {
-                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Repository DNF5 configurati. Abilitazione e disabilitazione usano config-manager e richiedono autenticazione amministrativa fresca.") }
+                    Controls.Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: qsTr("Repository DNF5 configurati. Quelli abilitati sono mostrati per primi; i disabilitati restano visibili ma attenuati.")
+                    }
                     Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: SoftwareBackend.refreshRepositories() }
                 }
                 Controls.BusyIndicator { visible: SoftwareBackend.busy; running: visible }
@@ -266,13 +296,17 @@ Kirigami.ScrollablePage {
                     delegate: Kirigami.AbstractCard {
                         required property var modelData
                         Layout.fillWidth: true
+                        opacity: modelData.enabled ? 1.0 : 0.58
                         contentItem: RowLayout {
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 Controls.Label { font.bold: true; text: modelData.name }
                                 Controls.Label { text: modelData.id; opacity: 0.7 }
                             }
-                            Controls.Label { text: modelData.enabled ? qsTr("attivo") : qsTr("disattivo") }
+                            Controls.Label {
+                                font.bold: modelData.enabled
+                                text: modelData.enabled ? qsTr("ABILITATO") : qsTr("disabilitato")
+                            }
                             Controls.Button {
                                 enabled: !PolkitHelper.running
                                 text: modelData.enabled ? qsTr("Disabilita") : qsTr("Abilita")
@@ -289,12 +323,14 @@ Kirigami.ScrollablePage {
                 Controls.Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                    text: qsTr("Per applicazioni grafiche, Flatpak, recensioni e aggiornamenti applicativi usiamo Discover invece di duplicarne le funzioni in K-ControlC.")
+                    text: SystemBackend.toolAvailable("discover")
+                          ? qsTr("Discover è disponibile per applicazioni grafiche e Flatpak. La gestione Flatpak essenziale potrà essere integrata direttamente qui senza dipendere da Discover.")
+                          : qsTr("Discover non è installato. Flatpak è indipendente da Discover: la gestione essenziale verrà integrata direttamente in K-ControlC.")
                 }
                 Controls.Button {
+                    visible: SystemBackend.toolAvailable("discover")
                     text: qsTr("Apri Discover")
                     icon.name: "plasmadiscover"
-                    enabled: SystemBackend.toolAvailable("discover")
                     onClicked: SystemBackend.launchFlatpakManager()
                 }
             }
