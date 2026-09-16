@@ -10,6 +10,7 @@
 #include "PolkitHelper.h"
 #include "SoftwareBackend.h"
 #include "SystemBackend.h"
+#include "UtilityBackend.h"
 
 int main(int argc, char *argv[])
 {
@@ -24,6 +25,7 @@ int main(int argc, char *argv[])
     BootcBackend bootcBackend;
     SoftwareBackend softwareBackend;
     SystemBackend systemBackend;
+    UtilityBackend utilityBackend;
 
     QObject::connect(&polkitHelper, &PolkitHelper::finished, &systemBackend,
                      [&systemBackend](bool success, const QString &output) {
@@ -38,6 +40,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty(QStringLiteral("BootcBackend"), &bootcBackend);
     engine.rootContext()->setContextProperty(QStringLiteral("SoftwareBackend"), &softwareBackend);
     engine.rootContext()->setContextProperty(QStringLiteral("SystemBackend"), &systemBackend);
+    engine.rootContext()->setContextProperty(QStringLiteral("UtilityBackend"), &utilityBackend);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
                      &app, [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
