@@ -175,19 +175,6 @@ void BootcBackend::startHumanStatus(const QString &previousError)
         emit statusChanged();
     });
 
-    connect(rawProcess, &QProcess::errorOccurred, this,
-            [this, process, previousError](QProcess::ProcessError error) {
-        if (!process || process != m_process || error != QProcess::FailedToStart)
-            return;
-        m_errorText = tr("Impossibile avviare bootc: %1. %2")
-                          .arg(process->errorString(), previousError);
-        m_statusText.clear();
-        m_process = nullptr;
-        process->deleteLater();
-        setBusy(false);
-        emit statusChanged();
-    });
-
     rawProcess->start(QStringLiteral("/usr/bin/bootc"),
                       {QStringLiteral("status"), QStringLiteral("--format"),
                        QStringLiteral("humanreadable")});
