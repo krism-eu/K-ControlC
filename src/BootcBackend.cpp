@@ -18,26 +18,52 @@ QVariantMap deploymentMap(const QString &role, const QJsonObject &deployment)
     QVariantMap map;
     map.insert(QStringLiteral("role"), role);
 
-    const QJsonObject imageObject = deployment.value(QStringLiteral("image")).toObject();
-    QString image = jsonString(imageObject, QStringLiteral("image"));
-    if (image.isEmpty()) image = jsonString(imageObject, QStringLiteral("reference"));
+    // bootc v1 status schema:
+    // deployment.image.image.image -> container image reference
+    // deployment.image.version -> image version
+    // deployment.image.imageDigest -> container digest
+    // deployment.image.timestamp -> image timestamp
+    // deployment.ostree.checksum -> OSTree deployment checksum
+    const QJsonObject imageStatus = deployment.value(QStringLiteral("image")).toObject();
+    const QJsonObject imageReference = imageStatus.value(QStringLiteral("image")).toObject();
+    const QJsonObject ostree = deployment.value(QStringLiteral("ostree")).toObject();
+
+    QString image = jsonString(imageReference, QStringLiteral("image"));
+    if (image.isEmpty())
+        image = jsonString(imageReference, QStringLiteral("reference"));
+
+    // Compatibility fallbacks for older/alternate serializers.
+    if (image.isEmpty())
+        image = jsonString(imageStatus, QStringLiteral("image"));
     if (image.isEmpty() && deployment.value(QStringLiteral("image")).isString())
         image = deployment.value(QStringLiteral("image")).toString();
 
-    QString version = jsonString(deployment, QStringLiteral("version"));
-    if (version.isEmpty()) version = jsonString(imageObject, QStringLiteral("version"));
-    QString digest = jsonString(deployment, QStringLiteral("imageDigest"));
-    if (digest.isEmpty()) digest = jsonString(imageObject, QStringLiteral("imageDigest"));
-    if (digest.isEmpty()) digest = jsonString(imageObject, QStringLiteral("digest"));
+    QString version = jsonString(imageStatus, QStringLiteral("version"));
+    if (version.isEmpty())
+        version = jsonString(deployment, QStringLiteral("version"));
+
+    QString digest = jsonString(imageStatus, QStringLiteral("imageDigest"));
+    if (digest.isEmpty())
+        digest = jsonString(imageReference, QStringLiteral("imageDigest"));
+    if (digest.isEmpty())
+        digest = jsonString(imageReference, QStringLiteral("digest"));
+    if (digest.isEmpty())
+        digest = jsonString(deployment, QStringLiteral("imageDigest"));
+
+    QString checksum = jsonString(ostree, QStringLiteral("checksum"));
+    if (checksum.isEmpty())
+        checksum = jsonString(deployment, QStringLiteral("checksum"));
+
+    QString timestamp = jsonString(imageStatus, QStringLiteral("timestamp"));
+    if (timestamp.isEmpty())
+        timestamp = jsonString(deployment, QStringLiteral("timestamp"));
 
     map.insert(QStringLiteral("image"), image);
     map.insert(QStringLiteral("version"), version);
     map.insert(QStringLiteral("digest"), digest);
-    map.insert(QStringLiteral("checksum"), jsonString(deployment, QStringLiteral("ostree")));
-    if (map.value(QStringLiteral("checksum")).toString().isEmpty())
-        map[QStringLiteral("checksum")] = jsonString(deployment, QStringLiteral("checksum"));
+    map.insert(QStringLiteral("checksum"), checksum);
     map.insert(QStringLiteral("pinned"), deployment.value(QStringLiteral("pinned")).toBool(false));
-    map.insert(QStringLiteral("timestamp"), jsonString(deployment, QStringLiteral("timestamp")));
+    map.insert(QStringLiteral("timestamp"), timestamp);
     return map;
 }
 }
@@ -95,7 +121,7 @@ void BootcBackend::refreshStatus()
         }
 
         startHumanStatus(stderrText.isEmpty()
-                             ? tr("bootc status --json e' terminato con codice %1.").arg(exitCode)
+                             ? tr("bootc status --format json e' terminato con codice %1.").arg(exitCode)
                              : stderrText);
     });
 
@@ -110,8 +136,8 @@ void BootcBackend::refreshStatus()
     });
 
     rawProcess->start(QStringLiteral("/usr/bin/bootc"),
-                      {QStringLiteral("status"), QStringLiteral("--json"),
-                       QStringLiteral("--format-version=1")});
+                      {QStringLiteral("status"), QStringLiteral("--format"),
+                       QStringLiteral("json")});
 }
 
 void BootcBackend::startHumanStatus(const QString &previousError)
@@ -149,8 +175,22 @@ void BootcBackend::startHumanStatus(const QString &previousError)
         emit statusChanged();
     });
 
+    connect(rawProcess, &QProcess::errorOccurred, this,
+            [this, process, previousError](QProcess::ProcessError error) {
+        if (!process || process != m_process || error != QProcess::FailedToStart)
+            return;
+        m_errorText = tr("Impossibile avviare bootc: %1. %2")
+                          .arg(process->errorString(), previousError);
+        m_statusText.clear();
+        m_process = nullptr;
+        process->deleteLater();
+        setBusy(false);
+        emit statusChanged();
+    });
+
     rawProcess->start(QStringLiteral("/usr/bin/bootc"),
-                      {QStringLiteral("status"), QStringLiteral("--format=humanreadable")});
+                      {QStringLiteral("status"), QStringLiteral("--format"),
+                       QStringLiteral("humanreadable")});
 }
 
 void BootcBackend::parseJsonStatus(const QByteArray &data)
