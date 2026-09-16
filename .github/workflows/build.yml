@@ -34,24 +34,28 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
           QT_QUICK_CONTROLS_STYLE: Basic
-          KCC_SMOKE_TEST: "1"
-        run: ./build/kcc
+          KRISCC_SMOKE_TEST: "1"
+        run: ./build/krisCC
 
       - name: Read-only integration checks
         run: ./tests/e2e-readonly.sh
 
       - name: Validate RPM spec
         run: |
-          rpmspec -P packaging/kcc.spec >/dev/null
-          test "$(rpmspec -q --qf '%{NAME}\n' packaging/kcc.spec | head -n1)" = "kcc"
+          rpmspec -P packaging/krisCC.spec >/dev/null
+          test "$(rpmspec -q --qf '%{NAME}\n' packaging/krisCC.spec | head -n1)" = "krisCC"
+          ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Provides:[[:space:]]+kcc([[:space:]=]|$)'
+          ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Obsoletes:[[:space:]]+kcc([[:space:]<=>]|$)'
 
       - name: Stage install
         run: |
           DESTDIR="$PWD/stage" cmake --install build --prefix /usr
-          test -x stage/usr/bin/kcc
-          test -f stage/usr/share/applications/kcc.desktop
-          test -f stage/usr/share/icons/hicolor/scalable/apps/kcc.svg
-          tar -C stage -czf kcc-stage.tar.gz .
+          test -x stage/usr/bin/krisCC
+          test -f stage/usr/share/applications/krisCC.desktop
+          test -f stage/usr/share/icons/hicolor/scalable/apps/krisCC.svg
+          test -f stage/usr/share/polkit-1/actions/org.kriscc.controlcenter.policy
+          test -f stage/usr/share/metainfo/org.kriscc.KrisCC.metainfo.xml
+          tar -C stage -czf krisCC-stage.tar.gz .
 
       - name: Build RPM
         shell: bash
@@ -66,21 +70,28 @@ jobs:
               --exclude='./build' \
               --exclude='./stage' \
               --exclude='./artifacts' \
-              --exclude='./kcc-stage.tar.gz' \
-              --transform='s,^\./,kcc-0.4.0/,' \
-              -czf "$HOME/rpmbuild/SOURCES/kcc-0.4.0.tar.gz" .
-            cp "$GITHUB_WORKSPACE/packaging/kcc.spec" "$HOME/rpmbuild/SPECS/kcc.spec"
-            rpmbuild -ba "$HOME/rpmbuild/SPECS/kcc.spec"
+              --exclude='./krisCC-stage.tar.gz' \
+              --transform='s,^\./,krisCC-0.4.0/,' \
+              -czf "$HOME/rpmbuild/SOURCES/krisCC-0.4.0.tar.gz" .
+            cp "$GITHUB_WORKSPACE/packaging/krisCC.spec" "$HOME/rpmbuild/SPECS/krisCC.spec"
+            rpmbuild -ba "$HOME/rpmbuild/SPECS/krisCC.spec"
             mkdir -p "$GITHUB_WORKSPACE/artifacts/rpm" "$GITHUB_WORKSPACE/artifacts/srpm" "$GITHUB_WORKSPACE/artifacts/stage"
-            cp "$HOME"/rpmbuild/RPMS/*/kcc-*.rpm "$GITHUB_WORKSPACE/artifacts/rpm/"
-            cp "$HOME"/rpmbuild/SRPMS/kcc-*.src.rpm "$GITHUB_WORKSPACE/artifacts/srpm/"
-            cp "$GITHUB_WORKSPACE/kcc-stage.tar.gz" "$GITHUB_WORKSPACE/artifacts/stage/"
+            cp "$HOME"/rpmbuild/RPMS/*/krisCC-*.rpm "$GITHUB_WORKSPACE/artifacts/rpm/"
+            cp "$HOME"/rpmbuild/SRPMS/krisCC-*.src.rpm "$GITHUB_WORKSPACE/artifacts/srpm/"
+            cp "$GITHUB_WORKSPACE/krisCC-stage.tar.gz" "$GITHUB_WORKSPACE/artifacts/stage/"
           ) 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/logs/rpmbuild.log"
 
-      - name: Verify replacement of legacy k-controlc RPM
+      - name: Verify Fedora kcc coexistence and legacy replacement
         shell: bash
         run: |
           set -euxo pipefail
+
+          # Fedora already owns the generic kcc name and /usr/bin/kcc. krisCC
+          # must install next to it without Provides/Obsoletes or file conflicts.
+          dnf -y install kcc
+          rpm -q kcc
+          test -x /usr/bin/kcc
+
           cat > "$HOME/rpmbuild/SPECS/k-controlc-legacy.spec" <<'EOF'
           Name: k-controlc
           Version: 0.3.0
@@ -90,7 +101,7 @@ jobs:
           BuildArch: noarch
 
           %description
-          Minimal legacy package used only to verify KCC RPM replacement semantics.
+          Minimal legacy package used only to verify krisCC RPM replacement semantics.
 
           %install
           mkdir -p %{buildroot}%{_bindir}
@@ -112,34 +123,36 @@ jobs:
           rpmbuild -bb "$HOME/rpmbuild/SPECS/k-controlc-legacy.spec"
           dnf -y install "$HOME"/rpmbuild/RPMS/noarch/k-controlc-0.3.0-1*.rpm
           rpm -q k-controlc
-          test -x /usr/bin/k-controlc
-          test -f /usr/share/applications/k-controlc.desktop
-          test -f /usr/share/icons/hicolor/scalable/apps/k-controlc.svg
 
-          dnf -y install artifacts/rpm/kcc-*.rpm
+          dnf -y install artifacts/rpm/krisCC-*.rpm
+          rpm -q krisCC
           rpm -q kcc
           ! rpm -q k-controlc
+          test -x /usr/bin/kcc
+          test -x /usr/bin/krisCC
           test ! -e /usr/bin/k-controlc
           test ! -e /usr/share/applications/k-controlc.desktop
           test ! -e /usr/share/icons/hicolor/scalable/apps/k-controlc.svg
-          test "$(rpm -qf /usr/share/polkit-1/actions/org.kcontrolc.controlcenter.policy)" = "$(rpm -q kcc)"
+          test ! -e /usr/share/polkit-1/actions/org.kcontrolc.controlcenter.policy
+          test "$(rpm -qf /usr/share/polkit-1/actions/org.kriscc.controlcenter.policy)" = "$(rpm -q krisCC)"
 
       - name: Install built RPM and smoke test
         env:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
           QT_QUICK_CONTROLS_STYLE: Basic
-          KCC_SMOKE_TEST: "1"
+          KRISCC_SMOKE_TEST: "1"
         run: |
-          dnf -y reinstall artifacts/rpm/kcc-*.rpm
+          dnf -y reinstall artifacts/rpm/krisCC-*.rpm
+          rpm -q krisCC
           rpm -q kcc
-          test "$(rpm -q --provides kcc | grep -c '^k-controlc = ')" -ge 1
-          /usr/bin/kcc
+          test "$(rpm -q --provides krisCC | grep -c '^k-controlc = ')" -ge 1
+          /usr/bin/krisCC
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: kcc-${{ github.sha }}
+          name: krisCC-${{ github.sha }}
           path: artifacts/
           if-no-files-found: warn
 
@@ -152,7 +165,7 @@ jobs:
           tag="$GITHUB_REF_NAME"
           if ! gh release view "$tag" >/dev/null 2>&1; then
             gh release create "$tag" \
-              --title "KCC $tag" \
-              --notes "KCC RPM built and smoke-tested by CI from $GITHUB_SHA."
+              --title "krisCC $tag" \
+              --notes "krisCC RPM built and smoke-tested by CI from $GITHUB_SHA."
           fi
-          gh release upload "$tag" artifacts/rpm/kcc-*.rpm --clobber
+          gh release upload "$tag" artifacts/rpm/krisCC-*.rpm --clobber
