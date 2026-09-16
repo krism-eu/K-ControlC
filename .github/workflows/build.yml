@@ -16,7 +16,7 @@ jobs:
 
       - name: Install build dependencies
         run: >-
-          dnf -y install gcc-c++ cmake ninja-build git
+          dnf -y install gcc-c++ cmake ninja-build git gzip
           qt6-qtbase-devel qt6-qtdeclarative-devel kf6-kirigami-devel
           dnf5 dnf5-plugins rpm rpm-build tar
 
@@ -48,17 +48,19 @@ jobs:
       - name: Build RPM
         shell: bash
         run: |
-          set -o pipefail
-          mkdir -p "$HOME/rpmbuild"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
           mkdir -p artifacts/logs
-          git archive --format=tar.gz --prefix=k-controlc-0.4.0/ \
-            -o "$HOME/rpmbuild/SOURCES/k-controlc-0.4.0.tar.gz" HEAD
-          cp packaging/k-controlc.spec "$HOME/rpmbuild/SPECS/"
-          rpmbuild -ba "$HOME/rpmbuild/SPECS/k-controlc.spec" 2>&1 | tee artifacts/logs/rpmbuild.log
-          mkdir -p artifacts/rpm artifacts/srpm artifacts/stage
-          cp "$HOME"/rpmbuild/RPMS/*/k-controlc-*.rpm artifacts/rpm/
-          cp "$HOME"/rpmbuild/SRPMS/k-controlc-*.src.rpm artifacts/srpm/
-          cp k-controlc-stage.tar.gz artifacts/stage/
+          (
+            set -euxo pipefail
+            mkdir -p "$HOME/rpmbuild"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+            git archive --format=tar --prefix=k-controlc-0.4.0/ HEAD \
+              | gzip -n > "$HOME/rpmbuild/SOURCES/k-controlc-0.4.0.tar.gz"
+            cp packaging/k-controlc.spec "$HOME/rpmbuild/SPECS/"
+            rpmbuild -ba "$HOME/rpmbuild/SPECS/k-controlc.spec"
+            mkdir -p artifacts/rpm artifacts/srpm artifacts/stage
+            cp "$HOME"/rpmbuild/RPMS/*/k-controlc-*.rpm artifacts/rpm/
+            cp "$HOME"/rpmbuild/SRPMS/k-controlc-*.src.rpm artifacts/srpm/
+            cp k-controlc-stage.tar.gz artifacts/stage/
+          ) 2>&1 | tee artifacts/logs/rpmbuild.log
 
       - name: Install built RPM and smoke test
         env:
