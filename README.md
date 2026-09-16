@@ -69,7 +69,7 @@ cp packaging/krisCC.spec ~/rpmbuild/SPECS/krisCC.spec
 rpmbuild -ba ~/rpmbuild/SPECS/krisCC.spec
 ```
 
-Repository: https://github.com/krism-eu/KCC
+Repository: https://github.com/krism-eu/krisCC
 
 ## Test reale
 

@@ -3,7 +3,7 @@ Version:        0.4.0
 Release:        9%{?dist}
 Summary:        krisCC personal control center for KrisOS and Fedora bootc
 License:        MIT
-URL:            https://github.com/krism-eu/KCC
+URL:            https://github.com/krism-eu/krisCC
 Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  gcc-c++
