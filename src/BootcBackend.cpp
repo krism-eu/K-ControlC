@@ -6,6 +6,8 @@
 #include <QJsonObject>
 #include <QTimer>
 
+#include <unistd.h>
+
 namespace {
 QString jsonString(const QJsonObject &object, const QString &key)
 {
@@ -18,12 +20,6 @@ QVariantMap deploymentMap(const QString &role, const QJsonObject &deployment)
     QVariantMap map;
     map.insert(QStringLiteral("role"), role);
 
-    // bootc v1 status schema:
-    // deployment.image.image.image -> container image reference
-    // deployment.image.version -> image version
-    // deployment.image.imageDigest -> container digest
-    // deployment.image.timestamp -> image timestamp
-    // deployment.ostree.checksum -> OSTree deployment checksum
     const QJsonObject imageStatus = deployment.value(QStringLiteral("image")).toObject();
     const QJsonObject imageReference = imageStatus.value(QStringLiteral("image")).toObject();
     const QJsonObject ostree = deployment.value(QStringLiteral("ostree")).toObject();
@@ -31,8 +27,6 @@ QVariantMap deploymentMap(const QString &role, const QJsonObject &deployment)
     QString image = jsonString(imageReference, QStringLiteral("image"));
     if (image.isEmpty())
         image = jsonString(imageReference, QStringLiteral("reference"));
-
-    // Compatibility fallbacks for older/alternate serializers.
     if (image.isEmpty())
         image = jsonString(imageStatus, QStringLiteral("image"));
     if (image.isEmpty() && deployment.value(QStringLiteral("image")).isString())
@@ -65,6 +59,22 @@ QVariantMap deploymentMap(const QString &role, const QJsonObject &deployment)
     map.insert(QStringLiteral("pinned"), deployment.value(QStringLiteral("pinned")).toBool(false));
     map.insert(QStringLiteral("timestamp"), timestamp);
     return map;
+}
+
+void startBootcStatus(QProcess *process, const QString &format)
+{
+    const QStringList bootcArgs = {
+        QStringLiteral("status"), QStringLiteral("--format"), format
+    };
+
+    if (::geteuid() == 0) {
+        process->start(QStringLiteral("/usr/bin/bootc"), bootcArgs);
+        return;
+    }
+
+    QStringList pkexecArgs = {QStringLiteral("/usr/bin/bootc")};
+    pkexecArgs.append(bootcArgs);
+    process->start(QStringLiteral("/usr/bin/pkexec"), pkexecArgs);
 }
 }
 
@@ -135,9 +145,7 @@ void BootcBackend::refreshStatus()
         startHumanStatus(tr("Impossibile avviare bootc JSON: %1").arg(reason));
     });
 
-    rawProcess->start(QStringLiteral("/usr/bin/bootc"),
-                      {QStringLiteral("status"), QStringLiteral("--format"),
-                       QStringLiteral("json")});
+    startBootcStatus(rawProcess, QStringLiteral("json"));
 }
 
 void BootcBackend::startHumanStatus(const QString &previousError)
@@ -175,9 +183,7 @@ void BootcBackend::startHumanStatus(const QString &previousError)
         emit statusChanged();
     });
 
-    rawProcess->start(QStringLiteral("/usr/bin/bootc"),
-                      {QStringLiteral("status"), QStringLiteral("--format"),
-                       QStringLiteral("humanreadable")});
+    startBootcStatus(rawProcess, QStringLiteral("humanreadable"));
 }
 
 void BootcBackend::parseJsonStatus(const QByteArray &data)
