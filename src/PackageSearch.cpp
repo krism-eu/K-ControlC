@@ -202,7 +202,7 @@ void PackageSearch::startRepoQuery(const QString &term)
         for (const QString &line : lines) {
             const QStringList parts = line.split(QLatin1Char('\t'));
             const QString name = parts.value(0).trimmed();
-            if (name.isEmpty() || seen.contains(name))
+            if (name.isEmpty() || parts.size() < 7 || seen.contains(name))
                 continue;
 
             seen.insert(name);
@@ -245,7 +245,7 @@ void PackageSearch::startRepoQuery(const QString &term)
     rawProcess->start(QStringLiteral("/usr/bin/dnf5"),
                       {QStringLiteral("repoquery"), QStringLiteral("--available"),
                        QStringLiteral("--queryformat"),
-                       QStringLiteral("%{name}\\t%{summary}\\t%{evr}\\t%{repoid}\\t%{arch}\\t%{downloadsize}\\t%{installsize}\\n"),
+                       QStringLiteral("%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n"),
                        packageSpec});
 }
 
