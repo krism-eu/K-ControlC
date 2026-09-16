@@ -42,8 +42,6 @@ foreach(qml_file IN LISTS KRISCC_QML_FILES)
     set_source_files_properties("${qml_file}" PROPERTIES QT_RESOURCE_ALIAS "${qml_name}")
 endforeach()
 
-# PackageSearch is registered at runtime. Keep the page that instantiates it
-# out of qmlcachegen to avoid the previous QAbstractListModel registrar issue.
 set_source_files_properties(qml/modules/SoftwareModule.qml PROPERTIES QT_QML_SKIP_CACHEGEN ON)
 
 qt_add_qml_module(krisCC
