@@ -60,7 +60,7 @@ target_link_libraries(kcc PRIVATE
 target_compile_definitions(kcc PRIVATE KCC_VERSION="${PROJECT_VERSION}")
 
 install(TARGETS kcc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(FILES data/k-controlc.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications RENAME kcc.desktop)
+install(FILES data/kcc.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
 install(FILES data/org.kcontrolc.controlcenter.policy DESTINATION ${CMAKE_INSTALL_DATADIR}/polkit-1/actions)
 install(FILES data/org.kcontrolc.KControlC.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
-install(FILES data/icons/hicolor/scalable/apps/k-controlc.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps RENAME kcc.svg)
+install(FILES data/icons/hicolor/scalable/apps/kcc.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
