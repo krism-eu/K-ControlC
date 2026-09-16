@@ -44,7 +44,7 @@ Kirigami.ScrollablePage {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
                 opacity: 0.72
-                text: qsTr("Ricerca e gestione delle applicazioni Flatpak senza uscire da KCC.")
+                text: qsTr("Ricerca e gestione delle applicazioni Flatpak senza uscire da krisCC.")
             }
         }
 
@@ -52,10 +52,10 @@ Kirigami.ScrollablePage {
             id: flatpakTabs
             Layout.fillWidth: true
             currentIndex: root.mode === "installed" ? 1 : root.mode === "updates" ? 2 : root.mode === "remotes" ? 3 : 0
-            Controls.TabButton { text: qsTr("Cerca"); onClicked: root.mode = "search" }
-            Controls.TabButton { text: qsTr("Installati"); onClicked: root.run("installed", "") }
-            Controls.TabButton { text: qsTr("Aggiornamenti"); onClicked: root.run("updates", "") }
-            Controls.TabButton { text: qsTr("Remote"); onClicked: root.run("remotes", "") }
+            Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Cerca"); onClicked: root.mode = "search" }
+            Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Installati"); onClicked: root.run("installed", "") }
+            Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Aggiornamenti"); onClicked: root.run("updates", "") }
+            Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Remote"); onClicked: root.run("remotes", "") }
         }
 
         RowLayout {
