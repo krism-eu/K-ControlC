@@ -1,3 +1,5 @@
+#include <QCommandLineOption>
+#include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
@@ -18,6 +20,17 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName(QStringLiteral("krisCC"));
     QCoreApplication::setApplicationName(QStringLiteral("krisCC"));
     QCoreApplication::setApplicationVersion(QStringLiteral(KRISCC_VERSION));
+
+    QCommandLineParser parser;
+    parser.setApplicationDescription(QStringLiteral("krisCC control center"));
+    parser.addHelpOption();
+    parser.addVersionOption();
+    QCommandLineOption backgroundOption(
+        QStringList{QStringLiteral("background")},
+        QStringLiteral("Start krisCC without opening the main window."));
+    parser.addOption(backgroundOption);
+    parser.process(app);
+    const bool startHidden = parser.isSet(backgroundOption);
 
     qmlRegisterType<PackageSearch>("org.kriscc", 1, 0, "PackageSearch");
 
@@ -41,6 +54,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty(QStringLiteral("SoftwareBackend"), &softwareBackend);
     engine.rootContext()->setContextProperty(QStringLiteral("SystemBackend"), &systemBackend);
     engine.rootContext()->setContextProperty(QStringLiteral("UtilityBackend"), &utilityBackend);
+    engine.rootContext()->setContextProperty(QStringLiteral("KrisccStartHidden"), startHidden);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
                      &app, [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
