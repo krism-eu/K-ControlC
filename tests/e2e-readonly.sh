@@ -11,6 +11,18 @@ if grep -Eq '<allow_(any|inactive|active)>auth_admin_keep</allow_' data/org.raku
   exit 1
 fi
 
+# Guard the exact bootc JSON invocation and schema traversal used by the UI.
+if grep -Eq 'QStringLiteral\("--json"\)|QStringLiteral\("--format-version' src/BootcBackend.cpp; then
+  echo "ERROR: BootcBackend must use bootc status --format json without legacy JSON flags" >&2
+  exit 1
+fi
+
+grep -q 'QStringLiteral("--format")' src/BootcBackend.cpp
+grep -q 'QStringLiteral("json")' src/BootcBackend.cpp
+grep -q 'imageStatus.value(QStringLiteral("image")).toObject()' src/BootcBackend.cpp
+grep -q 'deployment.value(QStringLiteral("ostree")).toObject()' src/BootcBackend.cpp
+grep -q 'jsonString(ostree, QStringLiteral("checksum"))' src/BootcBackend.cpp
+
 grep -q 'org.kde.kirigami' qml/Main.qml
 grep -q 'config-manager' src/PolkitHelper.cpp
 
@@ -23,8 +35,9 @@ dnf5 repo list --all --json >/dev/null
 dnf5 config-manager --help >/dev/null
 
 if command -v bootc >/dev/null 2>&1; then
-  echo "bootc detected; validating status JSON when available"
-  bootc status --json --format-version=1 >/dev/null || bootc status --format=humanreadable >/dev/null
+  echo "bootc detected; validating the exact JSON command used by K-ControlC"
+  bootc status --format json > /tmp/k-controlc-bootc-status.json
+  grep -q '"status"' /tmp/k-controlc-bootc-status.json
 else
-  echo "bootc not available in this CI container; skipping host deployment probe"
+  echo "bootc not available in this CI container; static command/schema guards passed"
 fi
