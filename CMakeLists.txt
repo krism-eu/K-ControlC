@@ -30,6 +30,7 @@ set(KCONTROLC_QML_FILES
     qml/modules/DashboardModule.qml
     qml/modules/SoftwareModule.qml
     qml/modules/FlatpakModule.qml
+    qml/modules/PodmanModule.qml
     qml/modules/BootcModule.qml
     qml/modules/ToolsModule.qml
     qml/modules/CommandsModule.qml
