@@ -46,18 +46,26 @@ grep -q '/var/lib/raku-kris/packages.list' src/BootcBackend.cpp
 
 # KCC is now the package, executable and installed desktop identity. The old RPM
 # name is retained only as Provides/Obsoletes so upgrades do not duplicate it.
-grep -q '^Name:[[:space:]]*kcc$' packaging/k-controlc.spec
-grep -q '^Provides:[[:space:]]*k-controlc' packaging/k-controlc.spec
-grep -q '^Obsoletes:[[:space:]]*k-controlc' packaging/k-controlc.spec
+test -f packaging/kcc.spec
+test ! -e packaging/k-controlc.spec
+test -f data/kcc.desktop
+test ! -e data/k-controlc.desktop
+test -f data/icons/hicolor/scalable/apps/kcc.svg
+test ! -e data/icons/hicolor/scalable/apps/k-controlc.svg
+grep -q '^Name:[[:space:]]*kcc$' packaging/kcc.spec
+grep -q '^Provides:[[:space:]]*k-controlc' packaging/kcc.spec
+grep -q '^Obsoletes:[[:space:]]*k-controlc' packaging/kcc.spec
 grep -q 'qt_add_executable(kcc' CMakeLists.txt
 grep -q 'install(TARGETS kcc' CMakeLists.txt
-grep -q '^Name=KCC$' data/k-controlc.desktop
-grep -q '^Exec=kcc$' data/k-controlc.desktop
-grep -q '^Icon=kcc$' data/k-controlc.desktop
+grep -q 'data/kcc.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/kcc.svg' CMakeLists.txt
+grep -q '^Name=KCC$' data/kcc.desktop
+grep -q '^Exec=kcc$' data/kcc.desktop
+grep -q '^Icon=kcc$' data/kcc.desktop
 grep -q '<name>KCC</name>' data/org.kcontrolc.KControlC.metainfo.xml
 grep -q '<provides><binary>kcc</binary></provides>' data/org.kcontrolc.KControlC.metainfo.xml
 grep -q '<vendor>KCC</vendor>' data/org.kcontrolc.controlcenter.policy
-grep -q 'https://github.com/krism-eu/KCC' packaging/k-controlc.spec
+grep -q 'https://github.com/krism-eu/KCC' packaging/kcc.spec
 grep -q 'https://github.com/krism-eu/KCC' data/org.kcontrolc.KControlC.metainfo.xml
 grep -q 'https://github.com/krism-eu/KCC' data/org.kcontrolc.controlcenter.policy
 
@@ -81,7 +89,7 @@ grep -q 'import org.kcontrolc' qml/Main.qml
 grep -q 'config-manager' src/PolkitHelper.cpp
 
 if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
-    CMakeLists.txt src/main.cpp qml data/k-controlc.desktop packaging/k-controlc.spec \
+    CMakeLists.txt src/main.cpp qml data/kcc.desktop packaging/kcc.spec \
     data/org.kcontrolc.controlcenter.policy data/org.kcontrolc.KControlC.metainfo.xml; then
   echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
   exit 1
