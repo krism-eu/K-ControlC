@@ -46,12 +46,15 @@ jobs:
           tar -C stage -czf k-controlc-stage.tar.gz .
 
       - name: Build RPM
+        shell: bash
         run: |
+          set -o pipefail
           mkdir -p "$HOME/rpmbuild"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          mkdir -p artifacts/logs
           git archive --format=tar.gz --prefix=k-controlc-0.4.0/ \
             -o "$HOME/rpmbuild/SOURCES/k-controlc-0.4.0.tar.gz" HEAD
           cp packaging/k-controlc.spec "$HOME/rpmbuild/SPECS/"
-          rpmbuild -ba "$HOME/rpmbuild/SPECS/k-controlc.spec"
+          rpmbuild -ba "$HOME/rpmbuild/SPECS/k-controlc.spec" 2>&1 | tee artifacts/logs/rpmbuild.log
           mkdir -p artifacts/rpm artifacts/srpm artifacts/stage
           cp "$HOME"/rpmbuild/RPMS/*/k-controlc-*.rpm artifacts/rpm/
           cp "$HOME"/rpmbuild/SRPMS/k-controlc-*.src.rpm artifacts/srpm/
@@ -68,7 +71,8 @@ jobs:
           /usr/bin/k-controlc
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: k-controlc-${{ github.sha }}
           path: artifacts/
-          if-no-files-found: error
+          if-no-files-found: warn
