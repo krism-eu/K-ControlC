@@ -23,6 +23,7 @@ public:
     Q_INVOKABLE bool previewRpmInstall(const QString &packageName);
     Q_INVOKABLE bool runFlatpak(const QString &mode, const QString &query = QString());
     Q_INVOKABLE bool addFlathubUser();
+    Q_INVOKABLE bool runPodman(const QString &mode, const QString &container = QString(), const QString &value = QString());
 
 signals:
     void stateChanged();
@@ -30,6 +31,7 @@ signals:
 private:
     bool start(const QString &program, const QStringList &args, const QString &title);
     bool validPackageName(const QString &name) const;
+    bool validContainerName(const QString &name) const;
     void finish(const QString &message = QString());
 
     QPointer<QProcess> m_process;

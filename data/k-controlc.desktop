@@ -1,11 +1,11 @@
 [Desktop Entry]
 Type=Application
-Name=K-ControlC
+Name=KCC
 GenericName=System Control Center
 Comment=Personal control center for Fedora bootc systems
 Exec=k-controlc
 Icon=k-controlc
 Terminal=false
 Categories=Settings;System;
-Keywords=bootc;system;settings;software;recovery;fedora;control center;
+Keywords=bootc;system;settings;software;recovery;fedora;control center;containers;podman;
 StartupNotify=true

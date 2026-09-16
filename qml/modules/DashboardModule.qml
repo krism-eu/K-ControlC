@@ -15,12 +15,12 @@ Kirigami.ScrollablePage {
         Kirigami.Heading {
             Layout.fillWidth: true
             level: 1
-            text: qsTr("K-ControlC")
+            text: qsTr("KCC")
         }
         Controls.Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: qsTr("Software persistente, deployment BootC, strumenti pratici e recovery. Le normali impostazioni desktop restano a Plasma.")
+            text: qsTr("Software persistente, Flatpak, container Podman, deployment BootC, strumenti pratici e recovery. Le normali impostazioni desktop restano a Plasma.")
         }
 
         Kirigami.InlineMessage {
@@ -82,6 +82,24 @@ Kirigami.ScrollablePage {
                         text: qsTr("Apri Software")
                         icon.name: "system-software-install"
                         onClicked: root.openRequested("software")
+                    }
+                }
+            }
+
+            Kirigami.AbstractCard {
+                Layout.fillWidth: true
+                contentItem: ColumnLayout {
+                    Kirigami.Heading { level: 2; text: qsTr("Container") }
+                    Controls.Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: SystemBackend.programAvailable("podman") ? qsTr("Gestione Podman disponibile") : qsTr("Podman non installato")
+                    }
+                    Controls.Button {
+                        text: qsTr("Apri Container")
+                        icon.name: "package-x-generic"
+                        enabled: SystemBackend.programAvailable("podman")
+                        onClicked: root.openRequested("podman")
                     }
                 }
             }

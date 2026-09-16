@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>org.kcontrolc.KControlC</id>
-  <name>K-ControlC</name>
+  <name>KCC</name>
   <summary>Personal Kirigami control center for Fedora bootc</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <description>
-    <p>K-ControlC provides persistent software management, bootc deployments, practical maintenance tools, diagnostics, recovery and local configuration/home backups without duplicating Plasma System Settings.</p>
+    <p>KCC provides persistent software management, bootc deployments, practical maintenance tools, diagnostics, recovery and local configuration/home backups without duplicating Plasma System Settings.</p>
   </description>
   <launchable type="desktop-id">k-controlc.desktop</launchable>
   <url type="homepage">https://github.com/krism-eu/K-ControlC</url>

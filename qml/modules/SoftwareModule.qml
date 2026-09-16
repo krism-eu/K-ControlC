@@ -16,7 +16,7 @@ Kirigami.ScrollablePage {
 
     function humanSize(bytes) {
         if (!bytes || bytes <= 0)
-            return ""
+            return qsTr("non disponibile")
         if (bytes >= 1024 * 1024 * 1024)
             return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GiB"
         if (bytes >= 1024 * 1024)
@@ -46,6 +46,43 @@ Kirigami.ScrollablePage {
     function isAdvancedRepo(id) {
         var x = (id || "").toLowerCase()
         return x.indexOf("debuginfo") >= 0 || x.indexOf("source") >= 0 || x.indexOf("testing") >= 0 || x.indexOf("archive") >= 0
+    }
+
+    function transactionDependencies() {
+        var lines = UtilityBackend.output.split("\n")
+        var result = []
+        var inDependencies = false
+        for (var i = 0; i < lines.length; ++i) {
+            var line = lines[i]
+            var trimmed = line.trim()
+            if (trimmed === "Installing dependencies:" || trimmed === "Installing weak dependencies:") {
+                inDependencies = true
+                continue
+            }
+            if (inDependencies && (trimmed === "Transaction Summary:" || trimmed.indexOf("Total size of inbound packages") === 0 || trimmed.indexOf("After this operation") === 0))
+                inDependencies = false
+            if (!inDependencies || !trimmed)
+                continue
+            if (trimmed.endsWith(":")) {
+                inDependencies = false
+                continue
+            }
+            if (trimmed.indexOf("replacing ") === 0)
+                continue
+            result.push(trimmed)
+        }
+        return result
+    }
+
+    function transactionTotals() {
+        var lines = UtilityBackend.output.split("\n")
+        var result = []
+        for (var i = 0; i < lines.length; ++i) {
+            var trimmed = lines[i].trim()
+            if (trimmed.indexOf("Total size of inbound packages") === 0 || trimmed.indexOf("After this operation") === 0)
+                result.push(trimmed)
+        }
+        return result
     }
 
     function runPrivileged(program, args) {
@@ -187,8 +224,8 @@ Kirigami.ScrollablePage {
                             }
                             RowLayout {
                                 Layout.fillWidth: true
-                                Controls.Label { visible: model.downloadSize > 0; opacity: 0.72; text: qsTr("Download: %1").arg(root.humanSize(model.downloadSize)) }
-                                Controls.Label { visible: model.installSize > 0; opacity: 0.72; text: qsTr("Installato: %1").arg(root.humanSize(model.installSize)) }
+                                Controls.Label { opacity: 0.72; text: qsTr("Download: %1").arg(root.humanSize(model.downloadSize)) }
+                                Controls.Label { opacity: 0.72; text: qsTr("Installato: %1").arg(root.humanSize(model.installSize)) }
                                 Item { Layout.fillWidth: true }
                                 Controls.Button {
                                     text: qsTr("Dettagli")
@@ -389,34 +426,103 @@ Kirigami.ScrollablePage {
     Controls.Dialog {
         id: packageDialog
         modal: true
-        width: Math.min(root.width - 48, 760)
+        width: Math.min(root.width - 48, 800)
         title: root.detailPackage ? root.detailPackage.name : qsTr("Dettagli pacchetto")
         standardButtons: Controls.Dialog.Close
         contentItem: ColumnLayout {
-            Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: root.detailPackage ? root.detailPackage.summary : "" }
+            spacing: Kirigami.Units.smallSpacing
+
+            Controls.Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
+                text: root.detailPackage ? root.detailPackage.summary : ""
+            }
             Controls.Label {
                 Layout.fillWidth: true
                 opacity: 0.7
                 wrapMode: Text.WordWrap
                 text: root.detailPackage ? [root.detailPackage.version, root.detailPackage.arch, root.detailPackage.repository, root.detailPackage.state].filter(function(x) { return !!x }).join(" · ") : ""
             }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Kirigami.AbstractCard {
+                    Layout.fillWidth: true
+                    contentItem: ColumnLayout {
+                        Controls.Label { text: qsTr("Download"); opacity: 0.65 }
+                        Controls.Label { font.bold: true; text: root.detailPackage ? root.humanSize(root.detailPackage.downloadSize) : "" }
+                    }
+                }
+                Kirigami.AbstractCard {
+                    Layout.fillWidth: true
+                    contentItem: ColumnLayout {
+                        Controls.Label { text: qsTr("Spazio installato"); opacity: 0.65 }
+                        Controls.Label { font.bold: true; text: root.detailPackage ? root.humanSize(root.detailPackage.installSize) : "" }
+                    }
+                }
+            }
+
+            Kirigami.Separator { Layout.fillWidth: true }
+            Kirigami.Heading { level: 3; text: qsTr("Cosa verrebbe installato") }
             Controls.Label {
                 Layout.fillWidth: true
-                visible: root.detailPackage && (root.detailPackage.downloadSize > 0 || root.detailPackage.installSize > 0)
-                text: root.detailPackage ? qsTr("Download %1 · installato %2").arg(root.humanSize(root.detailPackage.downloadSize)).arg(root.humanSize(root.detailPackage.installSize)) : ""
+                wrapMode: Text.WordWrap
+                opacity: 0.72
+                text: qsTr("Anteprima DNF5: dipendenze e spazio vengono calcolati dal gestore pacchetti, senza modificare il sistema.")
             }
-            Kirigami.Separator { Layout.fillWidth: true }
-            Controls.Label { text: qsTr("Anteprima transazione DNF5"); font.bold: true }
-            Controls.BusyIndicator { visible: UtilityBackend.busy; running: visible }
+            Controls.BusyIndicator { visible: UtilityBackend.busy; running: visible; Layout.alignment: Qt.AlignHCenter }
+
+            Repeater {
+                model: root.transactionTotals()
+                delegate: Controls.Label {
+                    required property string modelData
+                    Layout.fillWidth: true
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                    text: modelData
+                }
+            }
+
+            Kirigami.AbstractCard {
+                Layout.fillWidth: true
+                visible: !UtilityBackend.busy && root.transactionDependencies().length > 0
+                contentItem: ColumnLayout {
+                    Controls.Label { text: qsTr("Pacchetti aggiuntivi"); font.bold: true }
+                    Repeater {
+                        model: root.transactionDependencies()
+                        delegate: Controls.Label {
+                            required property string modelData
+                            Layout.fillWidth: true
+                            wrapMode: Text.WrapAnywhere
+                            text: modelData
+                        }
+                    }
+                }
+            }
+
+            Kirigami.InlineMessage {
+                Layout.fillWidth: true
+                visible: !UtilityBackend.busy && root.transactionDependencies().length === 0 && UtilityBackend.output.length > 0
+                type: Kirigami.MessageType.Information
+                text: qsTr("DNF5 non segnala pacchetti aggiuntivi, oppure il pacchetto è già installato.")
+            }
+
+            Controls.CheckBox {
+                id: technicalOutputToggle
+                text: qsTr("Mostra output tecnico DNF5")
+            }
             Controls.TextArea {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 260
+                Layout.preferredHeight: 180
+                visible: technicalOutputToggle.checked
                 readOnly: true
                 wrapMode: TextEdit.Wrap
                 font.family: "monospace"
                 text: UtilityBackend.output
             }
         }
+        onClosed: technicalOutputToggle.checked = false
     }
 
     Controls.Dialog {

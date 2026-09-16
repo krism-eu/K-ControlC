@@ -15,6 +15,12 @@ bool UtilityBackend::validPackageName(const QString &name) const
     return pattern.match(name).hasMatch();
 }
 
+bool UtilityBackend::validContainerName(const QString &name) const
+{
+    static const QRegularExpression pattern(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"));
+    return pattern.match(name).hasMatch();
+}
+
 bool UtilityBackend::start(const QString &program, const QStringList &args, const QString &title)
 {
     if (m_busy)
@@ -109,13 +115,31 @@ bool UtilityBackend::previewRpmInstall(const QString &packageName)
 bool UtilityBackend::runFlatpak(const QString &mode, const QString &query)
 {
     if (mode == QStringLiteral("installed"))
-        return start(QStringLiteral("/usr/bin/flatpak"), {QStringLiteral("list"), QStringLiteral("--app"), QStringLiteral("--columns=application,name,version,origin")}, tr("Flatpak installati"));
+        return start(QStringLiteral("/usr/bin/flatpak"),
+                     {QStringLiteral("list"), QStringLiteral("--app"),
+                      QStringLiteral("--columns=name,application,version,origin")},
+                     tr("Flatpak installati"));
     if (mode == QStringLiteral("updates"))
-        return start(QStringLiteral("/usr/bin/flatpak"), {QStringLiteral("remote-ls"), QStringLiteral("--updates"), QStringLiteral("--app"), QStringLiteral("--columns=application,name,version,origin")}, tr("Aggiornamenti Flatpak"));
+        return start(QStringLiteral("/usr/bin/flatpak"),
+                     {QStringLiteral("remote-ls"), QStringLiteral("--updates"), QStringLiteral("--app"),
+                      QStringLiteral("--columns=name,application,version,origin")},
+                     tr("Aggiornamenti Flatpak"));
     if (mode == QStringLiteral("remotes"))
-        return start(QStringLiteral("/usr/bin/flatpak"), {QStringLiteral("remotes"), QStringLiteral("--show-details")}, tr("Remote Flatpak"));
+        return start(QStringLiteral("/usr/bin/flatpak"),
+                     {QStringLiteral("remotes"), QStringLiteral("--columns=name,title,url,options")},
+                     tr("Remote Flatpak"));
     if (mode == QStringLiteral("search") && query.trimmed().size() >= 2)
-        return start(QStringLiteral("/usr/bin/flatpak"), {QStringLiteral("search"), query.trimmed()}, tr("Ricerca Flatpak: %1").arg(query.trimmed()));
+        return start(QStringLiteral("/usr/bin/flatpak"),
+                     {QStringLiteral("search"), QStringLiteral("--columns=name,description,application,version,branch,remotes"), query.trimmed()},
+                     tr("Ricerca Flatpak: %1").arg(query.trimmed()));
+    if (mode == QStringLiteral("install") && validPackageName(query.trimmed()))
+        return start(QStringLiteral("/usr/bin/flatpak"),
+                     {QStringLiteral("install"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), QStringLiteral("flathub"), query.trimmed()},
+                     tr("Installazione Flatpak: %1").arg(query.trimmed()));
+    if (mode == QStringLiteral("remove") && validPackageName(query.trimmed()))
+        return start(QStringLiteral("/usr/bin/flatpak"),
+                     {QStringLiteral("uninstall"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), query.trimmed()},
+                     tr("Rimozione Flatpak: %1").arg(query.trimmed()));
     return false;
 }
 
@@ -125,4 +149,31 @@ bool UtilityBackend::addFlathubUser()
                  {QStringLiteral("remote-add"), QStringLiteral("--user"), QStringLiteral("--if-not-exists"),
                   QStringLiteral("flathub"), QStringLiteral("https://flathub.org/repo/flathub.flatpakrepo")},
                  tr("Aggiunta Flathub per l'utente"));
+}
+
+bool UtilityBackend::runPodman(const QString &mode, const QString &container, const QString &value)
+{
+    if (mode == QStringLiteral("list"))
+        return start(QStringLiteral("/usr/bin/podman"),
+                     {QStringLiteral("ps"), QStringLiteral("--all"), QStringLiteral("--size"), QStringLiteral("--format"), QStringLiteral("json")},
+                     tr("Container Podman"));
+
+    const QString name = container.trimmed();
+    if (!validContainerName(name))
+        return false;
+
+    if (mode == QStringLiteral("info"))
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("inspect"), name}, tr("Info container: %1").arg(name));
+    if (mode == QStringLiteral("logs"))
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("logs"), QStringLiteral("--tail"), QStringLiteral("200"), name}, tr("Log container: %1").arg(name));
+    if (mode == QStringLiteral("start"))
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("start"), name}, tr("Avvio container: %1").arg(name));
+    if (mode == QStringLiteral("stop"))
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("stop"), name}, tr("Arresto container: %1").arg(name));
+    if (mode == QStringLiteral("restart"))
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("restart"), name}, tr("Riavvio container: %1").arg(name));
+    if (mode == QStringLiteral("rename") && validContainerName(value.trimmed()))
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("rename"), name, value.trimmed()}, tr("Rinomina container: %1").arg(name));
+
+    return false;
 }

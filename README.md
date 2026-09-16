@@ -1,27 +1,34 @@
-# K-ControlC
+# KCC
 
-K-ControlC è un **Control Center personale Kirigami per Fedora bootc**. Non vuole sostituire Plasma System Settings: rete, utenti, firewall, display, audio e preferenze desktop restano agli strumenti KDE già presenti.
+KCC è un **Control Center personale Kirigami per KrisOS / Fedora bootc**. Non vuole sostituire Plasma System Settings: rete, utenti, firewall, display, audio e preferenze desktop restano agli strumenti KDE già presenti.
 
 ## Cosa gestisce
 
 - **Panoramica**: sistema, BootC, storage, pacchetti persistenti e Quick System Info.
-- **Software**: ricerca RPM, installati, aggiornabili, pacchetti recenti, repository DNF5 e layer persistente gestito da `rk`.
-- **Discover**: applicazioni grafiche e Flatpak vengono delegati a Plasma Discover.
+- **Software RPM**: ricerca, installati, aggiornabili, pacchetti recenti, repository DNF5, provenienza Base/Persistente/Locale e anteprima della transazione prima dell'installazione.
+- **Flatpak**: ricerca strutturata, installati, aggiornamenti, remote e integrazione Flathub senza dipendere da Discover.
+- **Container / Podman**: elenco container, stato, immagine, dimensione, informazioni, log, start/stop/restart e rinomina. Nessuna rimozione automatica.
 - **BootC**: stato deployment JSON, upgrade, download/apply e rollback.
-- **Strumenti**: pulizia Flatpak, analisi RPM non necessari, log dell'ultimo boot, firmware, dischi, monitor e restart rapido di NetworkManager/CUPS/Bluetooth.
+- **Strumenti e comandi**: utility amministrative mirate, servizi rapidi e launcher KDE disponibili sul sistema.
 - **Recovery e backup**: rollback BootC, `rk sync`, azioni di sessione e snapshot `tar.gz` della configurazione o della home.
-
-Gli snapshot vengono salvati in `~/K-ControlC Backups`. Il backup della home esclude cache, cestino e la cartella stessa dei backup; prima di partire verifica anche che nel filesystem di destinazione ci sia uno spazio libero minimo di sicurezza.
 
 ## Sicurezza
 
 Le modifiche privilegiate passano da `pkexec` con una allowlist C++ stretta. La policy non usa `auth_admin_keep`. Sono ammesse soltanto le combinazioni previste per `rk`, `bootc` e l'abilitazione/disabilitazione dei repository tramite `dnf5 config-manager`. Non vengono eseguite shell root generiche.
 
-Le query DNF5 sono read-only. La ricerca usa `dnf5 repoquery --available ... '*term*'`; inventario, aggiornamenti e pacchetti recenti usano le API JSON di DNF5. I test che richiedono metadata remoti sono separati dai controlli locali obbligatori, per evitare falsi negativi quando i mirror non sono raggiungibili.
+Le query DNF5 sono read-only. L'anteprima delle dipendenze usa DNF5 senza applicare la transazione. Le operazioni Podman dell'utente non introducono un helper root generico.
 
-## Compatibilità attuale con il sistema
+## Compatibilità KrisOS
 
-K-ControlC è ora identificato in modo autonomo (`org.kcontrolc`). Per non rompere il collaudo sull'installazione attuale, il backend mantiene temporaneamente l'integrazione con `/usr/bin/rk` e con i percorsi dati legacy usati dal sistema corrente. Questi punti verranno migrati insieme al futuro rinomina dell'OS, non prima.
+KCC usa in via primaria il layout corrente di KrisOS:
+
+- `/var/lib/krisos/packages.list`
+- `/usr/share/krisos/owned-packages.txt`
+- `/usr/bin/rk`
+
+Per la fase di migrazione mantiene un fallback in sola lettura verso i vecchi percorsi `/var/lib/raku-kris` e `/usr/share/raku-kris`. Il layout KrisOS ha sempre precedenza.
+
+L'identità visibile dell'app è **KCC**. Per evitare regressioni durante l'integrazione nell'immagine, il nome tecnico del pacchetto, l'eseguibile e gli ID già installati restano temporaneamente compatibili (`k-controlc`, `org.kcontrolc`). Una futura rinomina del NEVRA dovrà usare `Provides/Obsoletes` e venire coordinata con la pipeline KrisOS.
 
 ## Build locale
 
@@ -34,9 +41,17 @@ cmake --build build
 ./build/k-controlc
 ```
 
-## RPM
+## RPM e integrazione nell'immagine
 
-Lo spec è in `packaging/k-controlc.spec`. La CI Fedora 44 costruisce automaticamente sia il binario/staging sia l'RPM `k-controlc-0.4.0-*.rpm`, installa l'RPM nel container e riesegue lo smoke test. L'RPM prodotto è disponibile come artifact del workflow e può essere copiato direttamente nel build context della tua immagine BootC.
+Lo spec è in `packaging/k-controlc.spec`. La CI Fedora 44 costruisce automaticamente l'RPM `k-controlc-0.4.0-*.rpm`, lo installa nel container e riesegue lo smoke test.
+
+Il flusso previsto per KrisOS è:
+
+```text
+KCC source -> CI/test -> RPM -> build context KrisOS -> installazione nella base -> snapshot owned packages -> immagine BootC
+```
+
+L'RPM deve essere installato **prima** della generazione di `/usr/share/krisos/owned-packages.txt` e `owned-nevra.txt`, così KCC viene riconosciuto come parte della base immutabile e non come pacchetto dell'overlay.
 
 Esempio manuale:
 
@@ -50,4 +65,4 @@ rpmbuild -ba ~/rpmbuild/SPECS/k-controlc.spec
 
 ## Test reale
 
-La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk add/rm/sync`, autenticazione Polkit, repository enable/disable, upgrade/rollback BootC, restart servizi e backup della home/configurazione.
+La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk add/rm/sync`, autenticazione Polkit, ricerca RPM con dimensioni e dipendenze, Flatpak, Podman, repository enable/disable, upgrade/rollback BootC, restart servizi e backup della home/configurazione.
