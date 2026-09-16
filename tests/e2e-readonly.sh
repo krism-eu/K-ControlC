@@ -38,6 +38,15 @@ grep -q 'imageStatus.value(QStringLiteral("image")).toObject()' src/BootcBackend
 grep -q 'deployment.value(QStringLiteral("ostree")).toObject()' src/BootcBackend.cpp
 grep -q 'jsonString(ostree, QStringLiteral("checksum"))' src/BootcBackend.cpp
 
+# KrisOS is now the primary package-state layout. Keep the old Raku paths only
+# as a compatibility fallback until existing installations have migrated.
+grep -q '/usr/share/krisos/owned-packages.txt' src/PackageSearch.cpp
+grep -q '/var/lib/krisos/packages.list' src/PackageSearch.cpp
+grep -q '/var/lib/krisos/packages.list' src/BootcBackend.cpp
+grep -q '/usr/share/raku-kris/owned-packages.txt' src/PackageSearch.cpp
+grep -q '/var/lib/raku-kris/packages.list' src/PackageSearch.cpp
+grep -q '/var/lib/raku-kris/packages.list' src/BootcBackend.cpp
+
 grep -q 'org.kde.kirigami' qml/Main.qml
 grep -q 'import org.kcontrolc' qml/Main.qml
 grep -q 'config-manager' src/PolkitHelper.cpp
@@ -76,7 +85,7 @@ else
 fi
 
 if command -v bootc >/dev/null 2>&1; then
-  echo "bootc detected; validating the exact JSON command used by K-ControlC"
+  echo "bootc detected; validating the exact JSON command used by KCC"
   bootc status --format json > /tmp/k-controlc-bootc-status.json
   grep -q '"status"' /tmp/k-controlc-bootc-status.json
 else
