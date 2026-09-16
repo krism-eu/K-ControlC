@@ -42,14 +42,15 @@ jobs:
 
       - name: Validate RPM spec
         run: |
-          rpmspec -P packaging/k-controlc.spec >/dev/null
-          test "$(rpmspec -q --qf '%{NAME}\n' packaging/k-controlc.spec | head -n1)" = "kcc"
+          rpmspec -P packaging/kcc.spec >/dev/null
+          test "$(rpmspec -q --qf '%{NAME}\n' packaging/kcc.spec | head -n1)" = "kcc"
 
       - name: Stage install
         run: |
           DESTDIR="$PWD/stage" cmake --install build --prefix /usr
           test -x stage/usr/bin/kcc
           test -f stage/usr/share/applications/kcc.desktop
+          test -f stage/usr/share/icons/hicolor/scalable/apps/kcc.svg
           tar -C stage -czf kcc-stage.tar.gz .
 
       - name: Build RPM
@@ -68,13 +69,60 @@ jobs:
               --exclude='./kcc-stage.tar.gz' \
               --transform='s,^\./,kcc-0.4.0/,' \
               -czf "$HOME/rpmbuild/SOURCES/kcc-0.4.0.tar.gz" .
-            cp "$GITHUB_WORKSPACE/packaging/k-controlc.spec" "$HOME/rpmbuild/SPECS/kcc.spec"
+            cp "$GITHUB_WORKSPACE/packaging/kcc.spec" "$HOME/rpmbuild/SPECS/kcc.spec"
             rpmbuild -ba "$HOME/rpmbuild/SPECS/kcc.spec"
             mkdir -p "$GITHUB_WORKSPACE/artifacts/rpm" "$GITHUB_WORKSPACE/artifacts/srpm" "$GITHUB_WORKSPACE/artifacts/stage"
             cp "$HOME"/rpmbuild/RPMS/*/kcc-*.rpm "$GITHUB_WORKSPACE/artifacts/rpm/"
             cp "$HOME"/rpmbuild/SRPMS/kcc-*.src.rpm "$GITHUB_WORKSPACE/artifacts/srpm/"
             cp "$GITHUB_WORKSPACE/kcc-stage.tar.gz" "$GITHUB_WORKSPACE/artifacts/stage/"
           ) 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/logs/rpmbuild.log"
+
+      - name: Verify replacement of legacy k-controlc RPM
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat > "$HOME/rpmbuild/SPECS/k-controlc-legacy.spec" <<'EOF'
+          Name: k-controlc
+          Version: 0.3.0
+          Release: 1%{?dist}
+          Summary: Legacy K-ControlC transition fixture
+          License: MIT
+          BuildArch: noarch
+
+          %description
+          Minimal legacy package used only to verify KCC RPM replacement semantics.
+
+          %install
+          mkdir -p %{buildroot}%{_bindir}
+          mkdir -p %{buildroot}%{_datadir}/applications
+          mkdir -p %{buildroot}%{_datadir}/icons/hicolor/scalable/apps
+          mkdir -p %{buildroot}%{_datadir}/polkit-1/actions
+          printf '#!/bin/sh\nexit 0\n' > %{buildroot}%{_bindir}/k-controlc
+          chmod 0755 %{buildroot}%{_bindir}/k-controlc
+          printf '[Desktop Entry]\nName=K-ControlC Legacy\nExec=k-controlc\nType=Application\n' > %{buildroot}%{_datadir}/applications/k-controlc.desktop
+          printf '<svg xmlns="http://www.w3.org/2000/svg"/>\n' > %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/k-controlc.svg
+          printf '<policyconfig/>\n' > %{buildroot}%{_datadir}/polkit-1/actions/org.kcontrolc.controlcenter.policy
+
+          %files
+          %{_bindir}/k-controlc
+          %{_datadir}/applications/k-controlc.desktop
+          %{_datadir}/icons/hicolor/scalable/apps/k-controlc.svg
+          %{_datadir}/polkit-1/actions/org.kcontrolc.controlcenter.policy
+          EOF
+          rpmbuild -bb "$HOME/rpmbuild/SPECS/k-controlc-legacy.spec"
+          dnf -y install "$HOME"/rpmbuild/RPMS/noarch/k-controlc-0.3.0-1*.rpm
+          rpm -q k-controlc
+          test -x /usr/bin/k-controlc
+          test -f /usr/share/applications/k-controlc.desktop
+          test -f /usr/share/icons/hicolor/scalable/apps/k-controlc.svg
+
+          dnf -y install artifacts/rpm/kcc-*.rpm
+          rpm -q kcc
+          ! rpm -q k-controlc
+          test ! -e /usr/bin/k-controlc
+          test ! -e /usr/share/applications/k-controlc.desktop
+          test ! -e /usr/share/icons/hicolor/scalable/apps/k-controlc.svg
+          test "$(rpm -qf /usr/share/polkit-1/actions/org.kcontrolc.controlcenter.policy)" = "$(rpm -q kcc)"
 
       - name: Install built RPM and smoke test
         env:
@@ -83,7 +131,7 @@ jobs:
           QT_QUICK_CONTROLS_STYLE: Basic
           KCC_SMOKE_TEST: "1"
         run: |
-          dnf -y install artifacts/rpm/kcc-*.rpm
+          dnf -y reinstall artifacts/rpm/kcc-*.rpm
           rpm -q kcc
           test "$(rpm -q --provides kcc | grep -c '^k-controlc = ')" -ge 1
           /usr/bin/kcc
