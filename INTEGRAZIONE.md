@@ -76,4 +76,4 @@ rpm -V krisCC
 
 Poi verificare manualmente `rk sync/add/rm`, ricerca RPM con dimensioni e preview dipendenze, Flatpak, Podman, repository enable/disable, upgrade/rollback BootC, restart NetworkManager/CUPS/Bluetooth e creazione dei backup.
 
-Repository: https://github.com/krism-eu/KCC
+Repository: https://github.com/krism-eu/krisCC
