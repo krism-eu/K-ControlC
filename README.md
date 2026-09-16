@@ -1,6 +1,6 @@
-# KCC
+# krisCC
 
-KCC è un **Control Center personale Kirigami per KrisOS / Fedora bootc**. Non vuole sostituire Plasma System Settings: rete, utenti, firewall, display, audio e preferenze desktop restano agli strumenti KDE già presenti.
+krisCC è un **Control Center personale Kirigami per KrisOS / Fedora bootc**. Non vuole sostituire Plasma System Settings: rete, utenti, firewall, display, audio e preferenze desktop restano agli strumenti KDE già presenti.
 
 ## Cosa gestisce
 
@@ -20,7 +20,7 @@ Le query DNF5 sono read-only. L'anteprima delle dipendenze usa DNF5 senza applic
 
 ## Compatibilità KrisOS
 
-KCC usa in via primaria il layout corrente di KrisOS:
+krisCC usa in via primaria il layout corrente di KrisOS:
 
 - `/var/lib/krisos/packages.list`
 - `/usr/share/krisos/owned-packages.txt`
@@ -28,7 +28,9 @@ KCC usa in via primaria il layout corrente di KrisOS:
 
 Per la fase di migrazione mantiene un fallback in sola lettura verso i vecchi percorsi `/var/lib/raku-kris` e `/usr/share/raku-kris`. Il layout KrisOS ha sempre precedenza.
 
-Il pacchetto RPM e l'eseguibile si chiamano **`kcc`**. Lo spec dichiara `Provides/Obsoletes` per il precedente pacchetto `k-controlc`, così DNF può sostituirlo senza lasciare due pacchetti installati. Gli ID interni `org.kcontrolc` restano stabili per ora perché non entrano nel NEVRA e non sono necessari alla pipeline KrisOS.
+Il pacchetto RPM e l'eseguibile si chiamano **`krisCC`**. Il namespace QML è `org.kriscc`, le azioni Polkit usano `org.kriscc.controlcenter.*`, il desktop file è `krisCC.desktop` e l'AppStream ID è `org.kriscc.KrisCC`.
+
+Lo spec mantiene `Provides/Obsoletes` soltanto per l'identità storica `k-controlc`. **Non** dichiara `Provides` o `Obsoletes` per `kcc`, perché Fedora distribuisce già un pacchetto non correlato chiamato `kcc` e i due devono poter convivere. Le build transitorie del nostro precedente `kcc-0.4.0` non vengono quindi rimosse automaticamente: se una di quelle build è stata installata manualmente, va verificata e rimossa esplicitamente prima dell'integrazione definitiva.
 
 ## Build locale
 
@@ -38,33 +40,33 @@ Dipendenze Fedora:
 dnf install gcc-c++ cmake ninja-build qt6-qtbase-devel qt6-qtdeclarative-devel kf6-kirigami-devel
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-./build/kcc
+./build/krisCC
 ```
 
 ## RPM e integrazione nell'immagine
 
-Lo spec RPM è `packaging/kcc.spec` e produce **`kcc-0.4.0-*.rpm`**. La CI Fedora 44 costruisce l'RPM, lo installa nel container, verifica la sostituzione di un vecchio pacchetto `k-controlc` e riesegue lo smoke test con `/usr/bin/kcc`.
+Lo spec RPM è `packaging/krisCC.spec` e produce **`krisCC-0.4.0-*.rpm`**. La CI Fedora 44 costruisce l'RPM, lo installa nel container, verifica la sostituzione di un vecchio pacchetto `k-controlc`, verifica la coesistenza con il pacchetto Fedora `kcc` e riesegue lo smoke test con `/usr/bin/krisCC`.
 
 Il flusso previsto per KrisOS è:
 
 ```text
-KCC source -> CI/test -> kcc RPM -> build context KrisOS -> installazione nella base -> snapshot owned packages -> immagine BootC
+krisCC source -> CI/test -> krisCC RPM -> build context KrisOS -> installazione nella base -> snapshot owned packages -> immagine BootC
 ```
 
-L'RPM deve essere installato **prima** della generazione di `/usr/share/krisos/owned-packages.txt` e `owned-nevra.txt`, così KCC viene riconosciuto come parte della base immutabile e non come pacchetto dell'overlay.
+L'RPM deve essere installato **prima** della generazione di `/usr/share/krisos/owned-packages.txt` e `owned-nevra.txt`, così krisCC viene riconosciuto come parte della base immutabile e non come pacchetto dell'overlay.
 
 Esempio manuale:
 
 ```bash
 mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-git archive --format=tar.gz --prefix=kcc-0.4.0/ \
-  -o ~/rpmbuild/SOURCES/kcc-0.4.0.tar.gz HEAD
-cp packaging/kcc.spec ~/rpmbuild/SPECS/kcc.spec
-rpmbuild -ba ~/rpmbuild/SPECS/kcc.spec
+git archive --format=tar.gz --prefix=krisCC-0.4.0/ \
+  -o ~/rpmbuild/SOURCES/krisCC-0.4.0.tar.gz HEAD
+cp packaging/krisCC.spec ~/rpmbuild/SPECS/krisCC.spec
+rpmbuild -ba ~/rpmbuild/SPECS/krisCC.spec
 ```
 
 Repository: https://github.com/krism-eu/KCC
 
 ## Test reale
 
-La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging, sostituzione `k-controlc` → `kcc` e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk add/rm/sync`, autenticazione Polkit, ricerca RPM con dimensioni e dipendenze, Flatpak, Podman, repository enable/disable, upgrade/rollback BootC, restart servizi e backup della home/configurazione.
+La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging, sostituzione `k-controlc` → `krisCC`, coesistenza con Fedora `kcc` e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk add/rm/sync`, autenticazione Polkit, ricerca RPM con dimensioni e dipendenze, Flatpak, Podman, repository enable/disable, upgrade/rollback BootC, restart servizi e backup della home/configurazione.
