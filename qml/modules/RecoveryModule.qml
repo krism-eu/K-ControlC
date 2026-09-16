@@ -78,7 +78,7 @@ Kirigami.ScrollablePage {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     opacity: 0.7
-                    text: qsTr("Lo snapshot configurazione include ~/.config e alcune cartelle Plasma/Konsole presenti. Lo snapshot home esclude cache, cestino e la cartella dei backup per evitare ricorsioni.")
+                    text: qsTr("Lo snapshot configurazione include ~/.config e alcune cartelle Plasma/Konsole presenti. Lo snapshot home esclude cache, cestino e la cartella dei backup. K-ControlC richiede almeno 1 GiB libero per la configurazione e 5 GiB per la home.")
                 }
             }
         }
@@ -154,7 +154,7 @@ Kirigami.ScrollablePage {
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
             wrapMode: Text.WordWrap
-            text: qsTr("Può essere molto grande e può contenere documenti, chiavi, token e altri dati personali. Cache, cestino e backup precedenti vengono esclusi.")
+            text: qsTr("Può essere molto grande e può contenere documenti, chiavi, token e altri dati personali. Cache, cestino e backup precedenti vengono esclusi. Se restano meno di 5 GiB liberi, K-ControlC non avvia il backup.")
         }
         onAccepted: SystemBackend.createSnapshot("home")
     }
