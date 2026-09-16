@@ -48,19 +48,19 @@ jobs:
       - name: Build RPM
         shell: bash
         run: |
-          mkdir -p artifacts/logs
+          mkdir -p "$GITHUB_WORKSPACE/artifacts/logs"
           (
             set -euxo pipefail
             mkdir -p "$HOME/rpmbuild"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-            git archive --format=tar --prefix=k-controlc-0.4.0/ HEAD \
+            git -C "$GITHUB_WORKSPACE" archive --format=tar --prefix=k-controlc-0.4.0/ HEAD \
               | gzip -n > "$HOME/rpmbuild/SOURCES/k-controlc-0.4.0.tar.gz"
-            cp packaging/k-controlc.spec "$HOME/rpmbuild/SPECS/"
+            cp "$GITHUB_WORKSPACE/packaging/k-controlc.spec" "$HOME/rpmbuild/SPECS/"
             rpmbuild -ba "$HOME/rpmbuild/SPECS/k-controlc.spec"
-            mkdir -p artifacts/rpm artifacts/srpm artifacts/stage
-            cp "$HOME"/rpmbuild/RPMS/*/k-controlc-*.rpm artifacts/rpm/
-            cp "$HOME"/rpmbuild/SRPMS/k-controlc-*.src.rpm artifacts/srpm/
-            cp k-controlc-stage.tar.gz artifacts/stage/
-          ) 2>&1 | tee artifacts/logs/rpmbuild.log
+            mkdir -p "$GITHUB_WORKSPACE/artifacts/rpm" "$GITHUB_WORKSPACE/artifacts/srpm" "$GITHUB_WORKSPACE/artifacts/stage"
+            cp "$HOME"/rpmbuild/RPMS/*/k-controlc-*.rpm "$GITHUB_WORKSPACE/artifacts/rpm/"
+            cp "$HOME"/rpmbuild/SRPMS/k-controlc-*.src.rpm "$GITHUB_WORKSPACE/artifacts/srpm/"
+            cp "$GITHUB_WORKSPACE/k-controlc-stage.tar.gz" "$GITHUB_WORKSPACE/artifacts/stage/"
+          ) 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/logs/rpmbuild.log"
 
       - name: Install built RPM and smoke test
         env:
