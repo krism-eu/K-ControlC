@@ -508,19 +508,21 @@ Kirigami.ScrollablePage {
                 text: qsTr("DNF5 non segnala pacchetti aggiuntivi, oppure il pacchetto è già installato.")
             }
 
-            Controls.Expander {
+            Controls.CheckBox {
+                id: technicalOutputToggle
+                text: qsTr("Mostra output tecnico DNF5")
+            }
+            Controls.TextArea {
                 Layout.fillWidth: true
-                text: qsTr("Output tecnico DNF5")
-                contentItem: Controls.TextArea {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 180
-                    readOnly: true
-                    wrapMode: TextEdit.Wrap
-                    font.family: "monospace"
-                    text: UtilityBackend.output
-                }
+                Layout.preferredHeight: 180
+                visible: technicalOutputToggle.checked
+                readOnly: true
+                wrapMode: TextEdit.Wrap
+                font.family: "monospace"
+                text: UtilityBackend.output
             }
         }
+        onClosed: technicalOutputToggle.checked = false
     }
 
     Controls.Dialog {
