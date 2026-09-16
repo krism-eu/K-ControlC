@@ -28,9 +28,7 @@ krisCC usa in via primaria il layout corrente di KrisOS:
 
 Per la fase di migrazione mantiene un fallback in sola lettura verso i vecchi percorsi `/var/lib/raku-kris` e `/usr/share/raku-kris`. Il layout KrisOS ha sempre precedenza.
 
-Il pacchetto RPM e l'eseguibile si chiamano **`krisCC`**. Il namespace QML è `org.kriscc`, le azioni Polkit usano `org.kriscc.controlcenter.*`, il desktop file è `krisCC.desktop` e l'AppStream ID è `org.kriscc.KrisCC`.
-
-Lo spec mantiene `Provides/Obsoletes` soltanto per l'identità storica `k-controlc`. **Non** dichiara `Provides` o `Obsoletes` per `kcc`, perché Fedora distribuisce già un pacchetto non correlato chiamato `kcc` e i due devono poter convivere. Le build transitorie del nostro precedente `kcc-0.4.0` non vengono quindi rimosse automaticamente: se una di quelle build è stata installata manualmente, va verificata e rimossa esplicitamente prima dell'integrazione definitiva.
+Il pacchetto RPM e l'eseguibile si chiamano **`krisCC`**. Il nome è volutamente distinto dal pacchetto Fedora `kcc`, con il quale deve poter convivere. Lo spec mantiene `Provides/Obsoletes` soltanto per il vecchio pacchetto `k-controlc`, così DNF può sostituirlo senza lasciare duplicati.
 
 ## Build locale
 
@@ -43,9 +41,15 @@ cmake --build build
 ./build/krisCC
 ```
 
+È disponibile anche `--background` per l'avvio di sessione senza mostrare la finestra principale:
+
+```bash
+./build/krisCC --background
+```
+
 ## RPM e integrazione nell'immagine
 
-Lo spec RPM è `packaging/krisCC.spec` e produce **`krisCC-0.4.0-*.rpm`**. La CI Fedora 44 costruisce l'RPM, lo installa nel container, verifica la sostituzione di un vecchio pacchetto `k-controlc`, verifica la coesistenza con il pacchetto Fedora `kcc` e riesegue lo smoke test con `/usr/bin/krisCC`.
+Lo spec RPM è `packaging/krisCC.spec` e produce **`krisCC-0.4.0-*.rpm`**. La CI Fedora 44 costruisce l'RPM, lo installa nel container, verifica la sostituzione di un vecchio pacchetto `k-controlc` e riesegue lo smoke test con `/usr/bin/krisCC`.
 
 Il flusso previsto per KrisOS è:
 
@@ -69,4 +73,4 @@ Repository: https://github.com/krism-eu/KCC
 
 ## Test reale
 
-La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging, sostituzione `k-controlc` → `krisCC`, coesistenza con Fedora `kcc` e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk add/rm/sync`, autenticazione Polkit, ricerca RPM con dimensioni e dipendenze, Flatpak, Podman, repository enable/disable, upgrade/rollback BootC, restart servizi e backup della home/configurazione.
+La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging, sostituzione `k-controlc` → `krisCC` e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk add/rm/sync`, autenticazione Polkit, ricerca RPM con dimensioni e dipendenze, Flatpak, Podman, repository enable/disable, upgrade/rollback BootC, restart servizi e backup della home/configurazione.
