@@ -531,7 +531,7 @@ Kirigami.ScrollablePage {
         title: qsTr("Aggiungi repository RPM")
         standardButtons: Controls.Dialog.Ok | Controls.Dialog.Cancel
         contentItem: ColumnLayout {
-            Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Inserisci l'URL HTTPS di un file .repo. K-ControlC non rimuove repository esistenti automaticamente.") }
+            Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Inserisci l'URL HTTPS di un file .repo. KCC non rimuove repository esistenti automaticamente.") }
             Controls.TextField { id: repoUrl; Layout.fillWidth: true; placeholderText: "https://example.org/repository.repo" }
         }
         onAccepted: {

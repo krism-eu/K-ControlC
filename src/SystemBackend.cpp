@@ -123,7 +123,7 @@ QString SystemBackend::quickSystemInfo() const
 {
     QString text;
     QTextStream out(&text);
-    out << "K-ControlC Quick System Info\n";
+    out << "KCC Quick System Info\n";
     out << "OS: " << osName() << '\n';
     out << "Host: " << hostName() << '\n';
     out << "Kernel: " << kernelVersion() << '\n';
@@ -314,8 +314,8 @@ void SystemBackend::notify(const QString &summary, const QString &body) const
                                  QDBusConnection::sessionBus());
     if (!notifications.isValid())
         return;
-    notifications.asyncCall(QStringLiteral("Notify"), QStringLiteral("K-ControlC"), 0u,
-                            QStringLiteral("k-controlc"), summary, body,
+    notifications.asyncCall(QStringLiteral("Notify"), QStringLiteral("KCC"), 0u,
+                            QStringLiteral("kcc"), summary, body,
                             QStringList(), QVariantMap(), 5000);
 }
 
@@ -331,7 +331,7 @@ bool SystemBackend::createSnapshot(const QString &kind)
     }
 
     const QString home = QDir::homePath();
-    QDir backupDir(home + QStringLiteral("/K-ControlC Backups"));
+    QDir backupDir(home + QStringLiteral("/KCC Backups"));
     if (!backupDir.exists() && !backupDir.mkpath(QStringLiteral("."))) {
         setBackupResult(tr("Impossibile creare la cartella dei backup."));
         return false;
@@ -356,6 +356,7 @@ bool SystemBackend::createSnapshot(const QString &kind)
     if (kind == QStringLiteral("home")) {
         args << QStringLiteral("--exclude=./.cache")
              << QStringLiteral("--exclude=./.local/share/Trash")
+             << QStringLiteral("--exclude=./KCC Backups")
              << QStringLiteral("--exclude=./K-ControlC Backups")
              << QStringLiteral("-C") << home << QStringLiteral(".");
     } else if (kind == QStringLiteral("config")) {
@@ -424,7 +425,7 @@ bool SystemBackend::createSnapshot(const QString &kind)
 
 bool SystemBackend::openBackupFolder() const
 {
-    const QString path = QDir::homePath() + QStringLiteral("/K-ControlC Backups");
+    const QString path = QDir::homePath() + QStringLiteral("/KCC Backups");
     QDir().mkpath(path);
     return QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 }

@@ -61,6 +61,19 @@ grep -q 'https://github.com/krism-eu/KCC' packaging/k-controlc.spec
 grep -q 'https://github.com/krism-eu/KCC' data/org.kcontrolc.KControlC.metainfo.xml
 grep -q 'https://github.com/krism-eu/KCC' data/org.kcontrolc.controlcenter.policy
 
+# No old product name may leak into the UI. The single SystemBackend reference
+# to the old backup directory is intentional: it only excludes existing legacy
+# archives from a new home backup and is never displayed to the user.
+if grep -R -n 'K-ControlC' qml; then
+  echo "ERROR: visible legacy K-ControlC branding remains in QML" >&2
+  exit 1
+fi
+if grep -nE 'K-ControlC Quick System Info|Notify.*K-ControlC|QStringLiteral\("K-ControlC Backups"\)' src/SystemBackend.cpp; then
+  echo "ERROR: visible legacy K-ControlC branding remains in SystemBackend" >&2
+  exit 1
+fi
+grep -q 'QStringLiteral("/KCC Backups")' src/SystemBackend.cpp
+
 # The QML module and Polkit action namespace remain stable internally during the
 # package transition; changing those is unnecessary for KrisOS to install kcc.
 grep -q 'org.kde.kirigami' qml/Main.qml
