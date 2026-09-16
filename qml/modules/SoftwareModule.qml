@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import org.kde.kirigami as Kirigami
-import raku.cc
+import org.kcontrolc
 
 Kirigami.ScrollablePage {
     id: root
@@ -71,7 +71,7 @@ Kirigami.ScrollablePage {
         Controls.Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: qsTr("Gestione del layer RPM persistente raku e consultazione DNF5. Gli aggiornamenti della base immutabile restano nella pagina BootC; Flatpak e applicazioni grafiche restano in Discover.")
+            text: qsTr("Gestione del layer RPM persistente e consultazione DNF5. Gli aggiornamenti della base immutabile restano nella pagina BootC; Flatpak e applicazioni grafiche restano in Discover.")
         }
 
         Controls.TabBar {
@@ -167,7 +167,7 @@ Kirigami.ScrollablePage {
             ColumnLayout {
                 Controls.BusyIndicator { visible: installedModel.searching; running: visible }
                 RowLayout {
-                    Controls.Label { Layout.fillWidth: true; text: qsTr("Pacchetti RPM presenti nel sistema. Solo quelli nella lista persistente raku sono rimovibili da qui."); wrapMode: Text.WordWrap }
+                    Controls.Label { Layout.fillWidth: true; text: qsTr("Pacchetti RPM presenti nel sistema. Solo quelli nella lista persistente sono rimovibili da qui."); wrapMode: Text.WordWrap }
                     Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: installedModel.loadInstalled() }
                 }
                 ListView {

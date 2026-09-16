@@ -1,6 +1,6 @@
 import QtQuick
 import org.kde.kirigami as Kirigami
-import raku.cc
+import org.kcontrolc
 
 Kirigami.ApplicationWindow {
     id: root
@@ -9,7 +9,7 @@ Kirigami.ApplicationWindow {
     minimumWidth: 760
     minimumHeight: 560
     visible: true
-    title: qsTr("K-ControlC · raku")
+    title: qsTr("K-ControlC")
 
     function showPage(component) {
         pageStack.replace(component)

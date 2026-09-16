@@ -14,11 +14,11 @@
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
-    QCoreApplication::setOrganizationName(QStringLiteral("raku"));
+    QCoreApplication::setOrganizationName(QStringLiteral("K-ControlC"));
     QCoreApplication::setApplicationName(QStringLiteral("K-ControlC"));
     QCoreApplication::setApplicationVersion(QStringLiteral(KCONTROLC_VERSION));
 
-    qmlRegisterType<PackageSearch>("raku.cc", 1, 0, "PackageSearch");
+    qmlRegisterType<PackageSearch>("org.kcontrolc", 1, 0, "PackageSearch");
 
     PolkitHelper polkitHelper;
     BootcBackend bootcBackend;
@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
                      &app, [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
 
-    engine.loadFromModule(QStringLiteral("raku.cc"), QStringLiteral("Main"));
+    engine.loadFromModule(QStringLiteral("org.kcontrolc"), QStringLiteral("Main"));
 
     if (qEnvironmentVariableIsSet("KCONTROLC_SMOKE_TEST"))
         QTimer::singleShot(900, &app, &QCoreApplication::quit);
