@@ -15,8 +15,8 @@
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
-    QCoreApplication::setOrganizationName(QStringLiteral("K-ControlC"));
-    QCoreApplication::setApplicationName(QStringLiteral("K-ControlC"));
+    QCoreApplication::setOrganizationName(QStringLiteral("KCC"));
+    QCoreApplication::setApplicationName(QStringLiteral("KCC"));
     QCoreApplication::setApplicationVersion(QStringLiteral(KCONTROLC_VERSION));
 
     qmlRegisterType<PackageSearch>("org.kcontrolc", 1, 0, "PackageSearch");
