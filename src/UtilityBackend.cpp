@@ -15,6 +15,12 @@ bool UtilityBackend::validPackageName(const QString &name) const
     return pattern.match(name).hasMatch();
 }
 
+bool UtilityBackend::validContainerName(const QString &name) const
+{
+    static const QRegularExpression pattern(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"));
+    return pattern.match(name).hasMatch();
+}
+
 bool UtilityBackend::start(const QString &program, const QStringList &args, const QString &title)
 {
     if (m_busy)
@@ -143,4 +149,31 @@ bool UtilityBackend::addFlathubUser()
                  {QStringLiteral("remote-add"), QStringLiteral("--user"), QStringLiteral("--if-not-exists"),
                   QStringLiteral("flathub"), QStringLiteral("https://flathub.org/repo/flathub.flatpakrepo")},
                  tr("Aggiunta Flathub per l'utente"));
+}
+
+bool UtilityBackend::runPodman(const QString &mode, const QString &container, const QString &value)
+{
+    if (mode == QStringLiteral("list"))
+        return start(QStringLiteral("/usr/bin/podman"),
+                     {QStringLiteral("ps"), QStringLiteral("--all"), QStringLiteral("--size"), QStringLiteral("--format"), QStringLiteral("json")},
+                     tr("Container Podman"));
+
+    const QString name = container.trimmed();
+    if (!validContainerName(name))
+        return false;
+
+    if (mode == QStringLiteral("info"))
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("inspect"), name}, tr("Info container: %1").arg(name));
+    if (mode == QStringLiteral("logs"))
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("logs"), QStringLiteral("--tail"), QStringLiteral("200"), name}, tr("Log container: %1").arg(name));
+    if (mode == QStringLiteral("start"))
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("start"), name}, tr("Avvio container: %1").arg(name));
+    if (mode == QStringLiteral("stop"))
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("stop"), name}, tr("Arresto container: %1").arg(name));
+    if (mode == QStringLiteral("restart"))
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("restart"), name}, tr("Riavvio container: %1").arg(name));
+    if (mode == QStringLiteral("rename") && validContainerName(value.trimmed()))
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("rename"), name, value.trimmed()}, tr("Rinomina container: %1").arg(name));
+
+    return false;
 }
