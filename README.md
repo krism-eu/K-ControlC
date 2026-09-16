@@ -28,7 +28,7 @@ KCC usa in via primaria il layout corrente di KrisOS:
 
 Per la fase di migrazione mantiene un fallback in sola lettura verso i vecchi percorsi `/var/lib/raku-kris` e `/usr/share/raku-kris`. Il layout KrisOS ha sempre precedenza.
 
-L'identità visibile dell'app è **KCC**. Per evitare regressioni durante l'integrazione nell'immagine, il nome tecnico del pacchetto, l'eseguibile e gli ID già installati restano temporaneamente compatibili (`k-controlc`, `org.kcontrolc`). Una futura rinomina del NEVRA dovrà usare `Provides/Obsoletes` e venire coordinata con la pipeline KrisOS.
+Il pacchetto RPM e l'eseguibile si chiamano ora **`kcc`**. Lo spec dichiara `Provides/Obsoletes` per il precedente pacchetto `k-controlc`, così DNF può sostituirlo senza lasciare due pacchetti installati. Gli ID interni `org.kcontrolc` restano stabili per ora perché non entrano nel NEVRA e non sono necessari alla pipeline KrisOS.
 
 ## Build locale
 
@@ -38,17 +38,17 @@ Dipendenze Fedora:
 dnf install gcc-c++ cmake ninja-build qt6-qtbase-devel qt6-qtdeclarative-devel kf6-kirigami-devel
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-./build/k-controlc
+./build/kcc
 ```
 
 ## RPM e integrazione nell'immagine
 
-Lo spec è in `packaging/k-controlc.spec`. La CI Fedora 44 costruisce automaticamente l'RPM `k-controlc-0.4.0-*.rpm`, lo installa nel container e riesegue lo smoke test.
+Lo spec è ancora nel file `packaging/k-controlc.spec` durante questa transizione, ma produce l'RPM **`kcc-0.4.0-*.rpm`**. La CI Fedora 44 costruisce l'RPM, lo installa nel container e riesegue lo smoke test con `/usr/bin/kcc`.
 
 Il flusso previsto per KrisOS è:
 
 ```text
-KCC source -> CI/test -> RPM -> build context KrisOS -> installazione nella base -> snapshot owned packages -> immagine BootC
+KCC source -> CI/test -> kcc RPM -> build context KrisOS -> installazione nella base -> snapshot owned packages -> immagine BootC
 ```
 
 L'RPM deve essere installato **prima** della generazione di `/usr/share/krisos/owned-packages.txt` e `owned-nevra.txt`, così KCC viene riconosciuto come parte della base immutabile e non come pacchetto dell'overlay.
@@ -57,11 +57,13 @@ Esempio manuale:
 
 ```bash
 mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-git archive --format=tar.gz --prefix=k-controlc-0.4.0/ \
-  -o ~/rpmbuild/SOURCES/k-controlc-0.4.0.tar.gz HEAD
-cp packaging/k-controlc.spec ~/rpmbuild/SPECS/
-rpmbuild -ba ~/rpmbuild/SPECS/k-controlc.spec
+git archive --format=tar.gz --prefix=kcc-0.4.0/ \
+  -o ~/rpmbuild/SOURCES/kcc-0.4.0.tar.gz HEAD
+cp packaging/k-controlc.spec ~/rpmbuild/SPECS/kcc.spec
+rpmbuild -ba ~/rpmbuild/SPECS/kcc.spec
 ```
+
+Repository: https://github.com/krism-eu/KCC
 
 ## Test reale
 

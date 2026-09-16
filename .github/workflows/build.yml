@@ -31,19 +31,23 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
           QT_QUICK_CONTROLS_STYLE: Basic
-          KCONTROLC_SMOKE_TEST: "1"
-        run: ./build/k-controlc
+          KCC_SMOKE_TEST: "1"
+        run: ./build/kcc
 
       - name: Read-only integration checks
         run: ./tests/e2e-readonly.sh
 
       - name: Validate RPM spec
-        run: rpmspec -P packaging/k-controlc.spec >/dev/null
+        run: |
+          rpmspec -P packaging/k-controlc.spec >/dev/null
+          test "$(rpmspec -q --qf '%{NAME}\n' packaging/k-controlc.spec | head -n1)" = "kcc"
 
       - name: Stage install
         run: |
           DESTDIR="$PWD/stage" cmake --install build --prefix /usr
-          tar -C stage -czf k-controlc-stage.tar.gz .
+          test -x stage/usr/bin/kcc
+          test -f stage/usr/share/applications/kcc.desktop
+          tar -C stage -czf kcc-stage.tar.gz .
 
       - name: Build RPM
         shell: bash
@@ -58,15 +62,15 @@ jobs:
               --exclude='./build' \
               --exclude='./stage' \
               --exclude='./artifacts' \
-              --exclude='./k-controlc-stage.tar.gz' \
-              --transform='s,^\./,k-controlc-0.4.0/,' \
-              -czf "$HOME/rpmbuild/SOURCES/k-controlc-0.4.0.tar.gz" .
-            cp "$GITHUB_WORKSPACE/packaging/k-controlc.spec" "$HOME/rpmbuild/SPECS/"
-            rpmbuild -ba "$HOME/rpmbuild/SPECS/k-controlc.spec"
+              --exclude='./kcc-stage.tar.gz' \
+              --transform='s,^\./,kcc-0.4.0/,' \
+              -czf "$HOME/rpmbuild/SOURCES/kcc-0.4.0.tar.gz" .
+            cp "$GITHUB_WORKSPACE/packaging/k-controlc.spec" "$HOME/rpmbuild/SPECS/kcc.spec"
+            rpmbuild -ba "$HOME/rpmbuild/SPECS/kcc.spec"
             mkdir -p "$GITHUB_WORKSPACE/artifacts/rpm" "$GITHUB_WORKSPACE/artifacts/srpm" "$GITHUB_WORKSPACE/artifacts/stage"
-            cp "$HOME"/rpmbuild/RPMS/*/k-controlc-*.rpm "$GITHUB_WORKSPACE/artifacts/rpm/"
-            cp "$HOME"/rpmbuild/SRPMS/k-controlc-*.src.rpm "$GITHUB_WORKSPACE/artifacts/srpm/"
-            cp "$GITHUB_WORKSPACE/k-controlc-stage.tar.gz" "$GITHUB_WORKSPACE/artifacts/stage/"
+            cp "$HOME"/rpmbuild/RPMS/*/kcc-*.rpm "$GITHUB_WORKSPACE/artifacts/rpm/"
+            cp "$HOME"/rpmbuild/SRPMS/kcc-*.src.rpm "$GITHUB_WORKSPACE/artifacts/srpm/"
+            cp "$GITHUB_WORKSPACE/kcc-stage.tar.gz" "$GITHUB_WORKSPACE/artifacts/stage/"
           ) 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/logs/rpmbuild.log"
 
       - name: Install built RPM and smoke test
@@ -74,14 +78,16 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
           QT_QUICK_CONTROLS_STYLE: Basic
-          KCONTROLC_SMOKE_TEST: "1"
+          KCC_SMOKE_TEST: "1"
         run: |
-          dnf -y install artifacts/rpm/k-controlc-*.rpm
-          /usr/bin/k-controlc
+          dnf -y install artifacts/rpm/kcc-*.rpm
+          rpm -q kcc
+          test "$(rpm -q --provides kcc | grep -c '^k-controlc = ')" -ge 1
+          /usr/bin/kcc
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: k-controlc-${{ github.sha }}
+          name: kcc-${{ github.sha }}
           path: artifacts/
           if-no-files-found: warn

@@ -1,9 +1,9 @@
-Name:           k-controlc
+Name:           kcc
 Version:        0.4.0
-Release:        6%{?dist}
+Release:        7%{?dist}
 Summary:        KCC personal control center for KrisOS and Fedora bootc
 License:        MIT
-URL:            https://github.com/krism-eu/K-ControlC
+URL:            https://github.com/krism-eu/KCC
 Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  gcc-c++
@@ -22,6 +22,11 @@ Requires:       dnf5
 Requires:       dnf5-plugins
 Requires:       bootc
 Requires:       tar
+
+# Safe transition from the former RPM identity. This lets DNF replace an
+# installed k-controlc package instead of leaving both packages side by side.
+Provides:       k-controlc = %{version}-%{release}
+Obsoletes:      k-controlc < %{version}-%{release}
 
 %description
 KCC is a compact personal Kirigami control center for KrisOS and Fedora bootc
@@ -43,13 +48,18 @@ Settings.
 %files
 %license LICENSE
 %doc README.md
-%{_bindir}/k-controlc
-%{_datadir}/applications/k-controlc.desktop
+%{_bindir}/kcc
+%{_datadir}/applications/kcc.desktop
 %{_datadir}/polkit-1/actions/org.kcontrolc.controlcenter.policy
 %{_datadir}/metainfo/org.kcontrolc.KControlC.metainfo.xml
-%{_datadir}/icons/hicolor/scalable/apps/k-controlc.svg
+%{_datadir}/icons/hicolor/scalable/apps/kcc.svg
 
 %changelog
+* Wed Sep 16 2026 krism-eu - 0.4.0-7
+- Rename the RPM identity and executable to kcc
+- Add Provides/Obsoletes for safe replacement of installed k-controlc packages
+- Point package metadata at the renamed KCC repository
+
 * Wed Sep 16 2026 krism-eu - 0.4.0-6
 - Prefer current KrisOS package-state paths with a read-only legacy fallback
 - Complete the KCC user-facing metadata rename without changing installed technical IDs

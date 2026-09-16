@@ -17,8 +17,10 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     QCoreApplication::setOrganizationName(QStringLiteral("KCC"));
     QCoreApplication::setApplicationName(QStringLiteral("KCC"));
-    QCoreApplication::setApplicationVersion(QStringLiteral(KCONTROLC_VERSION));
+    QCoreApplication::setApplicationVersion(QStringLiteral(KCC_VERSION));
 
+    // Keep the QML module URI stable for this package-name transition. It is
+    // internal to the application and does not affect the RPM or executable name.
     qmlRegisterType<PackageSearch>("org.kcontrolc", 1, 0, "PackageSearch");
 
     PolkitHelper polkitHelper;
@@ -47,7 +49,7 @@ int main(int argc, char *argv[])
 
     engine.loadFromModule(QStringLiteral("org.kcontrolc"), QStringLiteral("Main"));
 
-    if (qEnvironmentVariableIsSet("KCONTROLC_SMOKE_TEST"))
+    if (qEnvironmentVariableIsSet("KCC_SMOKE_TEST"))
         QTimer::singleShot(900, &app, &QCoreApplication::quit);
 
     return app.exec();
