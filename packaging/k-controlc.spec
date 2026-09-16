@@ -1,7 +1,7 @@
 Name:           k-controlc
 Version:        0.4.0
-Release:        5%{?dist}
-Summary:        Personal Control Center for Fedora bootc
+Release:        6%{?dist}
+Summary:        KCC personal control center for KrisOS and Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/K-ControlC
 Source0:        %{name}-%{version}.tar.gz
@@ -24,9 +24,9 @@ Requires:       bootc
 Requires:       tar
 
 %description
-KCC is a compact personal Kirigami control center for Fedora bootc systems. It
-focuses on persistent software management, Flatpak applications, Podman
-containers, bootc deployments, practical maintenance tools, diagnostics,
+KCC is a compact personal Kirigami control center for KrisOS and Fedora bootc
+systems. It focuses on persistent software management, Flatpak applications,
+Podman containers, bootc deployments, practical maintenance tools, diagnostics,
 recovery and local configuration/home backups without duplicating Plasma System
 Settings.
 
@@ -50,6 +50,11 @@ Settings.
 %{_datadir}/icons/hicolor/scalable/apps/k-controlc.svg
 
 %changelog
+* Wed Sep 16 2026 krism-eu - 0.4.0-6
+- Prefer current KrisOS package-state paths with a read-only legacy fallback
+- Complete the KCC user-facing metadata rename without changing installed technical IDs
+- Document safe base-image integration before the KrisOS owned-package snapshot
+
 * Wed Sep 16 2026 krism-eu - 0.4.0-5
 - Add a simple Podman container management page with size, status and common actions
 - Begin the safe user-facing rename from K-ControlC to KCC while retaining package compatibility
