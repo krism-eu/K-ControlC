@@ -1,6 +1,6 @@
 Name:           k-controlc
 Version:        0.4.0
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Personal Control Center for Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/K-ControlC
@@ -49,6 +49,11 @@ backups without duplicating Plasma System Settings.
 %{_datadir}/icons/hicolor/scalable/apps/k-controlc.svg
 
 %changelog
+* Wed Sep 16 2026 krism-eu - 0.4.0-4
+- Replace raw Flatpak command output with structured application cards
+- Add direct Flatpak install/remove actions and clearer remote views
+- Make RPM sizes, dependency preview and transaction totals explicit
+
 * Wed Sep 16 2026 krism-eu - 0.4.0-3
 - Add top navigation tabs, dedicated Flatpak and command-bookmark pages
 - Add RPM transaction previews, package origin filters and repository-file addition
