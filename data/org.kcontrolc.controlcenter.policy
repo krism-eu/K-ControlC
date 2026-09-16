@@ -4,8 +4,17 @@
   <vendor>K-ControlC</vendor>
   <vendor_url>https://github.com/krism-eu/K-ControlC</vendor_url>
 
-  <!-- Fresh authentication: no auth_admin_keep. The C++ layer validates the
-       complete argument vector; exec.argv1 also narrows pkexec matching. -->
+  <!-- Read-only bootc status is allowed for the active local session so the
+       UI never asks for a password just to display system state. Mutating
+       operations still require fresh administrator authorization. -->
+  <action id="org.kcontrolc.controlcenter.bootc.status">
+    <description>Read bootc system status</description>
+    <message>Read bootc system status</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>yes</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/bootc</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">status</annotate>
+  </action>
+
   <action id="org.kcontrolc.controlcenter.rk.sync">
     <description>Synchronize persistent packages</description>
     <message>Authentication is required to synchronize persistent packages</message>
