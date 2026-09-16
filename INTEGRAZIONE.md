@@ -46,21 +46,21 @@ Il repository produce l'RPM `krisCC`. Il flusso consigliato è:
 krisCC source -> CI/test -> krisCC RPM -> build context KrisOS -> immagine BootC
 ```
 
-La build KrisOS può pescare l'RPM prodotto separatamente e installarlo nella base. L'ordine è importante: **`krisCC` deve essere installato prima che KrisOS generi `/usr/share/krisos/owned-packages.txt` e `owned-nevra.txt`**. In questo modo krisCC viene classificato correttamente come pacchetto della base immutabile e `rk` non proverà mai a trattarlo come pacchetto persistente dell'overlay.
+La build KrisOS può pescare l'RPM prodotto separatamente e installarlo nella base. L'ordine è importante: **`krisCC` deve essere installato prima che KrisOS generi `/usr/share/krisos/owned-packages.txt` e `owned-nevra.txt`**. In questo modo viene classificato correttamente come pacchetto della base immutabile e `rk` non proverà mai a trattarlo come pacchetto persistente dell'overlay.
 
 La build deve fallire se l'RPM richiesto non è disponibile o non si installa correttamente. Dopo l'installazione dell'RPM, eseguire almeno:
 
 ```bash
 rpm -q krisCC
 rpm -V krisCC
-/usr/bin/krisCC
+/usr/bin/krisCC --background
 ```
 
-Lo spec dichiara `Provides: k-controlc` e `Obsoletes: k-controlc`, quindi un sistema che avesse ancora installato il vecchio pacchetto storico può essere aggiornato senza lasciare due RPM concorrenti. Non dichiara invece alcun `Provides/Obsoletes` per `kcc`, perché Fedora usa già quel nome per un pacchetto indipendente e la coesistenza deve restare possibile.
+Lo spec dichiara `Provides: k-controlc` e `Obsoletes: k-controlc`, quindi un sistema che avesse ancora installato il vecchio pacchetto può essere aggiornato senza lasciare due RPM concorrenti. Non dichiara `Provides/Obsoletes: kcc`: il pacchetto Fedora omonimo deve poter convivere senza conflitti.
 
 ## Identità tecnica
 
-Il NEVRA e l'eseguibile sono `krisCC`. Il modulo QML usa `org.kriscc`; le azioni Polkit usano `org.kriscc.controlcenter.*`; il desktop file è `krisCC.desktop`; l'AppStream ID è `org.kriscc.KrisCC`.
+Il NEVRA e l'eseguibile sono `krisCC`. Il modulo QML, gli action ID Polkit, il desktop ID e l'AppStream ID usano il namespace `org.kriscc`.
 
 ## Verifica reale prima del tag
 
@@ -72,7 +72,6 @@ dnf5 repo list --all --json
 dnf5 config-manager --help
 rpm -q krisCC
 rpm -V krisCC
-/usr/bin/krisCC
 ```
 
 Poi verificare manualmente `rk sync/add/rm`, ricerca RPM con dimensioni e preview dipendenze, Flatpak, Podman, repository enable/disable, upgrade/rollback BootC, restart NetworkManager/CUPS/Bluetooth e creazione dei backup.
