@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>krisCC</vendor>
+  <vendor_url>https://github.com/krism-eu/KCC</vendor_url>
+
+  <!-- Read-only bootc status is allowed for the active local session so the
+       UI never asks for a password just to display system state. Mutating
+       operations still require fresh administrator authorization. -->
+  <action id="org.kriscc.controlcenter.bootc.status">
+    <description>Read bootc system status</description>
+    <message>Read bootc system status</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>yes</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/bootc</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">status</annotate>
+  </action>
+
+  <action id="org.kriscc.controlcenter.rk.sync">
+    <description>Synchronize persistent packages</description>
+    <message>Authentication is required to synchronize persistent packages</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/rk</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">sync</annotate>
+  </action>
+
+  <action id="org.kriscc.controlcenter.rk.add">
+    <description>Add a persistent package</description>
+    <message>Authentication is required to add a persistent package</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/rk</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">add</annotate>
+  </action>
+
+  <action id="org.kriscc.controlcenter.rk.rm">
+    <description>Remove a persistent package</description>
+    <message>Authentication is required to remove a persistent package</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/rk</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">rm</annotate>
+  </action>
+
+  <action id="org.kriscc.controlcenter.bootc.upgrade">
+    <description>Manage bootc upgrades</description>
+    <message>Authentication is required to update the operating system</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/bootc</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">upgrade</annotate>
+  </action>
+
+  <action id="org.kriscc.controlcenter.bootc.rollback">
+    <description>Manage bootc rollback</description>
+    <message>Authentication is required to roll back the operating system</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/bootc</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">rollback</annotate>
+  </action>
+
+  <action id="org.kriscc.controlcenter.dnf5.config-manager">
+    <description>Enable or disable a DNF5 repository</description>
+    <message>Authentication is required to change repository state</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/dnf5</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">config-manager</annotate>
+  </action>
+</policyconfig>
