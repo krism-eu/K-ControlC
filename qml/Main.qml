@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import org.kde.kirigami as Kirigami
-import org.kcontrolc
+import org.kriscc
 
 Kirigami.ApplicationWindow {
     id: root
@@ -10,8 +10,8 @@ Kirigami.ApplicationWindow {
     height: 760
     minimumWidth: 800
     minimumHeight: 580
-    visible: !KccStartHidden
-    title: qsTr("KCC")
+    visible: !KrisccStartHidden
+    title: qsTr("krisCC")
 
     function showIndex(index) {
         topTabs.currentIndex = index
@@ -44,7 +44,7 @@ Kirigami.ApplicationWindow {
                     Layout.fillWidth: true
                     font.bold: true
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize + 2
-                    text: qsTr("KCC")
+                    text: qsTr("krisCC")
                 }
                 Controls.Label {
                     opacity: 0.62
@@ -67,14 +67,14 @@ Kirigami.ApplicationWindow {
                         else pageStack.replace(dashboardPage)
                     }
                 }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("Panoramica") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("RPM") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("Flatpak") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("Container") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("BootC") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("Strumenti") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("Comandi") }
-                Controls.TabButton { width: topTabs.width / 8; text: qsTr("Backup") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("Panoramica") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("RPM") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("Flatpak") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("Container") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("BootC") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("Strumenti") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("Comandi") }
+                Controls.TabButton { width: topTabs.width / 8; implicitHeight: Kirigami.Units.gridUnit * 2.2; font.bold: checked; text: qsTr("Backup") }
             }
         }
     }

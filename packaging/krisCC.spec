@@ -1,7 +1,7 @@
-Name:           kcc
+Name:           krisCC
 Version:        0.4.0
-Release:        8%{?dist}
-Summary:        KCC personal control center for KrisOS and Fedora bootc
+Release:        9%{?dist}
+Summary:        krisCC personal control center for KrisOS and Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/KCC
 Source0:        %{name}-%{version}.tar.gz
@@ -23,13 +23,13 @@ Requires:       dnf5-plugins
 Requires:       bootc
 Requires:       tar
 
-# Safe transition from the former RPM identity. This lets DNF replace an
-# installed k-controlc package instead of leaving both packages side by side.
+# Safe transition from the original package identity. Do not obsolete/provide
+# Fedora's unrelated "kcc" package: krisCC must be able to coexist with it.
 Provides:       k-controlc = %{version}-%{release}
 Obsoletes:      k-controlc < %{version}-%{release}
 
 %description
-KCC is a compact personal Kirigami control center for KrisOS and Fedora bootc
+krisCC is a compact personal Kirigami control center for KrisOS and Fedora bootc
 systems. It focuses on persistent software management, Flatpak applications,
 Podman containers, bootc deployments, practical maintenance tools, diagnostics,
 recovery and local configuration/home backups without duplicating Plasma System
@@ -48,16 +48,21 @@ Settings.
 %files
 %license LICENSE
 %doc README.md
-%{_bindir}/kcc
-%{_datadir}/applications/kcc.desktop
-%{_datadir}/polkit-1/actions/org.kcontrolc.controlcenter.policy
-%{_datadir}/metainfo/org.kcontrolc.KControlC.metainfo.xml
-%{_datadir}/icons/hicolor/scalable/apps/kcc.svg
+%{_bindir}/krisCC
+%{_datadir}/applications/krisCC.desktop
+%{_datadir}/polkit-1/actions/org.kriscc.controlcenter.policy
+%{_datadir}/metainfo/org.kriscc.KrisCC.metainfo.xml
+%{_datadir}/icons/hicolor/scalable/apps/krisCC.svg
 
 %changelog
+* Wed Sep 16 2026 krism-eu - 0.4.0-9
+- Preserve --background startup mode after the krisCC technical rename
+- Keep KrisOS session autostart from opening the main window
+
 * Wed Sep 16 2026 krism-eu - 0.4.0-8
-- Add --background startup mode for KrisOS session autostart
-- Keep the KCC process running without opening the main window at login
+- Rename the package and executable to krisCC to avoid Fedora kcc collisions
+- Rename QML, Polkit, desktop, icon and AppStream identities to krisCC/org.kriscc
+- Keep only the original k-controlc transition Provides/Obsoletes
 
 * Wed Sep 16 2026 krism-eu - 0.4.0-7
 - Rename the RPM identity and executable to kcc

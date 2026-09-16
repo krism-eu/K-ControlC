@@ -15,7 +15,7 @@ Kirigami.ScrollablePage {
         Kirigami.Heading {
             Layout.fillWidth: true
             level: 1
-            text: qsTr("KCC")
+            text: qsTr("krisCC")
         }
         Controls.Label {
             Layout.fillWidth: true

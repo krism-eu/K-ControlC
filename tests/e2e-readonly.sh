@@ -14,13 +14,13 @@ if grep -Fq '%{name}\\\\t%{summary}' src/PackageSearch.cpp; then
   exit 1
 fi
 
-if grep -Eq '<allow_(any|inactive|active)>auth_admin_keep</allow_' data/org.kcontrolc.controlcenter.policy; then
+if grep -Eq '<allow_(any|inactive|active)>auth_admin_keep</allow_' data/org.kriscc.controlcenter.policy; then
   echo "ERROR: Polkit policy must not retain admin authorization" >&2
   exit 1
 fi
 
-grep -q 'org.kcontrolc.controlcenter.bootc.status' data/org.kcontrolc.controlcenter.policy
-grep -A6 'org.kcontrolc.controlcenter.bootc.status' data/org.kcontrolc.controlcenter.policy \
+grep -q 'org.kriscc.controlcenter.bootc.status' data/org.kriscc.controlcenter.policy
+grep -A6 'org.kriscc.controlcenter.bootc.status' data/org.kriscc.controlcenter.policy \
   | grep -q '<allow_active>yes</allow_active>'
 
 if grep -Eq 'QStringLiteral\("--json"\)|QStringLiteral\("--format-version' src/BootcBackend.cpp; then
@@ -44,45 +44,67 @@ grep -q '/usr/share/raku-kris/owned-packages.txt' src/PackageSearch.cpp
 grep -q '/var/lib/raku-kris/packages.list' src/PackageSearch.cpp
 grep -q '/var/lib/raku-kris/packages.list' src/BootcBackend.cpp
 
-# KCC is now the package, executable and installed desktop identity. The old RPM
-# name is retained only as Provides/Obsoletes so upgrades do not duplicate it.
-grep -q '^Name:[[:space:]]*kcc$' packaging/k-controlc.spec
-grep -q '^Provides:[[:space:]]*k-controlc' packaging/k-controlc.spec
-grep -q '^Obsoletes:[[:space:]]*k-controlc' packaging/k-controlc.spec
-grep -q 'qt_add_executable(kcc' CMakeLists.txt
-grep -q 'install(TARGETS kcc' CMakeLists.txt
-grep -q '^Name=KCC$' data/k-controlc.desktop
-grep -q '^Exec=kcc$' data/k-controlc.desktop
-grep -q '^Icon=kcc$' data/k-controlc.desktop
-grep -q '<name>KCC</name>' data/org.kcontrolc.KControlC.metainfo.xml
-grep -q '<provides><binary>kcc</binary></provides>' data/org.kcontrolc.KControlC.metainfo.xml
-grep -q '<vendor>KCC</vendor>' data/org.kcontrolc.controlcenter.policy
-grep -q 'https://github.com/krism-eu/KCC' packaging/k-controlc.spec
-grep -q 'https://github.com/krism-eu/KCC' data/org.kcontrolc.KControlC.metainfo.xml
-grep -q 'https://github.com/krism-eu/KCC' data/org.kcontrolc.controlcenter.policy
+# krisCC must have a unique technical identity and must not claim Fedora's kcc.
+test -f packaging/krisCC.spec
+test ! -e packaging/kcc.spec
+test ! -e packaging/k-controlc.spec
+test -f data/krisCC.desktop
+test ! -e data/kcc.desktop
+test ! -e data/k-controlc.desktop
+test -f data/icons/hicolor/scalable/apps/krisCC.svg
+test ! -e data/icons/hicolor/scalable/apps/kcc.svg
+test ! -e data/icons/hicolor/scalable/apps/k-controlc.svg
+test -f data/org.kriscc.controlcenter.policy
+test ! -e data/org.kcontrolc.controlcenter.policy
+test -f data/org.kriscc.KrisCC.metainfo.xml
+test ! -e data/org.kcontrolc.KControlC.metainfo.xml
 
-# No old product name may leak into the UI. The single SystemBackend reference
-# to the old backup directory is intentional: it only excludes existing legacy
-# archives from a new home backup and is never displayed to the user.
-if grep -R -n 'K-ControlC' qml; then
-  echo "ERROR: visible legacy K-ControlC branding remains in QML" >&2
+grep -q '^Name:[[:space:]]*krisCC$' packaging/krisCC.spec
+grep -q '^Provides:[[:space:]]*k-controlc' packaging/krisCC.spec
+grep -q '^Obsoletes:[[:space:]]*k-controlc' packaging/krisCC.spec
+if grep -Eq '^Provides:[[:space:]]*kcc([[:space:]=]|$)|^Obsoletes:[[:space:]]*kcc([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete Fedora's kcc package" >&2
   exit 1
 fi
-if grep -nE 'K-ControlC Quick System Info|Notify.*K-ControlC|QStringLiteral\("K-ControlC Backups"\)' src/SystemBackend.cpp; then
-  echo "ERROR: visible legacy K-ControlC branding remains in SystemBackend" >&2
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
   exit 1
 fi
-grep -q 'QStringLiteral("/KCC Backups")' src/SystemBackend.cpp
 
-# The QML module and Polkit action namespace remain stable internally during the
-# package transition; changing those is unnecessary for KrisOS to install kcc.
-grep -q 'org.kde.kirigami' qml/Main.qml
-grep -q 'import org.kcontrolc' qml/Main.qml
-grep -q 'config-manager' src/PolkitHelper.cpp
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
 
 if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
-    CMakeLists.txt src/main.cpp qml data/k-controlc.desktop packaging/k-controlc.spec \
-    data/org.kcontrolc.controlcenter.policy data/org.kcontrolc.KControlC.metainfo.xml; then
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
   echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
   exit 1
 fi
@@ -102,10 +124,10 @@ if dnf5 repo list --all --json >/dev/null 2>&1; then
   dnf5 repo list --all --json >/dev/null
   if dnf5 repoquery --available \
       --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
-      'bash*' > /tmp/kcc-repoquery.txt 2>/tmp/kcc-repoquery.err; then
-    grep -q '^bash' /tmp/kcc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
-    if grep -q '^bash' /tmp/kcc-repoquery.txt; then
-      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kcc-repoquery.txt \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
         || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
     fi
   else
@@ -118,9 +140,9 @@ else
 fi
 
 if command -v bootc >/dev/null 2>&1; then
-  echo "bootc detected; validating the exact JSON command used by KCC"
-  bootc status --format json > /tmp/kcc-bootc-status.json
-  grep -q '"status"' /tmp/kcc-bootc-status.json
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
 else
   echo "bootc not available in this CI container; static command/schema guards passed"
 fi
