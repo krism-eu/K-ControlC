@@ -11,7 +11,7 @@
 PackageSearch::PackageSearch(QObject *parent)
     : QAbstractListModel(parent)
 {
-    QFile file(QStringLiteral("/usr/share/raku-kris/owned-packages.txt"));
+    QFile file(QStringLiteral("/usr/share/krisos/owned-packages.txt"));
     if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QTextStream in(&file);
         while (!in.atEnd()) {
@@ -394,7 +394,7 @@ void PackageSearch::stopActiveProcess()
 void PackageSearch::refreshPersistentSet()
 {
     m_persistent.clear();
-    QFile file(QStringLiteral("/var/lib/raku-kris/packages.list"));
+    QFile file(QStringLiteral("/var/lib/krisos/packages.list"));
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
     while (!file.atEnd()) {
