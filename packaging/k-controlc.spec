@@ -1,6 +1,6 @@
 Name:           kcc
 Version:        0.4.0
-Release:        7%{?dist}
+Release:        8%{?dist}
 Summary:        KCC personal control center for KrisOS and Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/KCC
@@ -55,6 +55,10 @@ Settings.
 %{_datadir}/icons/hicolor/scalable/apps/kcc.svg
 
 %changelog
+* Wed Sep 16 2026 krism-eu - 0.4.0-8
+- Add --background startup mode for KrisOS session autostart
+- Keep the KCC process running without opening the main window at login
+
 * Wed Sep 16 2026 krism-eu - 0.4.0-7
 - Rename the RPM identity and executable to kcc
 - Add Provides/Obsoletes for safe replacement of installed k-controlc packages

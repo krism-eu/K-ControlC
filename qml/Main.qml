@@ -10,7 +10,7 @@ Kirigami.ApplicationWindow {
     height: 760
     minimumWidth: 800
     minimumHeight: 580
-    visible: true
+    visible: !KccStartHidden
     title: qsTr("KCC")
 
     function showIndex(index) {

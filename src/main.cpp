@@ -1,3 +1,5 @@
+#include <QCommandLineOption>
+#include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
@@ -18,6 +20,17 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName(QStringLiteral("KCC"));
     QCoreApplication::setApplicationName(QStringLiteral("KCC"));
     QCoreApplication::setApplicationVersion(QStringLiteral(KCC_VERSION));
+
+    QCommandLineParser parser;
+    parser.setApplicationDescription(QStringLiteral("KCC control center"));
+    parser.addHelpOption();
+    parser.addVersionOption();
+    QCommandLineOption backgroundOption(
+        QStringList{QStringLiteral("background")},
+        QStringLiteral("Start KCC without opening the main window."));
+    parser.addOption(backgroundOption);
+    parser.process(app);
+    const bool startHidden = parser.isSet(backgroundOption);
 
     // Keep the QML module URI stable for this package-name transition. It is
     // internal to the application and does not affect the RPM or executable name.
@@ -43,6 +56,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty(QStringLiteral("SoftwareBackend"), &softwareBackend);
     engine.rootContext()->setContextProperty(QStringLiteral("SystemBackend"), &systemBackend);
     engine.rootContext()->setContextProperty(QStringLiteral("UtilityBackend"), &utilityBackend);
+    engine.rootContext()->setContextProperty(QStringLiteral("KccStartHidden"), startHidden);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
                      &app, [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
