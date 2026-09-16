@@ -1,5 +1,6 @@
 #include "BootcBackend.h"
 
+#include <QDebug>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
@@ -17,9 +18,13 @@ QString jsonString(const QJsonObject &object, const QString &key)
 
 QString firstExistingPath(const QStringList &paths)
 {
-    for (const QString &path : paths) {
-        if (QFileInfo::exists(path))
-            return path;
+    for (qsizetype i = 0; i < paths.size(); ++i) {
+        const QString &path = paths.at(i);
+        if (!QFileInfo::exists(path))
+            continue;
+        if (i > 0)
+            qWarning().noquote() << "krisCC: using legacy compatibility path:" << path;
+        return path;
     }
     return paths.isEmpty() ? QString() : paths.constFirst();
 }
