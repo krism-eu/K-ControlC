@@ -37,7 +37,7 @@ Kirigami.ScrollablePage {
         Controls.Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: qsTr("Deployment dell'immagine di sistema, aggiornamenti atomici e rollback. Qui non vengono eseguite transazioni DNF sulla base immutabile.")
+            text: qsTr("KrisOS usa un solo deployment supportato. Gli aggiornamenti del sistema sono image-based tramite BootC; i pacchetti persistenti restano gestiti separatamente da rk.")
         }
 
         Kirigami.InlineMessage {
@@ -101,11 +101,6 @@ Kirigami.ScrollablePage {
                         enabled: BootcBackend.bootcAvailable && !PolkitHelper.running
                         onClicked: applyDialog.open()
                     }
-                    Controls.Button {
-                        text: qsTr("Rollback")
-                        enabled: BootcBackend.bootcAvailable && !PolkitHelper.running
-                        onClicked: rollbackDialog.open()
-                    }
                 }
             }
         }
@@ -144,12 +139,5 @@ Kirigami.ScrollablePage {
         title: qsTr("Applicare l'aggiornamento?")
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         onAccepted: root.runBootc(["upgrade", "--apply"])
-    }
-    Controls.Dialog {
-        id: rollbackDialog
-        modal: true
-        title: qsTr("Preparare il rollback?")
-        standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
-        onAccepted: root.runBootc(["rollback"])
     }
 }
