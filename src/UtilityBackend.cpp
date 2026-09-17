@@ -121,9 +121,17 @@ bool UtilityBackend::runFlatpak(const QString &mode, const QString &query)
                      tr("Flatpak installati"));
     if (mode == QStringLiteral("updates"))
         return start(QStringLiteral("/usr/bin/flatpak"),
-                     {QStringLiteral("remote-ls"), QStringLiteral("--updates"), QStringLiteral("--app"),
+                     {QStringLiteral("remote-ls"), QStringLiteral("--user"), QStringLiteral("--updates"), QStringLiteral("--app"),
                       QStringLiteral("--columns=name,application,version,origin")},
                      tr("Aggiornamenti Flatpak"));
+    if (mode == QStringLiteral("update-all"))
+        return start(QStringLiteral("/usr/bin/flatpak"),
+                     {QStringLiteral("update"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), QStringLiteral("--assumeyes")},
+                     tr("Aggiornamento Flatpak"));
+    if (mode == QStringLiteral("update") && validPackageName(query.trimmed()))
+        return start(QStringLiteral("/usr/bin/flatpak"),
+                     {QStringLiteral("update"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), QStringLiteral("--assumeyes"), query.trimmed()},
+                     tr("Aggiornamento Flatpak: %1").arg(query.trimmed()));
     if (mode == QStringLiteral("remotes"))
         return start(QStringLiteral("/usr/bin/flatpak"),
                      {QStringLiteral("remotes"), QStringLiteral("--columns=name,title,url,options")},
