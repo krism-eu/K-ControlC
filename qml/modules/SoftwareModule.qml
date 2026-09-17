@@ -43,11 +43,6 @@ Kirigami.ScrollablePage {
         return true
     }
 
-    function isAdvancedRepo(id) {
-        var x = (id || "").toLowerCase()
-        return x.indexOf("debuginfo") >= 0 || x.indexOf("source") >= 0 || x.indexOf("testing") >= 0 || x.indexOf("archive") >= 0
-    }
-
     function transactionDependencies() {
         var lines = UtilityBackend.output.split("\n")
         var result = []
@@ -137,7 +132,7 @@ Kirigami.ScrollablePage {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
                 opacity: 0.72
-                text: qsTr("Base immutabile, pacchetti persistenti gestiti da rk e pacchetti locali vengono distinti chiaramente.")
+                text: qsTr("Base immutabile, pacchetti persistenti gestiti da rk e pacchetti locali vengono distinti chiaramente. La ricerca installabile usa solo i repository Fedora supportati da KrisOS.")
             }
         }
 
@@ -310,7 +305,7 @@ Kirigami.ScrollablePage {
 
             ColumnLayout {
                 RowLayout {
-                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Aggiornamenti RPM disponibili. La base resta aggiornata tramite BootC.") }
+                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Aggiornamenti RPM disponibili nei repository Fedora supportati. La base resta aggiornata tramite BootC.") }
                     Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: upgradesModel.loadUpgrades() }
                 }
                 Controls.BusyIndicator { visible: upgradesModel.searching; running: visible; Layout.alignment: Qt.AlignHCenter }
@@ -333,7 +328,7 @@ Kirigami.ScrollablePage {
 
             ColumnLayout {
                 RowLayout {
-                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Pacchetti cambiati di recente nei repository configurati.") }
+                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Pacchetti cambiati di recente nei repository Fedora supportati.") }
                     Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: recentModel.loadRecent() }
                 }
                 Controls.BusyIndicator { visible: recentModel.searching; running: visible; Layout.alignment: Qt.AlignHCenter }
@@ -355,19 +350,23 @@ Kirigami.ScrollablePage {
             }
 
             ColumnLayout {
+                spacing: Kirigami.Units.smallSpacing
+                Controls.Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.72
+                    text: qsTr("krisCC usa soltanto i repository Fedora supportati dalla policy rk. La gestione di repository RPM arbitrari non è esposta dal Control Center.")
+                }
                 RowLayout {
                     Layout.fillWidth: true
-                    Controls.Button { text: qsTr("Aggiungi repository…"); icon.name: "list-add"; onClicked: addRepoDialog.open() }
-                    Controls.CheckBox { id: showAdvanced; text: qsTr("Mostra debug/source/testing/archive") }
                     Item { Layout.fillWidth: true }
                     Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: SoftwareBackend.refreshRepositories() }
                 }
                 Controls.BusyIndicator { visible: SoftwareBackend.busy; running: visible; Layout.alignment: Qt.AlignHCenter }
                 Kirigami.InlineMessage { Layout.fillWidth: true; visible: SoftwareBackend.errorText.length > 0; type: Kirigami.MessageType.Error; text: SoftwareBackend.errorText }
 
-                Kirigami.Heading { level: 3; text: qsTr("Abilitati") }
                 Repeater {
-                    model: SoftwareBackend.repositories.filter(function(repo) { return repo.enabled && (showAdvanced.checked || !root.isAdvancedRepo(repo.id)) })
+                    model: SoftwareBackend.repositories
                     delegate: Kirigami.AbstractCard {
                         required property var modelData
                         Layout.fillWidth: true
@@ -377,27 +376,11 @@ Kirigami.ScrollablePage {
                                 Controls.Label { font.bold: true; text: modelData.name }
                                 Controls.Label { text: modelData.id; opacity: 0.62 }
                             }
-                            Controls.Label { text: qsTr("attivo"); font.bold: true }
-                            Controls.Button { Layout.preferredWidth: 120; enabled: !PolkitHelper.running; text: qsTr("Disabilita"); onClicked: root.runPrivileged("/usr/bin/dnf5", ["config-manager", "disable", modelData.id]) }
-                        }
-                    }
-                }
-
-                Kirigami.Heading { level: 3; text: qsTr("Disabilitati"); opacity: 0.72 }
-                Repeater {
-                    model: SoftwareBackend.repositories.filter(function(repo) { return !repo.enabled && (showAdvanced.checked || !root.isAdvancedRepo(repo.id)) })
-                    delegate: Kirigami.AbstractCard {
-                        required property var modelData
-                        Layout.fillWidth: true
-                        opacity: 0.68
-                        contentItem: RowLayout {
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                Controls.Label { font.bold: true; text: modelData.name }
-                                Controls.Label { text: modelData.id; opacity: 0.62 }
+                            Controls.Label {
+                                text: modelData.enabled ? qsTr("attivo") : qsTr("inattivo")
+                                font.bold: modelData.enabled
+                                opacity: modelData.enabled ? 1.0 : 0.68
                             }
-                            Controls.Label { text: qsTr("inattivo") }
-                            Controls.Button { Layout.preferredWidth: 120; enabled: !PolkitHelper.running; text: qsTr("Abilita"); onClicked: root.runPrivileged("/usr/bin/dnf5", ["config-manager", "enable", modelData.id]) }
                         }
                     }
                 }
@@ -464,12 +447,12 @@ Kirigami.ScrollablePage {
             }
 
             Kirigami.Separator { Layout.fillWidth: true }
-            Kirigami.Heading { level: 3; text: qsTr("Cosa verrebbe installato") }
+            Kirigami.Heading { level: 3; text: qsTr("Piano rk") }
             Controls.Label {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
                 opacity: 0.72
-                text: qsTr("Anteprima DNF5: dipendenze e spazio vengono calcolati dal gestore pacchetti, senza modificare il sistema.")
+                text: qsTr("L'anteprima usa la stessa policy rk dell'installazione reale: repository Fedora supportati, base immutabile protetta e architetture consentite.")
             }
             Controls.BusyIndicator { visible: UtilityBackend.busy; running: visible; Layout.alignment: Qt.AlignHCenter }
 
@@ -505,12 +488,12 @@ Kirigami.ScrollablePage {
                 Layout.fillWidth: true
                 visible: !UtilityBackend.busy && root.transactionDependencies().length === 0 && UtilityBackend.output.length > 0
                 type: Kirigami.MessageType.Information
-                text: qsTr("DNF5 non segnala pacchetti aggiuntivi, oppure il pacchetto è già installato.")
+                text: qsTr("Il piano rk non segnala dipendenze aggiuntive, oppure il pacchetto è già presente.")
             }
 
             Controls.CheckBox {
                 id: technicalOutputToggle
-                text: qsTr("Mostra output tecnico DNF5")
+                text: qsTr("Mostra output tecnico rk")
             }
             Controls.TextArea {
                 Layout.fillWidth: true
@@ -523,21 +506,5 @@ Kirigami.ScrollablePage {
             }
         }
         onClosed: technicalOutputToggle.checked = false
-    }
-
-    Controls.Dialog {
-        id: addRepoDialog
-        modal: true
-        title: qsTr("Aggiungi repository RPM")
-        standardButtons: Controls.Dialog.Ok | Controls.Dialog.Cancel
-        contentItem: ColumnLayout {
-            Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Inserisci l'URL HTTPS di un file .repo. krisCC non rimuove repository esistenti automaticamente.") }
-            Controls.TextField { id: repoUrl; Layout.fillWidth: true; placeholderText: "https://example.org/repository.repo" }
-        }
-        onAccepted: {
-            if (repoUrl.text.indexOf("https://") === 0 && repoUrl.text.endsWith(".repo"))
-                root.runPrivileged("/usr/bin/dnf5", ["config-manager", "addrepo", "--from-repofile=" + repoUrl.text])
-            repoUrl.text = ""
-        }
     }
 }
