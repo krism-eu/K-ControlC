@@ -42,7 +42,7 @@ Non aggiungere wrapper shell generici. `PolkitHelper` valida programma e argomen
 
 ## Pipeline immagine
 
-Il repository produce l'RPM `krisCC`. Il flusso di release previsto è:
+Il repository produce esclusivamente l'RPM `krisCC`. Il flusso di release previsto è:
 
 ```text
 krisCC source -> CI/test -> RPM + SHA256 -> build KrisOS -> immagine BootC
@@ -60,7 +60,7 @@ rpm -V krisCC
 /usr/bin/krisCC --background
 ```
 
-Lo spec dichiara `Provides: k-controlc` e `Obsoletes: k-controlc`, quindi un sistema che avesse ancora installato il vecchio pacchetto può essere aggiornato senza lasciare due RPM concorrenti. Non dichiara `Provides/Obsoletes: kcc`: il pacchetto Fedora omonimo deve poter convivere senza conflitti.
+Non esistono identità RPM di compatibilità da mantenere: nome pacchetto ed eseguibile sono `krisCC` e non vengono pubblicati alias o `Provides/Obsoletes` per vecchi nomi sperimentali.
 
 ## Identità tecnica
 
