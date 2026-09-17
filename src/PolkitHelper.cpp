@@ -3,6 +3,7 @@
 #include "OperationLog.h"
 
 #include <QDebug>
+#include <QFileInfo>
 #include <QRegularExpression>
 
 PolkitHelper::PolkitHelper(QObject *parent)
