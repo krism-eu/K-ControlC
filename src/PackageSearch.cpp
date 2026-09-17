@@ -364,9 +364,11 @@ void PackageSearch::startListQuery(const QString &filter, bool installedEntries)
         emit searchFinished();
     });
 
-    rawProcess->start(QStringLiteral("/usr/bin/dnf5"),
-                      {QStringLiteral("--repo=fedora,updates"),
-                       QStringLiteral("list"), filter, QStringLiteral("--json")});
+    QStringList args;
+    if (filter != QStringLiteral("--installed"))
+        args << QStringLiteral("--repo=fedora,updates");
+    args << QStringLiteral("list") << filter << QStringLiteral("--json");
+    rawProcess->start(QStringLiteral("/usr/bin/dnf5"), args);
 }
 
 void PackageSearch::clearResults()
