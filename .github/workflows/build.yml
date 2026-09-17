@@ -86,21 +86,20 @@ jobs:
             grep -Eq '^[0-9a-f]{64}[[:space:]]+krisCC-0[.]4[.]0-10.*[.]rpm$' SHA256SUMS
           ) 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/logs/rpmbuild.log"
 
-      - name: Install built RPM and smoke test
-        env:
-          QT_QPA_PLATFORM: offscreen
-          QT_QUICK_BACKEND: software
-          QT_QUICK_CONTROLS_STYLE: Basic
-          KRISCC_SMOKE_TEST: "1"
+      - name: Inspect built RPM artifact
+        shell: bash
         run: |
           set -euxo pipefail
-          dnf -y install artifacts/rpm/krisCC-*.rpm
-          rpm -q krisCC
-          test -x /usr/bin/krisCC
-          test "$(rpm -qf /usr/bin/krisCC)" = "$(rpm -q krisCC)"
-          test "$(rpm -qf /usr/share/polkit-1/actions/org.kriscc.controlcenter.policy)" = "$(rpm -q krisCC)"
-          ! rpm -q --provides krisCC | grep -Eq '^(kcc|k-controlc)([[:space:]=]|$)'
-          /usr/bin/krisCC
+          rpm_file="$(find artifacts/rpm -maxdepth 1 -type f -name 'krisCC-0.4.0-10*.x86_64.rpm' -print -quit)"
+          test -n "$rpm_file"
+          test "$(rpm -qp --qf '%{NAME}\n' "$rpm_file")" = "krisCC"
+          test "$(rpm -qp --qf '%{VERSION}-%{RELEASE}\n' "$rpm_file")" = "0.4.0-10.fc44"
+          rpm -qpl "$rpm_file" | grep -Fxq '/usr/bin/krisCC'
+          rpm -qpl "$rpm_file" | grep -Fxq '/usr/share/applications/krisCC.desktop'
+          rpm -qpl "$rpm_file" | grep -Fxq '/usr/share/polkit-1/actions/org.kriscc.controlcenter.policy'
+          rpm -qpR "$rpm_file" | grep -Eq '^polkit([[:space:]<=>]|$)'
+          ! rpm -qp --provides "$rpm_file" | grep -Eq '^(kcc|k-controlc)([[:space:]=]|$)'
+          (cd artifacts/rpm && sha256sum -c SHA256SUMS)
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -139,6 +138,6 @@ jobs:
           if ! gh release view "$tag" >/dev/null 2>&1; then
             gh release create "$tag" \
               --title "krisCC $tag" \
-              --notes "krisCC RPM built and smoke-tested by CI from $GITHUB_SHA. SHA256SUMS identifies the exact tested RPM."
+              --notes "krisCC RPM built and source-tested by CI from $GITHUB_SHA. SHA256SUMS identifies the exact component artifact; final runtime integration is validated by the KrisOS image pipeline."
           fi
           gh release upload "$tag" artifacts/rpm/krisCC-*.rpm artifacts/rpm/SHA256SUMS --clobber
