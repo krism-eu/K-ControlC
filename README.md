@@ -5,18 +5,18 @@ krisCC è un **Control Center personale Kirigami per KrisOS / Fedora bootc**. No
 ## Cosa gestisce
 
 - **Panoramica**: sistema, BootC, storage, pacchetti persistenti e Quick System Info.
-- **Software RPM**: ricerca, installati, aggiornabili, pacchetti recenti, repository DNF5, provenienza Base/Persistente/Locale e anteprima della transazione prima dell'installazione.
+- **Software RPM**: ricerca, installati, aggiornabili, pacchetti recenti, provenienza Base/Persistente/Locale e piano della transazione tramite la stessa policy `rk` usata per installare.
 - **Flatpak**: ricerca strutturata, installati, aggiornamenti, remote e integrazione Flathub senza dipendere da Discover.
 - **Container / Podman**: elenco container, stato, immagine, dimensione, informazioni, log, start/stop/restart e rinomina. Nessuna rimozione automatica.
-- **BootC**: stato deployment JSON, upgrade, download/apply e rollback.
+- **BootC**: stato del deployment, controllo aggiornamenti, download/preparazione e applicazione. KrisOS supporta un solo deployment e krisCC non espone rollback.
 - **Strumenti e comandi**: utility amministrative mirate, servizi rapidi e launcher KDE disponibili sul sistema.
-- **Recovery e backup**: rollback BootC, `rk sync`, azioni di sessione e snapshot `tar.gz` della configurazione o della home.
+- **Backup e recovery**: `rk sync`, azioni di sessione e snapshot `tar.gz` della configurazione o della home.
 
 ## Sicurezza
 
-Le modifiche privilegiate passano da `pkexec` con una allowlist C++ stretta. La policy non usa `auth_admin_keep`. Sono ammesse soltanto le combinazioni previste per `rk`, `bootc` e l'abilitazione/disabilitazione dei repository tramite `dnf5 config-manager`. Non vengono eseguite shell root generiche.
+Le modifiche privilegiate passano da `pkexec` con una allowlist C++ stretta. La policy non usa `auth_admin_keep`. Sono ammesse soltanto le combinazioni previste per `rk` e `bootc`; krisCC non espone più mutazioni arbitrarie dei repository DNF5 e non esegue shell root generiche.
 
-Le query DNF5 sono read-only. L'anteprima delle dipendenze usa DNF5 senza applicare la transazione. Le operazioni Podman dell'utente non introducono un helper root generico.
+Le query DNF5 sono read-only e limitate ai repository `fedora` e `updates`, gli stessi repository ammessi da `rk`. L'anteprima RPM usa `rk plan`, quindi la UI non presenta una transazione che l'installazione reale rifiuterebbe. Le operazioni Podman dell'utente restano rootless.
 
 ## Compatibilità KrisOS
 
@@ -54,10 +54,10 @@ Lo spec RPM è `packaging/krisCC.spec` e produce **`krisCC-0.4.0-*.rpm`**. La CI
 Il flusso previsto per KrisOS è:
 
 ```text
-krisCC source -> CI/test -> krisCC RPM -> build context KrisOS -> installazione nella base -> snapshot owned packages -> immagine BootC
+krisCC source -> CI/test -> RPM identificato + SHA256 -> build KrisOS -> snapshot owned packages -> immagine BootC
 ```
 
-L'RPM deve essere installato **prima** della generazione di `/usr/share/krisos/owned-packages.txt` e `owned-nevra.txt`, così krisCC viene riconosciuto come parte della base immutabile e non come pacchetto dell'overlay.
+L'RPM deve essere installato **prima** della generazione di `/usr/share/krisos/owned-packages.txt` e `owned-nevra.txt`, così krisCC viene riconosciuto come parte della base immutabile e non come pacchetto dell'overlay. La build KrisOS deve consumare un artefatto krisCC verificabile, non ricostruire implicitamente un altro repository durante la build dell'OS.
 
 Esempio manuale:
 
@@ -73,4 +73,4 @@ Repository: https://github.com/krism-eu/krisCC
 
 ## Test reale
 
-La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging, sostituzione `k-controlc` → `krisCC` e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk add/rm/sync`, autenticazione Polkit, ricerca RPM con dimensioni e dipendenze, Flatpak, Podman, repository enable/disable, upgrade/rollback BootC, restart servizi e backup della home/configurazione.
+La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging, sostituzione `k-controlc` → `krisCC` e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk plan/add/rm/sync`, autenticazione Polkit, ricerca RPM con dimensioni e dipendenze, Flatpak, Podman, update BootC, restart servizi e backup della home/configurazione.
