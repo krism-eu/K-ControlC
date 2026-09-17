@@ -49,6 +49,18 @@ fi
 grep -q 'QStringLiteral("--repo=fedora,updates")' src/PackageSearch.cpp
 grep -q 'id != QStringLiteral("fedora") && id != QStringLiteral("updates")' src/SoftwareBackend.cpp
 
+# Flatpak mutations remain rootless/per-user. Updates may target one application
+# or all user refs, while discovery remains read-only.
+grep -q 'mode == QStringLiteral("update-all")' src/UtilityBackend.cpp
+grep -q 'mode == QStringLiteral("update")' src/UtilityBackend.cpp
+grep -q 'QStringLiteral("update"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), QStringLiteral("--assumeyes")' src/UtilityBackend.cpp
+grep -q 'text: qsTr("Aggiorna tutto")' qml/modules/FlatpakModule.qml
+grep -q 'text: qsTr("Aggiorna")' qml/modules/FlatpakModule.qml
+
+# The BootC check is an explicit registry check and must remain non-applying.
+grep -Fq 'root.runBootc(["upgrade", "--check"])' qml/modules/BootcModule.qml
+grep -q 'text: qsTr("Controlla GHCR")' qml/modules/BootcModule.qml
+
 if grep -Eq 'QStringLiteral\("--json"\)|QStringLiteral\("--format-version' src/BootcBackend.cpp; then
   echo "ERROR: BootcBackend must use bootc status --format json without legacy JSON flags" >&2
   exit 1
