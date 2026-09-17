@@ -89,8 +89,8 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          rpm_file="$(find artifacts/rpm -maxdepth 1 -type f -name 'krisCC-0.4.0-10*.x86_64.rpm' -print -quit)"
-          test -n "$rpm_file"
+          rpm_file='artifacts/rpm/krisCC-0.4.0-10.fc44.x86_64.rpm'
+          test -f "$rpm_file"
           test "$(rpm -qp --qf '%{NAME}\n' "$rpm_file")" = "krisCC"
           test "$(rpm -qp --qf '%{VERSION}-%{RELEASE}\n' "$rpm_file")" = "0.4.0-10.fc44"
           rpm -qpl "$rpm_file" | grep -Fxq '/usr/bin/krisCC'
@@ -127,7 +127,18 @@ jobs:
           set -euo pipefail
           cd artifacts/rpm
           sha256sum -c SHA256SUMS
-          rpm_file="$(find . -maxdepth 1 -type f -name 'krisCC-*.x86_64.rpm' -print -quit)"
+
+          rpm_file=''
+          while IFS= read -r candidate; do
+            if [[ "$(rpm -qp --qf '%{NAME}' "$candidate")" == 'krisCC' ]]; then
+              if [[ -n "$rpm_file" ]]; then
+                echo 'More than one runtime krisCC RPM found.' >&2
+                exit 1
+              fi
+              rpm_file="$candidate"
+            fi
+          done < <(find . -maxdepth 1 -type f -name 'krisCC-*.x86_64.rpm' -print | sort)
+
           test -n "$rpm_file"
           base="$(basename "$rpm_file")"
           if [[ ! "$base" =~ ^krisCC-([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)\.fc44\.x86_64\.rpm$ ]]; then
@@ -136,7 +147,7 @@ jobs:
           fi
           tag="v${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
           checksum="$(awk -v f="$base" '$2 == f || $2 == "./" f {print $1}' SHA256SUMS)"
-          test -n "$checksum"
+          [[ "$checksum" =~ ^[0-9a-f]{64}$ ]]
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "rpm=$base" >> "$GITHUB_OUTPUT"
           echo "sha256=$checksum" >> "$GITHUB_OUTPUT"
