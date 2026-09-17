@@ -116,7 +116,7 @@ bool UtilityBackend::runFlatpak(const QString &mode, const QString &query)
 {
     if (mode == QStringLiteral("installed"))
         return start(QStringLiteral("/usr/bin/flatpak"),
-                     {QStringLiteral("list"), QStringLiteral("--app"),
+                     {QStringLiteral("list"), QStringLiteral("--user"), QStringLiteral("--app"),
                       QStringLiteral("--columns=name,application,version,origin")},
                      tr("Flatpak installati"));
     if (mode == QStringLiteral("updates"))
@@ -134,7 +134,7 @@ bool UtilityBackend::runFlatpak(const QString &mode, const QString &query)
                      tr("Aggiornamento Flatpak: %1").arg(query.trimmed()));
     if (mode == QStringLiteral("remotes"))
         return start(QStringLiteral("/usr/bin/flatpak"),
-                     {QStringLiteral("remotes"), QStringLiteral("--columns=name,title,url,options")},
+                     {QStringLiteral("remotes"), QStringLiteral("--user"), QStringLiteral("--columns=name,title,url,options")},
                      tr("Remote Flatpak"));
     if (mode == QStringLiteral("search") && query.trimmed().size() >= 2)
         return start(QStringLiteral("/usr/bin/flatpak"),
