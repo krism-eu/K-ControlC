@@ -1,8 +1,16 @@
 #include "UtilityBackend.h"
 
+#include <QDebug>
 #include <QFileInfo>
 #include <QRegularExpression>
 #include <QStandardPaths>
+#include <QTimer>
+
+namespace {
+constexpr int kShortQueryTimeoutMs = 30 * 1000;
+constexpr int kRepositoryQueryTimeoutMs = 2 * 60 * 1000;
+constexpr int kContainerQueryTimeoutMs = 60 * 1000;
+}
 
 UtilityBackend::UtilityBackend(QObject *parent)
     : QObject(parent)
@@ -21,95 +29,151 @@ bool UtilityBackend::validContainerName(const QString &name) const
     return pattern.match(name).hasMatch();
 }
 
-bool UtilityBackend::start(const QString &program, const QStringList &args, const QString &title)
+void UtilityBackend::setImmediateError(const QString &title, const QString &operationId, const QString &message)
 {
-    if (m_busy)
+    m_title = title;
+    m_operationId = operationId;
+    m_output = message;
+    m_resultState = QStringLiteral("error");
+    emit stateChanged();
+}
+
+bool UtilityBackend::start(const QString &program, const QStringList &args, const QString &title,
+                           const QString &operationId, int timeoutMs)
+{
+    if (m_busy) {
+        qDebug().noquote() << "UtilityBackend: refusing" << operationId
+                           << "while operation" << m_operationId << "is still running";
         return false;
+    }
 
     const QString executable = program.startsWith(QLatin1Char('/'))
         ? (QFileInfo(program).isExecutable() ? program : QString())
         : QStandardPaths::findExecutable(program);
     if (executable.isEmpty()) {
-        m_title = title;
-        m_output = tr("Comando non disponibile: %1").arg(program);
-        emit stateChanged();
+        setImmediateError(title, operationId, tr("Comando non disponibile: %1").arg(program));
         return false;
     }
 
     m_busy = true;
+    m_cancelRequested = false;
+    m_timedOut = false;
     m_title = title;
+    m_operationId = operationId;
     m_output.clear();
+    m_resultState = QStringLiteral("running");
     emit stateChanged();
 
     auto *process = new QProcess(this);
+    const QPointer<QProcess> guarded(process);
     m_process = process;
     process->setProcessChannelMode(QProcess::MergedChannels);
 
     connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
-            [this](int exitCode, QProcess::ExitStatus status) {
-        if (!m_process)
+            [this, guarded](int exitCode, QProcess::ExitStatus status) {
+        if (!guarded || guarded != m_process)
             return;
-        const QString text = QString::fromUtf8(m_process->readAllStandardOutput()).trimmed();
+        const QString text = QString::fromUtf8(guarded->readAllStandardOutput()).trimmed();
+        if (m_cancelRequested) {
+            finish(text.isEmpty() ? tr("Operazione annullata.") : text, QStringLiteral("cancelled"));
+            return;
+        }
+        if (m_timedOut) {
+            finish(text.isEmpty() ? tr("Tempo massimo superato; il comando è stato interrotto.") : text,
+                   QStringLiteral("timeout"));
+            return;
+        }
         const bool ok = status == QProcess::NormalExit && exitCode == 0;
-        finish(text.isEmpty() ? (ok ? tr("Nessun output.") : tr("Comando terminato con codice %1.").arg(exitCode)) : text);
+        finish(text.isEmpty() && !ok ? tr("Comando terminato con codice %1.").arg(exitCode) : text,
+               ok ? QStringLiteral("success") : QStringLiteral("error"));
     });
 
     connect(process, &QProcess::errorOccurred, this,
-            [this](QProcess::ProcessError error) {
-        if (!m_process || error != QProcess::FailedToStart)
+            [this, guarded](QProcess::ProcessError error) {
+        if (!guarded || guarded != m_process || error != QProcess::FailedToStart)
             return;
-        finish(tr("Impossibile avviare il comando: %1").arg(m_process->errorString()));
+        finish(tr("Impossibile avviare il comando: %1").arg(guarded->errorString()),
+               QStringLiteral("error"));
     });
+
+    if (timeoutMs > 0) {
+        QTimer::singleShot(timeoutMs, process, [this, guarded] {
+            if (!guarded || guarded != m_process || guarded->state() == QProcess::NotRunning)
+                return;
+            m_timedOut = true;
+            guarded->terminate();
+            QTimer::singleShot(2000, guarded, [guarded] {
+                if (guarded && guarded->state() != QProcess::NotRunning)
+                    guarded->kill();
+            });
+        });
+    }
 
     process->start(executable, args);
     return true;
 }
 
-void UtilityBackend::finish(const QString &message)
+void UtilityBackend::finish(const QString &message, const QString &state)
 {
     if (m_process) {
         m_process->deleteLater();
         m_process = nullptr;
     }
     m_busy = false;
+    m_cancelRequested = false;
+    m_timedOut = false;
     m_output = message;
+    m_resultState = state;
     emit stateChanged();
+}
+
+bool UtilityBackend::cancel()
+{
+    if (!m_process || !m_busy)
+        return false;
+    m_cancelRequested = true;
+    m_process->terminate();
+    const QPointer<QProcess> guarded = m_process;
+    QTimer::singleShot(2000, guarded, [guarded] {
+        if (guarded && guarded->state() != QProcess::NotRunning)
+            guarded->kill();
+    });
+    return true;
 }
 
 bool UtilityBackend::runBookmark(const QString &id)
 {
     if (id == QStringLiteral("failed-units"))
-        return start(QStringLiteral("systemctl"), {QStringLiteral("--failed"), QStringLiteral("--no-pager"), QStringLiteral("--plain")}, tr("Unità systemd fallite"));
+        return start(QStringLiteral("systemctl"), {QStringLiteral("--failed"), QStringLiteral("--no-pager"), QStringLiteral("--plain")}, tr("Unità systemd fallite"), QStringLiteral("bookmark.failed-units"), kShortQueryTimeoutMs);
     if (id == QStringLiteral("timers"))
-        return start(QStringLiteral("systemctl"), {QStringLiteral("list-timers"), QStringLiteral("--all"), QStringLiteral("--no-pager")}, tr("Timer systemd"));
+        return start(QStringLiteral("systemctl"), {QStringLiteral("list-timers"), QStringLiteral("--all"), QStringLiteral("--no-pager")}, tr("Timer systemd"), QStringLiteral("bookmark.timers"), kShortQueryTimeoutMs);
     if (id == QStringLiteral("ports"))
-        return start(QStringLiteral("ss"), {QStringLiteral("-lntu")}, tr("Porte in ascolto"));
+        return start(QStringLiteral("ss"), {QStringLiteral("-lntu")}, tr("Porte in ascolto"), QStringLiteral("bookmark.ports"), kShortQueryTimeoutMs);
     if (id == QStringLiteral("sessions"))
-        return start(QStringLiteral("loginctl"), {QStringLiteral("list-sessions"), QStringLiteral("--no-legend")}, tr("Sessioni attive"));
+        return start(QStringLiteral("loginctl"), {QStringLiteral("list-sessions"), QStringLiteral("--no-legend")}, tr("Sessioni attive"), QStringLiteral("bookmark.sessions"), kShortQueryTimeoutMs);
     if (id == QStringLiteral("mounts"))
-        return start(QStringLiteral("findmnt"), {QStringLiteral("-o"), QStringLiteral("TARGET,SOURCE,FSTYPE,OPTIONS")}, tr("Mount attivi"));
+        return start(QStringLiteral("findmnt"), {QStringLiteral("-o"), QStringLiteral("TARGET,SOURCE,FSTYPE,OPTIONS")}, tr("Mount attivi"), QStringLiteral("bookmark.mounts"), kShortQueryTimeoutMs);
     if (id == QStringLiteral("top-cpu"))
-        return start(QStringLiteral("ps"), {QStringLiteral("-eo"), QStringLiteral("pid,comm,%cpu,%mem"), QStringLiteral("--sort=-%cpu")}, tr("Processi per CPU"));
+        return start(QStringLiteral("ps"), {QStringLiteral("-eo"), QStringLiteral("pid,comm,%cpu,%mem"), QStringLiteral("--sort=-%cpu")}, tr("Processi per CPU"), QStringLiteral("bookmark.top-cpu"), kShortQueryTimeoutMs);
     if (id == QStringLiteral("top-memory"))
-        return start(QStringLiteral("ps"), {QStringLiteral("-eo"), QStringLiteral("pid,comm,%mem,%cpu"), QStringLiteral("--sort=-%mem")}, tr("Processi per memoria"));
+        return start(QStringLiteral("ps"), {QStringLiteral("-eo"), QStringLiteral("pid,comm,%mem,%cpu"), QStringLiteral("--sort=-%mem")}, tr("Processi per memoria"), QStringLiteral("bookmark.top-memory"), kShortQueryTimeoutMs);
     if (id == QStringLiteral("selinux"))
-        return start(QStringLiteral("getenforce"), {}, tr("SELinux"));
+        return start(QStringLiteral("getenforce"), {}, tr("SELinux"), QStringLiteral("bookmark.selinux"), kShortQueryTimeoutMs);
     if (id == QStringLiteral("services-active"))
-        return start(QStringLiteral("systemctl"), {QStringLiteral("list-units"), QStringLiteral("--type=service"), QStringLiteral("--state=running"), QStringLiteral("--no-pager"), QStringLiteral("--plain")}, tr("Servizi attivi"));
+        return start(QStringLiteral("systemctl"), {QStringLiteral("list-units"), QStringLiteral("--type=service"), QStringLiteral("--state=running"), QStringLiteral("--no-pager"), QStringLiteral("--plain")}, tr("Servizi attivi"), QStringLiteral("bookmark.services-active"), kShortQueryTimeoutMs);
     return false;
 }
 
 bool UtilityBackend::previewRpmInstall(const QString &packageName)
 {
     if (!validPackageName(packageName)) {
-        m_title = tr("Anteprima RPM");
-        m_output = tr("Nome pacchetto non valido.");
-        emit stateChanged();
+        setImmediateError(tr("Anteprima RPM"), QStringLiteral("rpm.plan"), tr("Nome pacchetto non valido."));
         return false;
     }
     return start(QStringLiteral("/usr/bin/rk"),
                  {QStringLiteral("plan"), packageName},
-                 tr("Piano installazione persistente: %1").arg(packageName));
+                 tr("Piano installazione persistente: %1").arg(packageName),
+                 QStringLiteral("rpm.plan"), kRepositoryQueryTimeoutMs);
 }
 
 bool UtilityBackend::runFlatpak(const QString &mode, const QString &query)
@@ -118,36 +182,36 @@ bool UtilityBackend::runFlatpak(const QString &mode, const QString &query)
         return start(QStringLiteral("/usr/bin/flatpak"),
                      {QStringLiteral("list"), QStringLiteral("--user"), QStringLiteral("--app"),
                       QStringLiteral("--columns=name,application,version,origin")},
-                     tr("Flatpak installati"));
+                     tr("Flatpak installati"), QStringLiteral("flatpak.installed"), kRepositoryQueryTimeoutMs);
     if (mode == QStringLiteral("updates"))
         return start(QStringLiteral("/usr/bin/flatpak"),
                      {QStringLiteral("remote-ls"), QStringLiteral("--user"), QStringLiteral("--updates"), QStringLiteral("--app"),
                       QStringLiteral("--columns=name,application,version,origin")},
-                     tr("Aggiornamenti Flatpak"));
+                     tr("Aggiornamenti Flatpak"), QStringLiteral("flatpak.updates"), kRepositoryQueryTimeoutMs);
     if (mode == QStringLiteral("update-all"))
         return start(QStringLiteral("/usr/bin/flatpak"),
                      {QStringLiteral("update"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), QStringLiteral("--assumeyes")},
-                     tr("Aggiornamento Flatpak"));
+                     tr("Aggiornamento Flatpak"), QStringLiteral("flatpak.update-all"));
     if (mode == QStringLiteral("update") && validPackageName(query.trimmed()))
         return start(QStringLiteral("/usr/bin/flatpak"),
                      {QStringLiteral("update"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), QStringLiteral("--assumeyes"), query.trimmed()},
-                     tr("Aggiornamento Flatpak: %1").arg(query.trimmed()));
+                     tr("Aggiornamento Flatpak: %1").arg(query.trimmed()), QStringLiteral("flatpak.update"));
     if (mode == QStringLiteral("remotes"))
         return start(QStringLiteral("/usr/bin/flatpak"),
                      {QStringLiteral("remotes"), QStringLiteral("--user"), QStringLiteral("--columns=name,title,url,options")},
-                     tr("Remote Flatpak"));
+                     tr("Remote Flatpak"), QStringLiteral("flatpak.remotes"), kRepositoryQueryTimeoutMs);
     if (mode == QStringLiteral("search") && query.trimmed().size() >= 2)
         return start(QStringLiteral("/usr/bin/flatpak"),
                      {QStringLiteral("search"), QStringLiteral("--columns=name,description,application,version,branch,remotes"), query.trimmed()},
-                     tr("Ricerca Flatpak: %1").arg(query.trimmed()));
+                     tr("Ricerca Flatpak: %1").arg(query.trimmed()), QStringLiteral("flatpak.search"), kRepositoryQueryTimeoutMs);
     if (mode == QStringLiteral("install") && validPackageName(query.trimmed()))
         return start(QStringLiteral("/usr/bin/flatpak"),
                      {QStringLiteral("install"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), QStringLiteral("flathub"), query.trimmed()},
-                     tr("Installazione Flatpak: %1").arg(query.trimmed()));
+                     tr("Installazione Flatpak: %1").arg(query.trimmed()), QStringLiteral("flatpak.install"));
     if (mode == QStringLiteral("remove") && validPackageName(query.trimmed()))
         return start(QStringLiteral("/usr/bin/flatpak"),
                      {QStringLiteral("uninstall"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), query.trimmed()},
-                     tr("Rimozione Flatpak: %1").arg(query.trimmed()));
+                     tr("Rimozione Flatpak: %1").arg(query.trimmed()), QStringLiteral("flatpak.remove"));
     return false;
 }
 
@@ -156,7 +220,7 @@ bool UtilityBackend::addFlathubUser()
     return start(QStringLiteral("/usr/bin/flatpak"),
                  {QStringLiteral("remote-add"), QStringLiteral("--user"), QStringLiteral("--if-not-exists"),
                   QStringLiteral("flathub"), QStringLiteral("https://flathub.org/repo/flathub.flatpakrepo")},
-                 tr("Aggiunta Flathub per l'utente"));
+                 tr("Aggiunta Flathub per l'utente"), QStringLiteral("flatpak.flathub-add"));
 }
 
 bool UtilityBackend::runPodman(const QString &mode, const QString &container, const QString &value)
@@ -164,24 +228,24 @@ bool UtilityBackend::runPodman(const QString &mode, const QString &container, co
     if (mode == QStringLiteral("list"))
         return start(QStringLiteral("/usr/bin/podman"),
                      {QStringLiteral("ps"), QStringLiteral("--all"), QStringLiteral("--size"), QStringLiteral("--format"), QStringLiteral("json")},
-                     tr("Container Podman"));
+                     tr("Container Podman"), QStringLiteral("podman.list"), kContainerQueryTimeoutMs);
 
     const QString name = container.trimmed();
     if (!validContainerName(name))
         return false;
 
     if (mode == QStringLiteral("info"))
-        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("inspect"), name}, tr("Info container: %1").arg(name));
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("inspect"), name}, tr("Info container: %1").arg(name), QStringLiteral("podman.info"), kContainerQueryTimeoutMs);
     if (mode == QStringLiteral("logs"))
-        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("logs"), QStringLiteral("--tail"), QStringLiteral("200"), name}, tr("Log container: %1").arg(name));
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("logs"), QStringLiteral("--tail"), QStringLiteral("200"), name}, tr("Log container: %1").arg(name), QStringLiteral("podman.logs"), kContainerQueryTimeoutMs);
     if (mode == QStringLiteral("start"))
-        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("start"), name}, tr("Avvio container: %1").arg(name));
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("start"), name}, tr("Avvio container: %1").arg(name), QStringLiteral("podman.start"));
     if (mode == QStringLiteral("stop"))
-        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("stop"), name}, tr("Arresto container: %1").arg(name));
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("stop"), name}, tr("Arresto container: %1").arg(name), QStringLiteral("podman.stop"));
     if (mode == QStringLiteral("restart"))
-        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("restart"), name}, tr("Riavvio container: %1").arg(name));
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("restart"), name}, tr("Riavvio container: %1").arg(name), QStringLiteral("podman.restart"));
     if (mode == QStringLiteral("rename") && validContainerName(value.trimmed()))
-        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("rename"), name, value.trimmed()}, tr("Rinomina container: %1").arg(name));
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("rename"), name, value.trimmed()}, tr("Rinomina container: %1").arg(name), QStringLiteral("podman.rename"));
 
     return false;
 }

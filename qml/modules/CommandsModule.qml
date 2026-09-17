@@ -72,6 +72,12 @@ Kirigami.ScrollablePage {
                     Layout.fillWidth: true
                     Kirigami.Heading { Layout.fillWidth: true; level: 3; text: UtilityBackend.title || qsTr("Output") }
                     Controls.Button {
+                        visible: UtilityBackend.busy
+                        text: qsTr("Annulla")
+                        icon.name: "process-stop"
+                        onClicked: UtilityBackend.cancel()
+                    }
+                    Controls.Button {
                         text: qsTr("Copia")
                         icon.name: "edit-copy"
                         enabled: UtilityBackend.output.length > 0

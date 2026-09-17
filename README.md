@@ -43,7 +43,7 @@ cmake --build build
 ./build/krisCC
 ```
 
-È disponibile anche `--background` per l'avvio di sessione senza mostrare la finestra principale:
+È disponibile anche `--background` per l'avvio di sessione senza mostrare la finestra principale. L'istanza registra un servizio D-Bus di sessione; un successivo avvio dal menu riattiva la stessa finestra invece di creare un secondo processo:
 
 ```bash
 ./build/krisCC --background

@@ -91,6 +91,12 @@ Kirigami.ScrollablePage {
                                 enabled: !SystemBackend.backupBusy
                                 onClicked: backupProfile.currentIndex === 0 ? SystemBackend.createSnapshot("config") : homeDialog.open()
                             }
+                            Controls.Button {
+                                visible: SystemBackend.backupBusy
+                                text: qsTr("Annulla")
+                                icon.name: "process-stop"
+                                onClicked: SystemBackend.cancelSnapshot()
+                            }
                             Controls.BusyIndicator { visible: SystemBackend.backupBusy; running: visible }
                         }
                     }
@@ -99,8 +105,10 @@ Kirigami.ScrollablePage {
                 Kirigami.InlineMessage {
                     Layout.fillWidth: true
                     visible: SystemBackend.backupStatus.length > 0
-                    type: SystemBackend.backupStatus.indexOf(qsTr("correttamente")) >= 0
-                          ? Kirigami.MessageType.Positive : Kirigami.MessageType.Information
+                    type: SystemBackend.backupState === "success" ? Kirigami.MessageType.Positive
+                          : SystemBackend.backupState === "warning" ? Kirigami.MessageType.Warning
+                          : SystemBackend.backupState === "error" ? Kirigami.MessageType.Error
+                          : Kirigami.MessageType.Information
                     text: SystemBackend.backupStatus + (SystemBackend.backupPath.length > 0 ? "\n" + SystemBackend.backupPath : "")
                 }
 

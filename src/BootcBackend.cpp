@@ -132,10 +132,19 @@ void BootcBackend::refreshStatus()
         if (!process || process != m_process)
             return;
 
+        const bool timedOut = process->property("krisccTimedOut").toBool();
         const QByteArray stdoutData = process->readAllStandardOutput();
         const QString stderrText = QString::fromUtf8(process->readAllStandardError()).trimmed();
         m_process = nullptr;
         process->deleteLater();
+
+        if (timedOut) {
+            m_statusText.clear();
+            m_errorText = tr("Tempo massimo superato durante bootc status.");
+            setBusy(false);
+            emit statusChanged();
+            return;
+        }
 
         if (status == QProcess::NormalExit && exitCode == 0) {
             parseJsonStatus(stdoutData);
@@ -160,6 +169,16 @@ void BootcBackend::refreshStatus()
     });
 
     startBootcStatus(rawProcess, QStringLiteral("json"));
+    QTimer::singleShot(30 * 1000, rawProcess, [this, process] {
+        if (!process || process != m_process || process->state() == QProcess::NotRunning)
+            return;
+        process->setProperty("krisccTimedOut", true);
+        process->terminate();
+        QTimer::singleShot(2000, process, [process] {
+            if (process && process->state() != QProcess::NotRunning)
+                process->kill();
+        });
+    });
 }
 
 void BootcBackend::startHumanStatus(const QString &previousError)
@@ -173,13 +192,15 @@ void BootcBackend::startHumanStatus(const QString &previousError)
             [this, process, previousError](int exitCode, QProcess::ExitStatus status) {
         if (!process || process != m_process)
             return;
+        const bool timedOut = process->property("krisccTimedOut").toBool();
         const QString output = QString::fromUtf8(process->readAllStandardOutput()).trimmed();
         const bool ok = status == QProcess::NormalExit && exitCode == 0;
         m_process = nullptr;
         process->deleteLater();
         m_statusText = output.isEmpty() ? tr("Nessun output da bootc status.") : output;
-        m_errorText = ok ? previousError
-                         : tr("bootc status e' terminato con codice %1. %2").arg(exitCode).arg(previousError);
+        m_errorText = timedOut ? tr("Tempo massimo superato durante bootc status. %1").arg(previousError)
+                               : (ok ? previousError
+                                     : tr("bootc status e' terminato con codice %1. %2").arg(exitCode).arg(previousError));
         setBusy(false);
         emit statusChanged();
     });
@@ -198,6 +219,16 @@ void BootcBackend::startHumanStatus(const QString &previousError)
     });
 
     startBootcStatus(rawProcess, QStringLiteral("humanreadable"));
+    QTimer::singleShot(30 * 1000, rawProcess, [this, process] {
+        if (!process || process != m_process || process->state() == QProcess::NotRunning)
+            return;
+        process->setProperty("krisccTimedOut", true);
+        process->terminate();
+        QTimer::singleShot(2000, process, [process] {
+            if (process && process->state() != QProcess::NotRunning)
+                process->kill();
+        });
+    });
 }
 
 void BootcBackend::parseJsonStatus(const QByteArray &data)

@@ -1,6 +1,6 @@
 Name:           krisCC
 Version:        0.4.0
-Release:        10%{?dist}
+Release:        11%{?dist}
 Summary:        krisCC personal control center for KrisOS and Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/krisCC
@@ -49,6 +49,12 @@ Settings.
 %{_datadir}/icons/hicolor/scalable/apps/krisCC.svg
 
 %changelog
+* Thu Sep 17 2026 krism-eu - 0.4.0-11
+- Use structured backend operation identifiers and result states in QML
+- Make backup archives atomic with warning/cancellation handling
+- Make --background a single D-Bus-activatable instance
+- Test the installed RPM artifact in CI
+
 * Thu Sep 17 2026 krism-eu - 0.4.0-10
 - Align BootC controls with KrisOS single-deployment update model
 - Route RPM previews through rk policy and limit discovery to supported repositories

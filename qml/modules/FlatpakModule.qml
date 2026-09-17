@@ -10,8 +10,13 @@ Kirigami.ScrollablePage {
     property string lastQuery: ""
     property bool refreshUpdatesAfterAction: false
 
+    function expectedOperationId() {
+        return "flatpak." + root.mode
+    }
+
     function rows() {
-        if (!UtilityBackend.output || UtilityBackend.output === qsTr("Nessun output."))
+        if (UtilityBackend.busy || UtilityBackend.resultState !== "success"
+                || UtilityBackend.operationId !== root.expectedOperationId() || !UtilityBackend.output)
             return []
         var lines = UtilityBackend.output.split("\n")
         var result = []
@@ -152,8 +157,9 @@ Kirigami.ScrollablePage {
 
         Kirigami.InlineMessage {
             Layout.fillWidth: true
-            visible: !UtilityBackend.busy && UtilityBackend.output.length > 0 && root.rows().length === 0
-            type: Kirigami.MessageType.Information
+            visible: !UtilityBackend.busy && UtilityBackend.operationId.indexOf("flatpak.") === 0
+                     && UtilityBackend.resultState !== "idle" && UtilityBackend.output.length > 0 && root.rows().length === 0
+            type: UtilityBackend.resultState === "success" ? Kirigami.MessageType.Information : Kirigami.MessageType.Error
             text: UtilityBackend.output
         }
 
@@ -237,14 +243,18 @@ Kirigami.ScrollablePage {
 
         Kirigami.InlineMessage {
             Layout.fillWidth: true
-            visible: root.mode === "search" && root.lastQuery.length >= 2 && !UtilityBackend.busy && root.rows().length === 0 && UtilityBackend.output.length === 0
+            visible: root.mode === "search" && root.lastQuery.length >= 2 && !UtilityBackend.busy
+                  && UtilityBackend.operationId === "flatpak.search" && UtilityBackend.resultState === "success"
+                  && root.rows().length === 0
             type: Kirigami.MessageType.Information
             text: qsTr("Nessun risultato.")
         }
 
         Kirigami.InlineMessage {
             Layout.fillWidth: true
-            visible: root.mode === "updates" && !UtilityBackend.busy && UtilityBackend.output.length === 0
+            visible: root.mode === "updates" && !UtilityBackend.busy
+                  && UtilityBackend.operationId === "flatpak.updates" && UtilityBackend.resultState === "success"
+                  && root.rows().length === 0
             type: Kirigami.MessageType.Positive
             text: qsTr("Nessun aggiornamento Flatpak disponibile.")
         }

@@ -1,13 +1,17 @@
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QCoreApplication>
+#include <QDBusConnection>
+#include <QDBusInterface>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QTimer>
+#include <QWindow>
 #include <QtQml/qqml.h>
 
 #include "BootcBackend.h"
+#include "InstanceController.h"
 #include "PackageSearch.h"
 #include "PolkitHelper.h"
 #include "SoftwareBackend.h"
@@ -27,10 +31,38 @@ int main(int argc, char *argv[])
     parser.addVersionOption();
     QCommandLineOption backgroundOption(
         QStringList{QStringLiteral("background")},
-        QStringLiteral("Start krisCC without opening the main window."));
+        QStringLiteral("Start the single krisCC instance without opening the main window."));
     parser.addOption(backgroundOption);
     parser.process(app);
-    const bool startHidden = parser.isSet(backgroundOption);
+
+    const QString serviceName = QStringLiteral("org.kriscc.ControlCenter");
+    const QString objectPath = QStringLiteral("/org/kriscc/ControlCenter");
+    const QString interfaceName = QStringLiteral("org.kriscc.ControlCenter");
+    QDBusConnection sessionBus = QDBusConnection::sessionBus();
+    bool ownsSingleInstanceService = false;
+    bool singleInstanceReady = false;
+    InstanceController instanceController;
+
+    if (sessionBus.isConnected()) {
+        ownsSingleInstanceService = sessionBus.registerService(serviceName);
+        if (!ownsSingleInstanceService) {
+            QDBusInterface existing(serviceName, objectPath, interfaceName, sessionBus);
+            if (existing.isValid()) {
+                existing.call(QDBus::NoBlock, QStringLiteral("show"));
+                return 0;
+            }
+        } else {
+            singleInstanceReady = sessionBus.registerObject(objectPath, &instanceController,
+                                                             QDBusConnection::ExportScriptableSlots);
+            if (!singleInstanceReady) {
+                sessionBus.unregisterService(serviceName);
+                ownsSingleInstanceService = false;
+            }
+        }
+    }
+
+    // Never leave an unreachable hidden process when the session bus or activation object is unavailable.
+    const bool startHidden = parser.isSet(backgroundOption) && singleInstanceReady;
 
     qmlRegisterType<PackageSearch>("org.kriscc", 1, 0, "PackageSearch");
 
@@ -60,6 +92,11 @@ int main(int argc, char *argv[])
                      &app, [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
 
     engine.loadFromModule(QStringLiteral("org.kriscc"), QStringLiteral("Main"));
+
+    if (!engine.rootObjects().isEmpty()) {
+        if (auto *window = qobject_cast<QWindow *>(engine.rootObjects().constFirst()))
+            instanceController.setWindow(window);
+    }
 
     if (qEnvironmentVariableIsSet("KRISCC_SMOKE_TEST"))
         QTimer::singleShot(900, &app, &QCoreApplication::quit);

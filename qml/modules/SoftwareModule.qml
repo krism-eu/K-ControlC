@@ -44,6 +44,8 @@ Kirigami.ScrollablePage {
     }
 
     function transactionDependencies() {
+        if (UtilityBackend.operationId !== "rpm.plan" || UtilityBackend.resultState !== "success")
+            return []
         var lines = UtilityBackend.output.split("\n")
         var result = []
         var inDependencies = false
@@ -70,6 +72,8 @@ Kirigami.ScrollablePage {
     }
 
     function transactionTotals() {
+        if (UtilityBackend.operationId !== "rpm.plan" || UtilityBackend.resultState !== "success")
+            return []
         var lines = UtilityBackend.output.split("\n")
         var result = []
         for (var i = 0; i < lines.length; ++i) {
@@ -486,9 +490,12 @@ Kirigami.ScrollablePage {
 
             Kirigami.InlineMessage {
                 Layout.fillWidth: true
-                visible: !UtilityBackend.busy && root.transactionDependencies().length === 0 && UtilityBackend.output.length > 0
-                type: Kirigami.MessageType.Information
-                text: qsTr("Il piano rk non segnala dipendenze aggiuntive, oppure il pacchetto è già presente.")
+                visible: !UtilityBackend.busy && UtilityBackend.operationId === "rpm.plan"
+                         && UtilityBackend.resultState !== "idle" && root.transactionDependencies().length === 0
+                type: UtilityBackend.resultState === "success" ? Kirigami.MessageType.Information : Kirigami.MessageType.Error
+                text: UtilityBackend.resultState === "success"
+                    ? qsTr("Il piano rk non segnala dipendenze aggiuntive, oppure il pacchetto è già presente.")
+                    : UtilityBackend.output
             }
 
             Controls.CheckBox {

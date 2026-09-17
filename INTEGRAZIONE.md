@@ -57,7 +57,7 @@ La build deve fallire se l'RPM richiesto non è disponibile, se l'hash non coinc
 ```bash
 rpm -q krisCC
 rpm -V krisCC
-/usr/bin/krisCC --background
+KRISCC_SMOKE_TEST=1 /usr/bin/krisCC --background
 ```
 
 Non esistono identità RPM di compatibilità da mantenere: nome pacchetto ed eseguibile sono `krisCC` e non vengono pubblicati alias o `Provides/Obsoletes` per vecchi nomi sperimentali.

@@ -23,6 +23,7 @@ qt_add_executable(krisCC
     src/PackageSearch.cpp src/PackageSearch.h
     src/PolkitHelper.cpp src/PolkitHelper.h
     src/UtilityBackend.cpp src/UtilityBackend.h
+    src/InstanceController.cpp src/InstanceController.h
 )
 
 set(KRISCC_QML_FILES

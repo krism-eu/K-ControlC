@@ -4,6 +4,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QTimer>
 
 #include <algorithm>
 
@@ -36,14 +37,16 @@ void SoftwareBackend::refreshRepositories()
         if (!guard || guard != m_process)
             return;
 
+        const bool timedOut = guard->property("krisccTimedOut").toBool();
         const QByteArray output = guard->readAllStandardOutput();
         const QString stderrText = QString::fromUtf8(guard->readAllStandardError()).trimmed();
         m_process = nullptr;
         guard->deleteLater();
         setBusy(false);
 
-        if (status != QProcess::NormalExit || exitCode != 0) {
-            setError(stderrText.isEmpty() ? tr("Impossibile leggere i repository DNF5.") : stderrText);
+        if (timedOut || status != QProcess::NormalExit || exitCode != 0) {
+            setError(timedOut ? tr("Tempo massimo superato durante la lettura dei repository DNF5.")
+                              : (stderrText.isEmpty() ? tr("Impossibile leggere i repository DNF5.") : stderrText));
             return;
         }
 
@@ -92,6 +95,16 @@ void SoftwareBackend::refreshRepositories()
     process->start(QStringLiteral("/usr/bin/dnf5"),
                    {QStringLiteral("repo"), QStringLiteral("list"),
                     QStringLiteral("--all"), QStringLiteral("--json")});
+    QTimer::singleShot(60 * 1000, process, [this, guard] {
+        if (!guard || guard != m_process || guard->state() == QProcess::NotRunning)
+            return;
+        guard->setProperty("krisccTimedOut", true);
+        guard->terminate();
+        QTimer::singleShot(2000, guard, [guard] {
+            if (guard && guard->state() != QProcess::NotRunning)
+                guard->kill();
+        });
+    });
 }
 
 void SoftwareBackend::setBusy(bool busy)

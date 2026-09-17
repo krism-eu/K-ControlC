@@ -146,8 +146,9 @@ void PackageSearch::startInstalledQuery(const QString &term)
             return;
         }
 
+        const bool timedOut = process->property("krisccTimedOut").toBool();
         m_installed.clear();
-        if (status == QProcess::NormalExit && exitCode == 0) {
+        if (!timedOut && status == QProcess::NormalExit && exitCode == 0) {
             const auto lines = process->readAllStandardOutput().split('\n');
             for (const QByteArray &line : lines) {
                 const QString name = QString::fromUtf8(line).trimmed();
@@ -165,6 +166,8 @@ void PackageSearch::startInstalledQuery(const QString &term)
 
         m_process = nullptr;
         process->deleteLater();
+        if (timedOut)
+            emit searchError(tr("Tempo massimo superato durante la lettura dei pacchetti installati; la ricerca continua senza cache locale aggiornata."));
         startRepoQuery(term);
     });
 
@@ -184,6 +187,17 @@ void PackageSearch::startInstalledQuery(const QString &term)
 
     rawProcess->start(QStringLiteral("/usr/bin/rpm"),
                       {QStringLiteral("-qa"), QStringLiteral("--qf"), QStringLiteral("%{NAME}\\n")});
+    QTimer::singleShot(30 * 1000, rawProcess, [this, process, generation] {
+        if (!process || process != m_process || generation != m_generation
+                || process->state() == QProcess::NotRunning)
+            return;
+        process->setProperty("krisccTimedOut", true);
+        process->terminate();
+        QTimer::singleShot(2000, process, [process] {
+            if (process && process->state() != QProcess::NotRunning)
+                process->kill();
+        });
+    });
 }
 
 void PackageSearch::startRepoQuery(const QString &term)
@@ -202,15 +216,17 @@ void PackageSearch::startRepoQuery(const QString &term)
             return;
         }
 
+        const bool timedOut = process->property("krisccTimedOut").toBool();
         const QByteArray stdoutData = process->readAllStandardOutput();
         const QString stderrText = QString::fromUtf8(process->readAllStandardError()).trimmed();
         m_process = nullptr;
         process->deleteLater();
 
-        if (status != QProcess::NormalExit || exitCode != 0) {
+        if (timedOut || status != QProcess::NormalExit || exitCode != 0) {
             clearResults();
             setSearching(false);
-            emit searchError(stderrText.isEmpty() ? tr("La ricerca dnf5 non e' riuscita.") : stderrText);
+            emit searchError(timedOut ? tr("Tempo massimo superato durante la ricerca DNF5.")
+                                      : (stderrText.isEmpty() ? tr("La ricerca dnf5 non e' riuscita.") : stderrText));
             emit searchFinished();
             return;
         }
@@ -268,6 +284,17 @@ void PackageSearch::startRepoQuery(const QString &term)
                        QStringLiteral("--queryformat"),
                        QStringLiteral("%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n"),
                        packageSpec});
+    QTimer::singleShot(2 * 60 * 1000, rawProcess, [this, process, generation] {
+        if (!process || process != m_process || generation != m_generation
+                || process->state() == QProcess::NotRunning)
+            return;
+        process->setProperty("krisccTimedOut", true);
+        process->terminate();
+        QTimer::singleShot(2000, process, [process] {
+            if (process && process->state() != QProcess::NotRunning)
+                process->kill();
+        });
+    });
 }
 
 void PackageSearch::startListQuery(const QString &filter, bool installedEntries)
@@ -290,14 +317,16 @@ void PackageSearch::startListQuery(const QString &filter, bool installedEntries)
             return;
         }
 
+        const bool timedOut = process->property("krisccTimedOut").toBool();
         const QByteArray stdoutData = process->readAllStandardOutput();
         const QString stderrText = QString::fromUtf8(process->readAllStandardError()).trimmed();
         m_process = nullptr;
         process->deleteLater();
 
-        if (status != QProcess::NormalExit || exitCode != 0) {
+        if (timedOut || status != QProcess::NormalExit || exitCode != 0) {
             setSearching(false);
-            emit searchError(stderrText.isEmpty() ? tr("Impossibile leggere l'elenco pacchetti DNF5.") : stderrText);
+            emit searchError(timedOut ? tr("Tempo massimo superato durante la lettura dell'elenco DNF5.")
+                                      : (stderrText.isEmpty() ? tr("Impossibile leggere l'elenco pacchetti DNF5.") : stderrText));
             emit searchFinished();
             return;
         }
@@ -369,6 +398,17 @@ void PackageSearch::startListQuery(const QString &filter, bool installedEntries)
         args << QStringLiteral("--repo=fedora,updates");
     args << QStringLiteral("list") << filter << QStringLiteral("--json");
     rawProcess->start(QStringLiteral("/usr/bin/dnf5"), args);
+    QTimer::singleShot(2 * 60 * 1000, rawProcess, [this, process, generation] {
+        if (!process || process != m_process || generation != m_generation
+                || process->state() == QProcess::NotRunning)
+            return;
+        process->setProperty("krisccTimedOut", true);
+        process->terminate();
+        QTimer::singleShot(2000, process, [process] {
+            if (process && process->state() != QProcess::NotRunning)
+                process->kill();
+        });
+    });
 }
 
 void PackageSearch::clearResults()

@@ -94,7 +94,8 @@ Kirigami.ScrollablePage {
 
         Kirigami.AbstractCard {
             Layout.fillWidth: true
-            visible: UtilityBackend.title === qsTr("Servizi attivi") || (UtilityBackend.output.length > 0 && UtilityBackend.title.indexOf(qsTr("Servizi")) >= 0)
+            visible: UtilityBackend.operationId === "bookmark.services-active"
+                  && UtilityBackend.resultState !== "idle"
             contentItem: ColumnLayout {
                 Kirigami.Heading { level: 3; text: UtilityBackend.title }
                 Controls.TextArea { Layout.fillWidth: true; Layout.preferredHeight: 260; readOnly: true; wrapMode: TextEdit.WrapAnywhere; font.family: "monospace"; text: UtilityBackend.output }

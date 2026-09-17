@@ -21,6 +21,7 @@
 #include <QSysInfo>
 #include <QTextStream>
 #include <QTimeZone>
+#include <QTimer>
 #include <QUrl>
 
 #include <sys/sysinfo.h>
@@ -52,6 +53,16 @@ const QSet<QString> &allowedServices()
 SystemBackend::SystemBackend(QObject *parent)
     : QObject(parent)
 {
+}
+
+SystemBackend::~SystemBackend()
+{
+    if (m_backupProcess && m_backupProcess->state() != QProcess::NotRunning) {
+        m_backupProcess->kill();
+        m_backupProcess->waitForFinished(2000);
+    }
+    if (!m_backupPartialPath.isEmpty())
+        QFile::remove(m_backupPartialPath);
 }
 
 QString SystemBackend::osName() const
@@ -326,14 +337,14 @@ bool SystemBackend::createSnapshot(const QString &kind)
 
     const QString tar = resolveExecutable(QStringLiteral("tar"));
     if (tar.isEmpty()) {
-        setBackupResult(tr("tar non disponibile."));
+        setBackupResult(tr("tar non disponibile."), QString(), QStringLiteral("error"));
         return false;
     }
 
     const QString home = QDir::homePath();
     QDir backupDir(home + QStringLiteral("/krisCC Backups"));
     if (!backupDir.exists() && !backupDir.mkpath(QStringLiteral("."))) {
-        setBackupResult(tr("Impossibile creare la cartella dei backup."));
+        setBackupResult(tr("Impossibile creare la cartella dei backup."), QString(), QStringLiteral("error"));
         return false;
     }
 
@@ -343,16 +354,24 @@ bool SystemBackend::createSnapshot(const QString &kind)
         const quint64 minimumFree = kind == QStringLiteral("home") ? 5ULL * oneGiB : oneGiB;
         if (backupStorage.bytesAvailable() < minimumFree) {
             setBackupResult(tr("Spazio libero insufficiente per lo snapshot: disponibili %1, richiesti almeno %2.")
-                                .arg(humanGiB(backupStorage.bytesAvailable()), humanGiB(minimumFree)));
+                                .arg(humanGiB(backupStorage.bytesAvailable()), humanGiB(minimumFree)),
+                            QString(), QStringLiteral("error"));
             return false;
         }
+    }
+
+    if (kind != QStringLiteral("home") && kind != QStringLiteral("config")) {
+        setBackupResult(tr("Tipo di snapshot non consentito."), QString(), QStringLiteral("error"));
+        return false;
     }
 
     const QString stamp = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"));
     const QString label = kind == QStringLiteral("home") ? QStringLiteral("home") : QStringLiteral("config");
     const QString output = backupDir.filePath(QStringLiteral("%1-%2.tar.gz").arg(label, stamp));
+    const QString partial = output + QStringLiteral(".partial");
+    QFile::remove(partial);
 
-    QStringList args = {QStringLiteral("-czf"), output};
+    QStringList args = {QStringLiteral("-czf"), partial};
     if (kind == QStringLiteral("home")) {
         args << QStringLiteral("--exclude=./.cache")
              << QStringLiteral("--exclude=./.local/share/Trash")
@@ -360,7 +379,7 @@ bool SystemBackend::createSnapshot(const QString &kind)
              << QStringLiteral("--exclude=./KCC Backups")
              << QStringLiteral("--exclude=./K-ControlC Backups")
              << QStringLiteral("-C") << home << QStringLiteral(".");
-    } else if (kind == QStringLiteral("config")) {
+    } else {
         QStringList entries;
         const QStringList candidates = {
             QStringLiteral(".config"),
@@ -375,52 +394,101 @@ bool SystemBackend::createSnapshot(const QString &kind)
                 entries << candidate;
         }
         if (entries.isEmpty()) {
-            setBackupResult(tr("Nessuna cartella di configurazione trovata."));
+            setBackupResult(tr("Nessuna cartella di configurazione trovata."), QString(), QStringLiteral("error"));
             return false;
         }
         args << QStringLiteral("-C") << home;
         args << entries;
-    } else {
-        setBackupResult(tr("Tipo di snapshot non consentito."));
-        return false;
     }
 
     auto *process = new QProcess(this);
+    const QPointer<QProcess> guarded(process);
     m_backupProcess = process;
+    m_backupPartialPath = partial;
+    m_backupCancelled = false;
     process->setProcessChannelMode(QProcess::MergedChannels);
     setBackupBusy(true);
-    setBackupResult(tr("Creazione snapshot in corso…"), output);
+    setBackupResult(tr("Creazione snapshot in corso…"), output, QStringLiteral("running"));
 
     connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
-            [this, output](int exitCode, QProcess::ExitStatus status) {
-        if (!m_backupProcess)
+            [this, guarded, output, partial](int exitCode, QProcess::ExitStatus status) {
+        if (!guarded || guarded != m_backupProcess)
             return;
-        const QString details = QString::fromUtf8(m_backupProcess->readAllStandardOutput()).trimmed();
-        const bool ok = status == QProcess::NormalExit && exitCode == 0;
-        m_backupProcess->deleteLater();
+        const QString details = QString::fromUtf8(guarded->readAllStandardOutput()).trimmed();
+        const bool cancelled = m_backupCancelled;
         m_backupProcess = nullptr;
+        guarded->deleteLater();
         setBackupBusy(false);
-        if (ok) {
-            setBackupResult(tr("Snapshot creato correttamente."), output);
-            notify(tr("Backup completato"), output);
-        } else {
-            QFile::remove(output);
-            setBackupResult(details.isEmpty() ? tr("Snapshot non riuscito (codice %1).").arg(exitCode) : details);
+
+        if (cancelled) {
+            QFile::remove(partial);
+            m_backupPartialPath.clear();
+            m_backupCancelled = false;
+            setBackupResult(tr("Backup annullato; il file parziale è stato rimosso."), QString(), QStringLiteral("cancelled"));
+            return;
         }
-    });
-    connect(process, &QProcess::errorOccurred, this,
-            [this, output](QProcess::ProcessError error) {
-        if (!m_backupProcess || error != QProcess::FailedToStart)
+
+        const bool archiveProduced = QFileInfo(partial).exists() && QFileInfo(partial).size() > 0;
+        const bool completed = status == QProcess::NormalExit && (exitCode == 0 || exitCode == 1) && archiveProduced;
+        if (completed) {
+            QFile::remove(output);
+            if (!QFile::rename(partial, output)) {
+                m_backupPartialPath = partial;
+                setBackupResult(tr("Snapshot prodotto ma non è stato possibile finalizzarne il nome. Il file parziale è stato conservato."),
+                                partial, QStringLiteral("error"));
+                return;
+            }
+            m_backupPartialPath.clear();
+            if (exitCode == 0) {
+                setBackupResult(tr("Snapshot creato correttamente."), output, QStringLiteral("success"));
+                notify(tr("Backup completato"), output);
+            } else {
+                const QString warning = details.isEmpty()
+                    ? tr("Snapshot creato con avvisi da tar. Verificare l'archivio prima di usarlo per un ripristino.")
+                    : tr("Snapshot creato con avvisi da tar. Verificare l'archivio prima di usarlo per un ripristino.\n%1").arg(details);
+                setBackupResult(warning, output, QStringLiteral("warning"));
+                notify(tr("Backup completato con avvisi"), output);
+            }
             return;
-        const QString message = m_backupProcess->errorString();
-        m_backupProcess->deleteLater();
+        }
+
+        QFile::remove(partial);
+        m_backupPartialPath.clear();
+        const QString message = details.isEmpty()
+            ? tr("Snapshot non riuscito (codice %1).").arg(exitCode)
+            : details;
+        setBackupResult(message, QString(), QStringLiteral("error"));
+    });
+
+    connect(process, &QProcess::errorOccurred, this,
+            [this, guarded, partial](QProcess::ProcessError error) {
+        if (!guarded || guarded != m_backupProcess || error != QProcess::FailedToStart)
+            return;
+        const QString message = guarded->errorString();
         m_backupProcess = nullptr;
-        QFile::remove(output);
+        guarded->deleteLater();
+        QFile::remove(partial);
+        m_backupPartialPath.clear();
+        m_backupCancelled = false;
         setBackupBusy(false);
-        setBackupResult(tr("Impossibile avviare il backup: %1").arg(message));
+        setBackupResult(tr("Impossibile avviare il backup: %1").arg(message), QString(), QStringLiteral("error"));
     });
 
     process->start(tar, args);
+    return true;
+}
+
+bool SystemBackend::cancelSnapshot()
+{
+    if (!m_backupProcess || !m_backupBusy)
+        return false;
+    m_backupCancelled = true;
+    m_backupProcess->terminate();
+    const QPointer<QProcess> guarded = m_backupProcess;
+    QTimer::singleShot(2000, guarded, [guarded] {
+        if (guarded && guarded->state() != QProcess::NotRunning)
+            guarded->kill();
+    });
     return true;
 }
 
@@ -439,10 +507,11 @@ void SystemBackend::setBackupBusy(bool busy)
     emit backupBusyChanged();
 }
 
-void SystemBackend::setBackupResult(const QString &status, const QString &path)
+void SystemBackend::setBackupResult(const QString &status, const QString &path, const QString &state)
 {
     m_backupStatus = status;
     m_backupPath = path;
+    m_backupState = state;
     emit backupStatusChanged();
 }
 

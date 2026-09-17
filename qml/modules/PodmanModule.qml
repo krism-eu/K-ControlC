@@ -18,8 +18,13 @@ Kirigami.ScrollablePage {
     }
 
     function parseList() {
-        if (UtilityBackend.busy || UtilityBackend.title !== qsTr("Container Podman"))
+        if (UtilityBackend.busy || UtilityBackend.operationId !== "podman.list")
             return
+        if (UtilityBackend.resultState !== "success") {
+            root.containers = []
+            root.parseError = UtilityBackend.output.length > 0 ? UtilityBackend.output : qsTr("Impossibile leggere l'elenco Podman.")
+            return
+        }
         try {
             var data = JSON.parse(UtilityBackend.output || "[]")
             root.containers = Array.isArray(data) ? data : []
@@ -198,7 +203,8 @@ Kirigami.ScrollablePage {
 
         Kirigami.AbstractCard {
             Layout.fillWidth: true
-            visible: UtilityBackend.title.length > 0 && UtilityBackend.title !== qsTr("Container Podman") && UtilityBackend.output.length > 0
+            visible: UtilityBackend.operationId.indexOf("podman.") === 0
+                  && UtilityBackend.operationId !== "podman.list" && UtilityBackend.output.length > 0
             contentItem: ColumnLayout {
                 Controls.Label { font.bold: true; text: UtilityBackend.title }
                 Controls.TextArea {

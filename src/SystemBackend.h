@@ -18,9 +18,11 @@ class SystemBackend : public QObject
     Q_PROPERTY(bool backupBusy READ backupBusy NOTIFY backupBusyChanged)
     Q_PROPERTY(QString backupStatus READ backupStatus NOTIFY backupStatusChanged)
     Q_PROPERTY(QString backupPath READ backupPath NOTIFY backupStatusChanged)
+    Q_PROPERTY(QString backupState READ backupState NOTIFY backupStatusChanged)
 
 public:
     explicit SystemBackend(QObject *parent = nullptr);
+    ~SystemBackend() override;
 
     QString osName() const;
     QString kernelVersion() const;
@@ -33,6 +35,7 @@ public:
     bool backupBusy() const { return m_backupBusy; }
     QString backupStatus() const { return m_backupStatus; }
     QString backupPath() const { return m_backupPath; }
+    QString backupState() const { return m_backupState; }
 
     Q_INVOKABLE QString quickSystemInfo() const;
     Q_INVOKABLE void copyToClipboard(const QString &text) const;
@@ -46,6 +49,7 @@ public:
     Q_INVOKABLE bool sessionAction(const QString &action);
     Q_INVOKABLE void notify(const QString &summary, const QString &body = QString()) const;
     Q_INVOKABLE bool createSnapshot(const QString &kind);
+    Q_INVOKABLE bool cancelSnapshot();
     Q_INVOKABLE bool openBackupFolder() const;
 
 signals:
@@ -57,10 +61,14 @@ private:
     QString toolProgram(const QString &toolId) const;
     QString resolveExecutable(const QString &program) const;
     void setBackupBusy(bool busy);
-    void setBackupResult(const QString &status, const QString &path = QString());
+    void setBackupResult(const QString &status, const QString &path = QString(),
+                         const QString &state = QStringLiteral("idle"));
 
     QPointer<QProcess> m_backupProcess;
     bool m_backupBusy = false;
     QString m_backupStatus;
     QString m_backupPath;
+    QString m_backupState = QStringLiteral("idle");
+    QString m_backupPartialPath;
+    bool m_backupCancelled = false;
 };
