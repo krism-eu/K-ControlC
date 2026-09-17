@@ -8,6 +8,7 @@ Kirigami.ScrollablePage {
     title: qsTr("Flatpak")
     property string mode: "search"
     property string lastQuery: ""
+    property bool refreshUpdatesAfterAction: false
 
     function rows() {
         if (!UtilityBackend.output || UtilityBackend.output === qsTr("Nessun output."))
@@ -32,6 +33,22 @@ Kirigami.ScrollablePage {
         UtilityBackend.runFlatpak(newMode, query || "")
     }
 
+    function updateFlatpaks(action, query) {
+        root.mode = "updates"
+        root.refreshUpdatesAfterAction = true
+        UtilityBackend.runFlatpak(action, query || "")
+    }
+
+    Connections {
+        target: UtilityBackend
+        function onStateChanged() {
+            if (root.refreshUpdatesAfterAction && !UtilityBackend.busy) {
+                root.refreshUpdatesAfterAction = false
+                root.run("updates", "")
+            }
+        }
+    }
+
     ColumnLayout {
         width: parent.width
         spacing: Kirigami.Units.largeSpacing
@@ -44,7 +61,7 @@ Kirigami.ScrollablePage {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
                 opacity: 0.72
-                text: qsTr("Ricerca e gestione delle applicazioni Flatpak senza uscire da krisCC.")
+                text: qsTr("Ricerca, installazione e aggiornamenti delle applicazioni Flatpak nel tuo profilo utente.")
             }
         }
 
@@ -73,6 +90,28 @@ Kirigami.ScrollablePage {
                 icon.name: "system-search"
                 enabled: !UtilityBackend.busy && searchField.text.trim().length >= 2
                 onClicked: root.run("search", searchField.text.trim())
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            visible: root.mode === "updates"
+            Controls.Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Aggiornamenti disponibili per le applicazioni Flatpak installate dall'utente.")
+            }
+            Controls.Button {
+                text: qsTr("Aggiorna elenco")
+                icon.name: "view-refresh"
+                enabled: !UtilityBackend.busy
+                onClicked: root.run("updates", "")
+            }
+            Controls.Button {
+                text: qsTr("Aggiorna tutto")
+                icon.name: "system-software-update"
+                enabled: !UtilityBackend.busy && root.rows().length > 0
+                onClicked: updateAllDialog.open()
             }
         }
 
@@ -170,6 +209,14 @@ Kirigami.ScrollablePage {
                             enabled: !UtilityBackend.busy
                             onClicked: removeDialog.openFor(modelData[1], modelData[0])
                         }
+
+                        Controls.Button {
+                            visible: root.mode === "updates" && modelData.length >= 2
+                            text: qsTr("Aggiorna")
+                            icon.name: "system-software-update"
+                            enabled: !UtilityBackend.busy
+                            onClicked: updateOneDialog.openFor(modelData[1], modelData[0])
+                        }
                     }
 
                     Controls.Label {
@@ -193,6 +240,13 @@ Kirigami.ScrollablePage {
             visible: root.mode === "search" && root.lastQuery.length >= 2 && !UtilityBackend.busy && root.rows().length === 0 && UtilityBackend.output.length === 0
             type: Kirigami.MessageType.Information
             text: qsTr("Nessun risultato.")
+        }
+
+        Kirigami.InlineMessage {
+            Layout.fillWidth: true
+            visible: root.mode === "updates" && !UtilityBackend.busy && UtilityBackend.output.length === 0
+            type: Kirigami.MessageType.Positive
+            text: qsTr("Nessun aggiornamento Flatpak disponibile.")
         }
     }
 
@@ -228,5 +282,36 @@ Kirigami.ScrollablePage {
             text: qsTr("Rimuove il Flatpak %1 dal tuo utente.").arg(removeDialog.appId)
         }
         onAccepted: root.run("remove", appId)
+    }
+
+    Controls.Dialog {
+        id: updateOneDialog
+        property string appId: ""
+        property string appName: ""
+        function openFor(id, name) {
+            appId = id
+            appName = name
+            open()
+        }
+        modal: true
+        title: qsTr("Aggiornare %1?").arg(appName)
+        standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
+        contentItem: Controls.Label {
+            wrapMode: Text.WordWrap
+            text: qsTr("Aggiorna %1 e le dipendenze necessarie nel profilo Flatpak dell'utente.").arg(updateOneDialog.appId)
+        }
+        onAccepted: root.updateFlatpaks("update", appId)
+    }
+
+    Controls.Dialog {
+        id: updateAllDialog
+        modal: true
+        title: qsTr("Aggiornare tutte le applicazioni Flatpak?")
+        standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
+        contentItem: Controls.Label {
+            wrapMode: Text.WordWrap
+            text: qsTr("Aggiorna tutte le applicazioni e i runtime Flatpak installati nel profilo utente.")
+        }
+        onAccepted: root.updateFlatpaks("update-all", "")
     }
 }
