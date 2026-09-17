@@ -8,20 +8,20 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-fedora:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container: fedora:44
     steps:
       - uses: actions/checkout@v4
 
       - name: Install build dependencies
         run: >-
-          dnf -y install gcc-c++ cmake ninja-build git gzip gh
+          dnf -y install gcc-c++ cmake ninja-build git gzip
           qt6-qtbase-devel qt6-qtdeclarative-devel kf6-kirigami-devel
-          dnf5 dnf5-plugins rpm rpm-build tar
+          dnf5 rpm rpm-build tar
 
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -44,8 +44,10 @@ jobs:
         run: |
           rpmspec -P packaging/krisCC.spec >/dev/null
           test "$(rpmspec -q --qf '%{NAME}\n' packaging/krisCC.spec | head -n1)" = "krisCC"
+          test "$(rpmspec -q --qf '%{VERSION}-%{RELEASE}\n' packaging/krisCC.spec | head -n1)" = "0.4.0-10.fc44"
           ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Provides:[[:space:]]+kcc([[:space:]=]|$)'
           ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Obsoletes:[[:space:]]+kcc([[:space:]<=>]|$)'
+          ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Requires:[[:space:]]+dnf5-plugins([[:space:]]|$)'
 
       - name: Stage install
         run: |
@@ -79,6 +81,9 @@ jobs:
             cp "$HOME"/rpmbuild/RPMS/*/krisCC-*.rpm "$GITHUB_WORKSPACE/artifacts/rpm/"
             cp "$HOME"/rpmbuild/SRPMS/krisCC-*.src.rpm "$GITHUB_WORKSPACE/artifacts/srpm/"
             cp "$GITHUB_WORKSPACE/krisCC-stage.tar.gz" "$GITHUB_WORKSPACE/artifacts/stage/"
+            cd "$GITHUB_WORKSPACE/artifacts/rpm"
+            sha256sum krisCC-*.rpm > SHA256SUMS
+            grep -Eq '^[0-9a-f]{64}[[:space:]]+krisCC-0\.4\.0-10.*\.rpm$' SHA256SUMS
           ) 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/logs/rpmbuild.log"
 
       - name: Verify Fedora kcc coexistence and legacy replacement
@@ -156,8 +161,28 @@ jobs:
           path: artifacts/
           if-no-files-found: warn
 
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-fedora
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download tested artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: krisCC-${{ github.sha }}
+          path: artifacts
+
+      - name: Verify RPM checksum artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd artifacts/rpm
+          sha256sum -c SHA256SUMS
+          test "$(find . -maxdepth 1 -type f -name 'krisCC-0.4.0-10*.rpm' | wc -l)" -ge 1
+
       - name: Publish tagged RPM release
-        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -166,6 +191,6 @@ jobs:
           if ! gh release view "$tag" >/dev/null 2>&1; then
             gh release create "$tag" \
               --title "krisCC $tag" \
-              --notes "krisCC RPM built and smoke-tested by CI from $GITHUB_SHA."
+              --notes "krisCC RPM built and smoke-tested by CI from $GITHUB_SHA. SHA256SUMS identifies the exact tested RPM."
           fi
-          gh release upload "$tag" artifacts/rpm/krisCC-*.rpm --clobber
+          gh release upload "$tag" artifacts/rpm/krisCC-*.rpm artifacts/rpm/SHA256SUMS --clobber
