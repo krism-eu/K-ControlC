@@ -13,14 +13,41 @@ jobs:
   build-fedora:
     runs-on: ubuntu-24.04
     container: fedora:44
+    outputs:
+      tag: ${{ steps.rpm_identity.outputs.tag }}
+      rpm: ${{ steps.rpm_identity.outputs.rpm }}
+      version: ${{ steps.rpm_identity.outputs.version }}
+      release: ${{ steps.rpm_identity.outputs.release }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Install build dependencies
         run: >-
           dnf -y install gcc-c++ cmake ninja-build git gzip
           qt6-qtbase-devel qt6-qtdeclarative-devel kf6-kirigami-devel
           dnf5 rpm rpm-build tar
+
+      - name: Resolve RPM identity
+        id: rpm_identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="$(rpmspec -q --qf '%{NAME}\n' packaging/krisCC.spec | head -n1)"
+          version="$(rpmspec -q --qf '%{VERSION}\n' packaging/krisCC.spec | head -n1)"
+          release="$(rpmspec -q --qf '%{RELEASE}\n' packaging/krisCC.spec | head -n1)"
+          test "$name" = "krisCC"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$release" =~ ^([0-9]+)\.fc44$ ]]
+          release_number="${BASH_REMATCH[1]}"
+          rpm="krisCC-${version}-${release}.x86_64.rpm"
+          tag="v${version}-${release_number}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "rpm=$rpm" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          printf 'Component identity: %s / %s\n' "$tag" "$rpm"
 
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -43,7 +70,6 @@ jobs:
         run: |
           rpmspec -P packaging/krisCC.spec >/dev/null
           test "$(rpmspec -q --qf '%{NAME}\n' packaging/krisCC.spec | head -n1)" = "krisCC"
-          test "$(rpmspec -q --qf '%{VERSION}-%{RELEASE}\n' packaging/krisCC.spec | head -n1)" = "0.4.0-10.fc44"
           ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Provides:[[:space:]]+(kcc|k-controlc)([[:space:]=]|$)'
           ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Obsoletes:[[:space:]]+(kcc|k-controlc)([[:space:]<=>]|$)'
           ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Requires:[[:space:]]+dnf5-plugins([[:space:]]|$)'
@@ -60,6 +86,9 @@ jobs:
 
       - name: Build RPM
         shell: bash
+        env:
+          VERSION: ${{ steps.rpm_identity.outputs.version }}
+          RPM_NAME: ${{ steps.rpm_identity.outputs.rpm }}
         run: |
           mkdir -p "$GITHUB_WORKSPACE/artifacts/logs"
           (
@@ -72,8 +101,8 @@ jobs:
               --exclude='./stage' \
               --exclude='./artifacts' \
               --exclude='./krisCC-stage.tar.gz' \
-              --transform='s,^\./,krisCC-0.4.0/,' \
-              -czf "$HOME/rpmbuild/SOURCES/krisCC-0.4.0.tar.gz" .
+              --transform="s,^\\./,krisCC-${VERSION}/," \
+              -czf "$HOME/rpmbuild/SOURCES/krisCC-${VERSION}.tar.gz" .
             cp "$GITHUB_WORKSPACE/packaging/krisCC.spec" "$HOME/rpmbuild/SPECS/krisCC.spec"
             rpmbuild -ba "$HOME/rpmbuild/SPECS/krisCC.spec"
             mkdir -p "$GITHUB_WORKSPACE/artifacts/rpm" "$GITHUB_WORKSPACE/artifacts/srpm" "$GITHUB_WORKSPACE/artifacts/stage"
@@ -81,18 +110,24 @@ jobs:
             cp "$HOME"/rpmbuild/SRPMS/krisCC-*.src.rpm "$GITHUB_WORKSPACE/artifacts/srpm/"
             cp "$GITHUB_WORKSPACE/krisCC-stage.tar.gz" "$GITHUB_WORKSPACE/artifacts/stage/"
             cd "$GITHUB_WORKSPACE/artifacts/rpm"
-            sha256sum krisCC-*.rpm > SHA256SUMS
-            grep -Eq '^[0-9a-f]{64}[[:space:]]+krisCC-0[.]4[.]0-10.*[.]rpm$' SHA256SUMS
+            test -f "$RPM_NAME"
+            sha256sum "$RPM_NAME" > SHA256SUMS
+            test "$(wc -l < SHA256SUMS)" -eq 1
+            grep -Eq "^[0-9a-f]{64}[[:space:]]+${RPM_NAME//./[.]}$" SHA256SUMS
           ) 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/logs/rpmbuild.log"
 
       - name: Inspect built RPM artifact
         shell: bash
+        env:
+          RPM_NAME: ${{ steps.rpm_identity.outputs.rpm }}
+          VERSION: ${{ steps.rpm_identity.outputs.version }}
+          RELEASE: ${{ steps.rpm_identity.outputs.release }}
         run: |
           set -euxo pipefail
-          rpm_file="$(find artifacts/rpm -maxdepth 1 -type f -name 'krisCC-0.4.0-10*.x86_64.rpm' -print -quit)"
-          test -n "$rpm_file"
+          rpm_file="artifacts/rpm/$RPM_NAME"
+          test -f "$rpm_file"
           test "$(rpm -qp --qf '%{NAME}\n' "$rpm_file")" = "krisCC"
-          test "$(rpm -qp --qf '%{VERSION}-%{RELEASE}\n' "$rpm_file")" = "0.4.0-10.fc44"
+          test "$(rpm -qp --qf '%{VERSION}-%{RELEASE}\n' "$rpm_file")" = "$VERSION-$RELEASE"
           rpm -qpl "$rpm_file" | grep -Fxq '/usr/bin/krisCC'
           rpm -qpl "$rpm_file" | grep -Fxq '/usr/share/applications/krisCC.desktop'
           rpm -qpl "$rpm_file" | grep -Fxq '/usr/share/polkit-1/actions/org.kriscc.controlcenter.policy'
@@ -114,53 +149,56 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
       - name: Download validated artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: krisCC-${{ github.sha }}
           path: artifacts
 
-      - name: Resolve immutable component release
-        id: component
+      - name: Verify component artifact
+        env:
+          RPM: ${{ needs.build-fedora.outputs.rpm }}
         shell: bash
         run: |
           set -euo pipefail
           cd artifacts/rpm
+          test -f "$RPM"
+          test "$(wc -l < SHA256SUMS)" -eq 1
           sha256sum -c SHA256SUMS
-          rpm_file="$(find . -maxdepth 1 -type f -name 'krisCC-*.x86_64.rpm' -print -quit)"
-          test -n "$rpm_file"
-          base="$(basename "$rpm_file")"
-          if [[ ! "$base" =~ ^krisCC-([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)\.fc44\.x86_64\.rpm$ ]]; then
-            echo "Unexpected RPM filename: $base" >&2
-            exit 1
-          fi
-          tag="v${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
-          checksum="$(awk -v f="$base" '$2 == f || $2 == "./" f {print $1}' SHA256SUMS)"
-          test -n "$checksum"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "rpm=$base" >> "$GITHUB_OUTPUT"
-          echo "sha256=$checksum" >> "$GITHUB_OUTPUT"
+          checksum="$(awk -v f="$RPM" '$2 == f || $2 == "./" f {print $1}' SHA256SUMS)"
+          [[ "$checksum" =~ ^[0-9a-f]{64}$ ]]
 
-      - name: Publish or verify component release
+      - name: Publish immutable component release when needed
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.component.outputs.tag }}
-          RPM: ${{ steps.component.outputs.rpm }}
-          SHA256: ${{ steps.component.outputs.sha256 }}
+          TAG: ${{ needs.build-fedora.outputs.tag }}
+          RPM: ${{ needs.build-fedora.outputs.rpm }}
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/kriscc-existing
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p SHA256SUMS -D /tmp/kriscc-existing
-            existing="$(awk -v f="$RPM" '$2 == f || $2 == "./" f {print $1}' /tmp/kriscc-existing/SHA256SUMS)"
-            if [[ "$existing" != "$SHA256" ]]; then
-              echo "Release $TAG already exists with different RPM content; bump packaging Release before publishing new krisCC code." >&2
-              exit 1
+            git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+            tag_sha="$(git rev-parse "$TAG^{commit}")"
+            mkdir -p /tmp/kriscc-existing
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+              -p "$RPM" -p SHA256SUMS -D /tmp/kriscc-existing
+            (cd /tmp/kriscc-existing && sha256sum -c SHA256SUMS)
+            if git diff --quiet "$tag_sha" "$GITHUB_SHA" -- \
+                CMakeLists.txt src qml data packaging/krisCC.spec; then
+              echo "Release $TAG already represents the current product sources; nothing to republish."
+              exit 0
             fi
-            echo "Release $TAG already contains this exact component; nothing to republish."
-            exit 0
+            echo "Product sources changed after immutable release $TAG. Bump Version or Release in packaging/krisCC.spec before merging." >&2
+            exit 1
           fi
+
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
