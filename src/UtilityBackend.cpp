@@ -107,9 +107,9 @@ bool UtilityBackend::previewRpmInstall(const QString &packageName)
         emit stateChanged();
         return false;
     }
-    return start(QStringLiteral("/usr/bin/dnf5"),
-                 {QStringLiteral("install"), QStringLiteral("--assumeno"), packageName},
-                 tr("Anteprima installazione: %1").arg(packageName));
+    return start(QStringLiteral("/usr/bin/rk"),
+                 {QStringLiteral("plan"), packageName},
+                 tr("Piano installazione persistente: %1").arg(packageName));
 }
 
 bool UtilityBackend::runFlatpak(const QString &mode, const QString &query)
