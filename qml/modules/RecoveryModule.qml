@@ -41,7 +41,7 @@ Kirigami.ScrollablePage {
                 Controls.Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                    text: qsTr("Un solo flusso per configurazioni o cartelle personali. I backup sono normali archivi tar.gz in ~/krisCC Backups, non richiedono root e non toccano i deployment BootC.")
+                    text: qsTr("Un solo flusso per configurazioni o cartelle personali. I backup sono normali archivi tar.gz in ~/krisCC Backups, non richiedono root e non toccano il deployment BootC.")
                 }
 
                 RowLayout {
@@ -115,12 +115,12 @@ Kirigami.ScrollablePage {
         Kirigami.AbstractCard {
             Layout.fillWidth: true
             contentItem: ColumnLayout {
-                Kirigami.Heading { level: 2; text: qsTr("Recovery BootC") }
+                Kirigami.Heading { level: 2; text: qsTr("Recovery KrisOS") }
                 Controls.Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     opacity: 0.72
-                    text: qsTr("Rollback dell'immagine e risincronizzazione del layer persistente restano separati dai backup dei tuoi file.")
+                    text: qsTr("KrisOS supporta un solo deployment. Se il layer RPM persistente deve essere ricostruito, rk può risincronizzare le richieste salvate sull'overlay attivo.")
                 }
                 Repeater {
                     model: BootcBackend.deployments
@@ -132,9 +132,11 @@ Kirigami.ScrollablePage {
                     }
                 }
                 RowLayout {
-                    Controls.Button { text: qsTr("Prepara rollback"); enabled: BootcBackend.bootcAvailable && !PolkitHelper.running; onClicked: rollbackDialog.open() }
-                    Controls.Button { text: qsTr("Rollback + apply"); enabled: BootcBackend.bootcAvailable && !PolkitHelper.running; onClicked: rollbackApplyDialog.open() }
-                    Controls.Button { text: qsTr("Risincronizza rk"); enabled: !PolkitHelper.running; onClicked: root.runPrivileged("/usr/bin/rk", ["sync"]) }
+                    Controls.Button {
+                        text: qsTr("Risincronizza pacchetti persistenti")
+                        enabled: !PolkitHelper.running
+                        onClicked: root.runPrivileged("/usr/bin/rk", ["sync"])
+                    }
                 }
             }
         }
@@ -175,8 +177,6 @@ Kirigami.ScrollablePage {
         }
         onAccepted: SystemBackend.createSnapshot("home")
     }
-    Controls.Dialog { id: rollbackDialog; modal: true; title: qsTr("Preparare il rollback BootC?"); standardButtons: Controls.Dialog.Yes | Controls.Dialog.No; onAccepted: root.runPrivileged("/usr/bin/bootc", ["rollback"]) }
-    Controls.Dialog { id: rollbackApplyDialog; modal: true; title: qsTr("Rollback e applicazione immediata?"); standardButtons: Controls.Dialog.Yes | Controls.Dialog.No; onAccepted: root.runPrivileged("/usr/bin/bootc", ["rollback", "--apply"]) }
     Controls.Dialog { id: rebootDialog; modal: true; title: qsTr("Riavviare il sistema?"); standardButtons: Controls.Dialog.Yes | Controls.Dialog.No; onAccepted: SystemBackend.sessionAction("reboot") }
     Controls.Dialog { id: powerDialog; modal: true; title: qsTr("Spegnere il sistema?"); standardButtons: Controls.Dialog.Yes | Controls.Dialog.No; onAccepted: SystemBackend.sessionAction("poweroff") }
 }
