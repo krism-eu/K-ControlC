@@ -1,6 +1,6 @@
 Name:           krisCC
-Version:        0.4.0
-Release:        11%{?dist}
+Version:        0.5.0
+Release:        1%{?dist}
 Summary:        krisCC personal control center for KrisOS and Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/krisCC
@@ -49,6 +49,14 @@ Settings.
 %{_datadir}/icons/hicolor/scalable/apps/krisCC.svg
 
 %changelog
+* Fri Sep 18 2026 krism-eu - 0.5.0-1
+- Add a unified minimal KrisOS system/update center
+- Add health, security, storage, UEFI and GRUB/BLS read-only diagnostics
+- Support one-shot UEFI BootNext and GRUB next-entry selection when available
+- Add backup inventory, verification and user-level restore
+- Add local operation history and expand safe terminal command bookmarks
+- Keep firmware and first-run/welcome tooling out of krisCC
+
 * Thu Sep 17 2026 krism-eu - 0.4.0-11
 - Use structured backend operation identifiers and result states in QML
 - Make backup archives atomic with warning/cancellation handling
