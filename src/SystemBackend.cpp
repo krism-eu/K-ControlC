@@ -497,8 +497,8 @@ bool SystemBackend::restoreSnapshot(const QString &path)
     });
 
     process->start(tar, {QStringLiteral("-xzf"), canonical,
-                         QStringLiteral("-C"), QDir::homePath(),
-                         QStringLiteral("--no-same-owner"), QStringLiteral("--no-same-permissions")});
+                         QStringLiteral("--no-same-owner"), QStringLiteral("--no-same-permissions"),
+                         QStringLiteral("-C"), QDir::homePath()});
     return true;
 }
 
@@ -607,6 +607,8 @@ bool SystemBackend::createSnapshot(const QString &kind)
             m_backupPartialPath.clear();
             m_backupCancelled = false;
             setBackupResult(tr("Backup annullato; il file parziale è stato rimosso."), QString(), QStringLiteral("cancelled"));
+            OperationLog::append(QStringLiteral("Backup"), QStringLiteral("create"),
+                                 QStringLiteral("cancelled"), QFileInfo(output).fileName());
             return;
         }
 
@@ -623,12 +625,16 @@ bool SystemBackend::createSnapshot(const QString &kind)
             m_backupPartialPath.clear();
             if (exitCode == 0) {
                 setBackupResult(tr("Snapshot creato correttamente."), output, QStringLiteral("success"));
+                OperationLog::append(QStringLiteral("Backup"), QStringLiteral("create"),
+                                     QStringLiteral("success"), QFileInfo(output).fileName());
                 notify(tr("Backup completato"), output);
             } else {
                 const QString warning = details.isEmpty()
                     ? tr("Snapshot creato con avvisi da tar. Verificare l'archivio prima di usarlo per un ripristino.")
                     : tr("Snapshot creato con avvisi da tar. Verificare l'archivio prima di usarlo per un ripristino.\n%1").arg(details);
                 setBackupResult(warning, output, QStringLiteral("warning"));
+                OperationLog::append(QStringLiteral("Backup"), QStringLiteral("create"),
+                                     QStringLiteral("warning"), QFileInfo(output).fileName());
                 notify(tr("Backup completato con avvisi"), output);
             }
             return;
@@ -640,6 +646,8 @@ bool SystemBackend::createSnapshot(const QString &kind)
             ? tr("Snapshot non riuscito (codice %1).").arg(exitCode)
             : details;
         setBackupResult(message, QString(), QStringLiteral("error"));
+        OperationLog::append(QStringLiteral("Backup"), QStringLiteral("create"),
+                             QStringLiteral("error"), QFileInfo(output).fileName());
     });
 
     connect(process, &QProcess::errorOccurred, this,
