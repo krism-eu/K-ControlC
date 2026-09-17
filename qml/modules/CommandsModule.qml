@@ -71,8 +71,6 @@ Kirigami.ScrollablePage {
                                 icon.name: "edit-copy"
                                 display: Controls.AbstractButton.IconOnly
                                 onClicked: SystemBackend.copyToClipboard(modelData.command)
-                                Controls.ToolTip.visible: hovered
-                                Controls.ToolTip.text: qsTr("Copia comando")
                             }
                             Controls.Button {
                                 text: qsTr("Esegui")
