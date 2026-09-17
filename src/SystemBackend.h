@@ -4,6 +4,7 @@
 #include <QPointer>
 #include <QProcess>
 #include <QString>
+#include <QVariantList>
 
 class SystemBackend : public QObject
 {
@@ -48,9 +49,16 @@ public:
     Q_INVOKABLE bool restartService(const QString &service);
     Q_INVOKABLE bool sessionAction(const QString &action);
     Q_INVOKABLE void notify(const QString &summary, const QString &body = QString()) const;
+
     Q_INVOKABLE bool createSnapshot(const QString &kind);
     Q_INVOKABLE bool cancelSnapshot();
+    Q_INVOKABLE QVariantList backups() const;
+    Q_INVOKABLE bool verifySnapshot(const QString &path);
+    Q_INVOKABLE bool restoreSnapshot(const QString &path);
     Q_INVOKABLE bool openBackupFolder() const;
+
+    Q_INVOKABLE QString operationHistory() const;
+    Q_INVOKABLE bool clearOperationHistory();
 
 signals:
     void backupBusyChanged();
@@ -60,6 +68,7 @@ private:
     QString readOsName() const;
     QString toolProgram(const QString &toolId) const;
     QString resolveExecutable(const QString &program) const;
+    bool validateBackupPath(const QString &path, QString *canonicalPath = nullptr) const;
     void setBackupBusy(bool busy);
     void setBackupResult(const QString &status, const QString &path = QString(),
                          const QString &state = QStringLiteral("idle"));
