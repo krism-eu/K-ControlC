@@ -3,7 +3,6 @@ name: Build
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
     branches: [main]
 
@@ -109,43 +108,63 @@ jobs:
           if-no-files-found: warn
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build-fedora
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
-      - name: Download tested artifacts
+      - name: Download validated artifacts
         uses: actions/download-artifact@v4
         with:
           name: krisCC-${{ github.sha }}
           path: artifacts
 
-      - name: Verify immutable component release
+      - name: Resolve immutable component release
+        id: component
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag="$GITHUB_REF_NAME"
-          test "$tag" = "v0.4.0-10"
           cd artifacts/rpm
           sha256sum -c SHA256SUMS
-          test "$(find . -maxdepth 1 -type f -name 'krisCC-0.4.0-10.fc44.x86_64.rpm' | wc -l)" -eq 1
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; refusing to replace component artifacts." >&2
+          rpm_file="$(find . -maxdepth 1 -type f -name 'krisCC-*.x86_64.rpm' -print -quit)"
+          test -n "$rpm_file"
+          base="$(basename "$rpm_file")"
+          if [[ ! "$base" =~ ^krisCC-([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)\.fc44\.x86_64\.rpm$ ]]; then
+            echo "Unexpected RPM filename: $base" >&2
             exit 1
           fi
+          tag="v${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
+          checksum="$(awk -v f="$base" '$2 == f || $2 == "./" f {print $1}' SHA256SUMS)"
+          test -n "$checksum"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "rpm=$base" >> "$GITHUB_OUTPUT"
+          echo "sha256=$checksum" >> "$GITHUB_OUTPUT"
 
-      - name: Publish immutable tagged RPM release
+      - name: Publish or verify component release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.component.outputs.tag }}
+          RPM: ${{ steps.component.outputs.rpm }}
+          SHA256: ${{ steps.component.outputs.sha256 }}
+        shell: bash
         run: |
           set -euo pipefail
-          tag="$GITHUB_REF_NAME"
-          gh release create "$tag" \
-            artifacts/rpm/krisCC-0.4.0-10.fc44.x86_64.rpm \
-            artifacts/rpm/SHA256SUMS \
-            --verify-tag \
-            --title "krisCC $tag" \
-            --notes "krisCC component artifact built and source-tested by CI from $GITHUB_SHA. The release is not replaced in place; final runtime integration is validated by the KrisOS image pipeline."
+          mkdir -p /tmp/kriscc-existing
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p SHA256SUMS -D /tmp/kriscc-existing
+            existing="$(awk -v f="$RPM" '$2 == f || $2 == "./" f {print $1}' /tmp/kriscc-existing/SHA256SUMS)"
+            if [[ "$existing" != "$SHA256" ]]; then
+              echo "Release $TAG already exists with different RPM content; bump packaging Release before publishing new krisCC code." >&2
+              exit 1
+            fi
+            echo "Release $TAG already contains this exact component; nothing to republish."
+            exit 0
+          fi
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "krisCC $TAG" \
+            --notes "Validated krisCC component built from $GITHUB_SHA. KrisOS performs final runtime integration before adopting this release." \
+            "artifacts/rpm/$RPM" \
+            artifacts/rpm/SHA256SUMS
