@@ -23,6 +23,32 @@ grep -q 'org.kriscc.controlcenter.bootc.status' data/org.kriscc.controlcenter.po
 grep -A6 'org.kriscc.controlcenter.bootc.status' data/org.kriscc.controlcenter.policy \
   | grep -q '<allow_active>yes</allow_active>'
 
+# KrisOS supports a single deployment: rollback must not be offered or
+# privileged, and repository mutations must not bypass rk policy.
+if grep -RniE 'bootc[^\n]*rollback|"rollback"|Rollback \+ apply|Prepara rollback' \
+    qml/modules/BootcModule.qml qml/modules/RecoveryModule.qml \
+    src/PolkitHelper.cpp data/org.kriscc.controlcenter.policy; then
+  echo "ERROR: unsupported BootC rollback remains exposed" >&2
+  exit 1
+fi
+if grep -RniE 'config-manager|addrepo|Aggiungi repository' \
+    qml/modules/SoftwareModule.qml src/PolkitHelper.cpp data/org.kriscc.controlcenter.policy; then
+  echo "ERROR: arbitrary DNF repository mutation remains exposed" >&2
+  exit 1
+fi
+
+# RPM preview must be the same policy path as the actual rk transaction.
+grep -q 'QStringLiteral("/usr/bin/rk")' src/UtilityBackend.cpp
+grep -q 'QStringLiteral("plan")' src/UtilityBackend.cpp
+if grep -nE 'dnf5.*install|install.*--assumeno|--assumeno' src/UtilityBackend.cpp; then
+  echo "ERROR: RPM preview bypasses rk policy" >&2
+  exit 1
+fi
+
+# Package discovery must match the repositories enabled by rk.
+grep -q 'QStringLiteral("--repo=fedora,updates")' src/PackageSearch.cpp
+grep -q 'id != QStringLiteral("fedora") && id != QStringLiteral("updates")' src/SoftwareBackend.cpp
+
 if grep -Eq 'QStringLiteral\("--json"\)|QStringLiteral\("--format-version' src/BootcBackend.cpp; then
   echo "ERROR: BootcBackend must use bootc status --format json without legacy JSON flags" >&2
   exit 1
@@ -63,6 +89,7 @@ test -f data/org.kriscc.KrisCC.metainfo.xml
 test ! -e data/org.kcontrolc.KControlC.metainfo.xml
 
 grep -q '^Name:[[:space:]]*krisCC$' packaging/krisCC.spec
+grep -q '^Release:[[:space:]]*10%{?dist}$' packaging/krisCC.spec
 grep -q '^Provides:[[:space:]]*k-controlc' packaging/krisCC.spec
 grep -q '^Obsoletes:[[:space:]]*k-controlc' packaging/krisCC.spec
 if grep -Eq '^Provides:[[:space:]]*kcc([[:space:]=]|$)|^Obsoletes:[[:space:]]*kcc([[:space:]<=>]|$)' packaging/krisCC.spec; then
@@ -120,12 +147,11 @@ fi
 
 echo "Checking mandatory local DNF5 behavior..."
 dnf5 list --installed --json >/dev/null
-dnf5 config-manager --help >/dev/null
 
 echo "Checking repository-backed DNF5 queries when metadata is available..."
 if dnf5 repo list --all --json >/dev/null 2>&1; then
   dnf5 repo list --all --json >/dev/null
-  if dnf5 repoquery --available \
+  if dnf5 --repo=fedora,updates repoquery --available \
       --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
       'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
     grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
@@ -136,8 +162,8 @@ if dnf5 repo list --all --json >/dev/null 2>&1; then
   else
     echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
   fi
-  dnf5 list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
-  dnf5 list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
 else
   echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
 fi
