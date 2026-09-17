@@ -45,8 +45,8 @@ jobs:
           rpmspec -P packaging/krisCC.spec >/dev/null
           test "$(rpmspec -q --qf '%{NAME}\n' packaging/krisCC.spec | head -n1)" = "krisCC"
           test "$(rpmspec -q --qf '%{VERSION}-%{RELEASE}\n' packaging/krisCC.spec | head -n1)" = "0.4.0-10.fc44"
-          ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Provides:[[:space:]]+kcc([[:space:]=]|$)'
-          ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Obsoletes:[[:space:]]+kcc([[:space:]<=>]|$)'
+          ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Provides:[[:space:]]+(kcc|k-controlc)([[:space:]=]|$)'
+          ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Obsoletes:[[:space:]]+(kcc|k-controlc)([[:space:]<=>]|$)'
           ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Requires:[[:space:]]+dnf5-plugins([[:space:]]|$)'
 
       - name: Stage install
@@ -86,61 +86,6 @@ jobs:
             grep -Eq '^[0-9a-f]{64}[[:space:]]+krisCC-0[.]4[.]0-10.*[.]rpm$' SHA256SUMS
           ) 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/logs/rpmbuild.log"
 
-      - name: Verify Fedora kcc coexistence and legacy replacement
-        shell: bash
-        run: |
-          set -euxo pipefail
-
-          # Fedora already owns the generic kcc name and /usr/bin/kcc. krisCC
-          # must install next to it without Provides/Obsoletes or file conflicts.
-          dnf -y install kcc
-          rpm -q kcc
-          test -x /usr/bin/kcc
-
-          cat > "$HOME/rpmbuild/SPECS/k-controlc-legacy.spec" <<'EOF'
-          Name: k-controlc
-          Version: 0.3.0
-          Release: 1%{?dist}
-          Summary: Legacy K-ControlC transition fixture
-          License: MIT
-          BuildArch: noarch
-
-          %description
-          Minimal legacy package used only to verify krisCC RPM replacement semantics.
-
-          %install
-          mkdir -p %{buildroot}%{_bindir}
-          mkdir -p %{buildroot}%{_datadir}/applications
-          mkdir -p %{buildroot}%{_datadir}/icons/hicolor/scalable/apps
-          mkdir -p %{buildroot}%{_datadir}/polkit-1/actions
-          printf '#!/bin/sh\nexit 0\n' > %{buildroot}%{_bindir}/k-controlc
-          chmod 0755 %{buildroot}%{_bindir}/k-controlc
-          printf '[Desktop Entry]\nName=K-ControlC Legacy\nExec=k-controlc\nType=Application\n' > %{buildroot}%{_datadir}/applications/k-controlc.desktop
-          printf '<svg xmlns="http://www.w3.org/2000/svg"/>\n' > %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/k-controlc.svg
-          printf '<policyconfig/>\n' > %{buildroot}%{_datadir}/polkit-1/actions/org.kcontrolc.controlcenter.policy
-
-          %files
-          %{_bindir}/k-controlc
-          %{_datadir}/applications/k-controlc.desktop
-          %{_datadir}/icons/hicolor/scalable/apps/k-controlc.svg
-          %{_datadir}/polkit-1/actions/org.kcontrolc.controlcenter.policy
-          EOF
-          rpmbuild -bb "$HOME/rpmbuild/SPECS/k-controlc-legacy.spec"
-          dnf -y install "$HOME"/rpmbuild/RPMS/noarch/k-controlc-0.3.0-1*.rpm
-          rpm -q k-controlc
-
-          dnf -y install artifacts/rpm/krisCC-*.rpm
-          rpm -q krisCC
-          rpm -q kcc
-          ! rpm -q k-controlc
-          test -x /usr/bin/kcc
-          test -x /usr/bin/krisCC
-          test ! -e /usr/bin/k-controlc
-          test ! -e /usr/share/applications/k-controlc.desktop
-          test ! -e /usr/share/icons/hicolor/scalable/apps/k-controlc.svg
-          test ! -e /usr/share/polkit-1/actions/org.kcontrolc.controlcenter.policy
-          test "$(rpm -qf /usr/share/polkit-1/actions/org.kriscc.controlcenter.policy)" = "$(rpm -q krisCC)"
-
       - name: Install built RPM and smoke test
         env:
           QT_QPA_PLATFORM: offscreen
@@ -148,10 +93,13 @@ jobs:
           QT_QUICK_CONTROLS_STYLE: Basic
           KRISCC_SMOKE_TEST: "1"
         run: |
-          dnf -y reinstall artifacts/rpm/krisCC-*.rpm
+          set -euxo pipefail
+          dnf -y install artifacts/rpm/krisCC-*.rpm
           rpm -q krisCC
-          rpm -q kcc
-          test "$(rpm -q --provides krisCC | grep -c '^k-controlc = ')" -ge 1
+          test -x /usr/bin/krisCC
+          test "$(rpm -qf /usr/bin/krisCC)" = "$(rpm -q krisCC)"
+          test "$(rpm -qf /usr/share/polkit-1/actions/org.kriscc.controlcenter.policy)" = "$(rpm -q krisCC)"
+          ! rpm -q --provides krisCC | grep -Eq '^(kcc|k-controlc)([[:space:]=]|$)'
           /usr/bin/krisCC
 
       - uses: actions/upload-artifact@v4
