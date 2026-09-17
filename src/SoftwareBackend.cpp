@@ -58,7 +58,7 @@ void SoftwareBackend::refreshRepositories()
         for (const QJsonValue &value : document.array()) {
             const QJsonObject object = value.toObject();
             const QString id = object.value(QStringLiteral("id")).toString();
-            if (id.isEmpty())
+            if (id != QStringLiteral("fedora") && id != QStringLiteral("updates"))
                 continue;
             QVariantMap repo;
             repo.insert(QStringLiteral("id"), id);
@@ -70,10 +70,6 @@ void SoftwareBackend::refreshRepositories()
         std::sort(repos.begin(), repos.end(), [](const QVariant &left, const QVariant &right) {
             const QVariantMap a = left.toMap();
             const QVariantMap b = right.toMap();
-            const bool aEnabled = a.value(QStringLiteral("enabled")).toBool();
-            const bool bEnabled = b.value(QStringLiteral("enabled")).toBool();
-            if (aEnabled != bEnabled)
-                return aEnabled > bEnabled;
             return a.value(QStringLiteral("id")).toString().localeAwareCompare(
                        b.value(QStringLiteral("id")).toString()) < 0;
         });
