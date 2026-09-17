@@ -77,27 +77,37 @@ Kirigami.ScrollablePage {
         Kirigami.AbstractCard {
             Layout.fillWidth: true
             contentItem: ColumnLayout {
-                Kirigami.Heading { level: 2; text: qsTr("Aggiornamenti") }
+                Kirigami.Heading { level: 2; text: qsTr("Aggiornamenti KrisOS") }
+                Controls.Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.72
+                    text: qsTr("Il controllo interroga direttamente il registro configurato per l'immagine corrente. Con KrisOS pubblicato su GHCR, BootC scarica solo manifest e configurazione per verificare se il digest remoto è cambiato; non scarica i layer durante il controllo.")
+                }
                 Flow {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
                     Controls.Button {
-                        text: qsTr("Controlla")
+                        text: qsTr("Controlla GHCR")
+                        icon.name: "view-refresh"
                         enabled: BootcBackend.bootcAvailable && !PolkitHelper.running
                         onClicked: root.runBootc(["upgrade", "--check"])
                     }
                     Controls.Button {
                         text: qsTr("Scarica e prepara")
+                        icon.name: "download"
                         enabled: BootcBackend.bootcAvailable && !PolkitHelper.running
                         onClicked: root.runBootc(["upgrade"])
                     }
                     Controls.Button {
                         text: qsTr("Solo download")
+                        icon.name: "download"
                         enabled: BootcBackend.bootcAvailable && !PolkitHelper.running
                         onClicked: root.runBootc(["upgrade", "--download-only"])
                     }
                     Controls.Button {
                         text: qsTr("Applica")
+                        icon.name: "system-reboot"
                         enabled: BootcBackend.bootcAvailable && !PolkitHelper.running
                         onClicked: applyDialog.open()
                     }
@@ -118,7 +128,7 @@ Kirigami.ScrollablePage {
             Layout.fillWidth: true
             visible: root.progressLines.length > 0
             contentItem: ColumnLayout {
-                Kirigami.Heading { level: 2; text: qsTr("Operazione") }
+                Kirigami.Heading { level: 2; text: qsTr("Operazione BootC") }
                 Repeater {
                     model: root.progressLines
                     delegate: Controls.Label {
@@ -138,6 +148,10 @@ Kirigami.ScrollablePage {
         modal: true
         title: qsTr("Applicare l'aggiornamento?")
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
+        contentItem: Controls.Label {
+            wrapMode: Text.WordWrap
+            text: qsTr("BootC applicherà l'immagine preparata e riavvierà il sistema se necessario.")
+        }
         onAccepted: root.runBootc(["upgrade", "--apply"])
     }
 }
