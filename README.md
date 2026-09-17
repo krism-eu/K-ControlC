@@ -28,7 +28,7 @@ krisCC usa in via primaria il layout corrente di KrisOS:
 
 Per la fase di migrazione mantiene un fallback in sola lettura verso i vecchi percorsi `/var/lib/raku-kris` e `/usr/share/raku-kris`. Il layout KrisOS ha sempre precedenza.
 
-Il pacchetto RPM e l'eseguibile si chiamano **`krisCC`**. Il nome è volutamente distinto dal pacchetto Fedora `kcc`, con il quale deve poter convivere. Lo spec mantiene `Provides/Obsoletes` soltanto per il vecchio pacchetto `k-controlc`, così DNF può sostituirlo senza lasciare duplicati.
+Il pacchetto RPM e l'eseguibile hanno una sola identità tecnica: **`krisCC`**. Non sono previsti alias, binari o compatibilità RPM con i vecchi nomi sperimentali.
 
 krisCC è parte della base immutabile di KrisOS: le release normali del control center arrivano insieme a una nuova immagine KrisOS, non tramite `rk` o un aggiornamento RPM separato sul sistema installato.
 
@@ -51,7 +51,7 @@ cmake --build build
 
 ## RPM e integrazione nell'immagine
 
-Lo spec RPM è `packaging/krisCC.spec` e produce **`krisCC-0.4.0-*.rpm`**. La CI Fedora 44 costruisce l'RPM, lo installa nel container, verifica la sostituzione di un vecchio pacchetto `k-controlc`, riesegue lo smoke test e produce `SHA256SUMS` degli artefatti RPM/SRPM.
+Lo spec RPM è `packaging/krisCC.spec` e produce **`krisCC-0.4.0-*.rpm`**. La CI Fedora 44 costruisce l'RPM, lo installa in un ambiente pulito, riesegue lo smoke test e produce `SHA256SUMS` dell'artefatto RPM.
 
 Il flusso previsto per KrisOS è:
 
@@ -75,4 +75,4 @@ Repository: https://github.com/krism-eu/krisCC
 
 ## Test reale
 
-La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging, sostituzione `k-controlc` → `krisCC` e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk plan/add/rm/sync`, autenticazione Polkit, ricerca RPM con dimensioni e dipendenze, aggiornamenti Flatpak, Podman, `bootc upgrade --check`, download/apply BootC, restart servizi e backup della home/configurazione.
+La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk plan/add/rm/sync`, autenticazione Polkit, ricerca RPM con dimensioni e dipendenze, aggiornamenti Flatpak, Podman, `bootc upgrade --check`, download/apply BootC, restart servizi e backup della home/configurazione.
