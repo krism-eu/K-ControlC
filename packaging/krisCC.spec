@@ -22,11 +22,6 @@ Requires:       dnf5
 Requires:       bootc
 Requires:       tar
 
-# Safe transition from the original package identity. Do not obsolete/provide
-# Fedora's unrelated "kcc" package: krisCC must be able to coexist with it.
-Provides:       k-controlc = %{version}-%{release}
-Obsoletes:      k-controlc < %{version}-%{release}
-
 %description
 krisCC is a compact personal Kirigami control center for KrisOS and Fedora bootc
 systems. It focuses on persistent software management, Flatpak applications,
@@ -58,6 +53,7 @@ Settings.
 - Align BootC controls with KrisOS single-deployment update model
 - Route RPM previews through rk policy and limit discovery to supported repositories
 - Remove privileged rollback and arbitrary DNF repository mutations
+- Drop unused legacy RPM migration metadata; krisCC has a single package identity
 
 * Wed Sep 16 2026 krism-eu - 0.4.0-9
 - Preserve --background startup mode after the krisCC technical rename
