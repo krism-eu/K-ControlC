@@ -214,10 +214,12 @@ void BootcBackend::parseJsonStatus(const QByteArray &data)
     const QJsonObject status = root.value(QStringLiteral("status")).toObject();
     m_deployments.clear();
 
+    // KrisOS exposes only the supported current/staged deployment. A rollback
+    // deployment may exist internally in bootc status, but it is deliberately
+    // not part of the krisCC product model or UI.
     const struct { const char *key; const char *label; } roles[] = {
         {"staged", "Staged"},
-        {"booted", "Booted"},
-        {"rollback", "Rollback"}
+        {"booted", "Booted"}
     };
     for (const auto &role : roles) {
         const QJsonObject deployment = status.value(QLatin1String(role.key)).toObject();
