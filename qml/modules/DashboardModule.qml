@@ -12,27 +12,36 @@ Kirigami.ScrollablePage {
         width: parent.width
         spacing: Kirigami.Units.largeSpacing
 
-        Kirigami.Heading {
+        RowLayout {
             Layout.fillWidth: true
-            level: 1
-            text: qsTr("krisCC")
-        }
-        Controls.Label {
-            Layout.fillWidth: true
-            wrapMode: Text.WordWrap
-            text: qsTr("Software persistente, Flatpak, container Podman, deployment BootC, strumenti pratici e recovery. Le normali impostazioni desktop restano a Plasma.")
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 2
+                Kirigami.Heading { level: 1; text: qsTr("krisCC") }
+                Controls.Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.72
+                    text: qsTr("Controllo essenziale di KrisOS senza duplicare le Impostazioni di sistema Plasma.")
+                }
+            }
+            Controls.Button {
+                text: qsTr("Sistema")
+                icon.name: "preferences-system"
+                onClicked: root.openRequested("system")
+            }
         }
 
         Kirigami.InlineMessage {
             Layout.fillWidth: true
             visible: !BootcBackend.bootcAvailable
             type: Kirigami.MessageType.Warning
-            text: qsTr("bootc non è disponibile in questo ambiente. Le funzioni di deployment saranno disabilitate.")
+            text: qsTr("bootc non è disponibile in questo ambiente. Le funzioni image-based sono disabilitate.")
         }
 
         GridLayout {
             Layout.fillWidth: true
-            columns: width > 720 ? 3 : 1
+            columns: width > 760 ? 2 : 1
             columnSpacing: Kirigami.Units.largeSpacing
             rowSpacing: Kirigami.Units.largeSpacing
 
@@ -41,13 +50,11 @@ Kirigami.ScrollablePage {
                 contentItem: ColumnLayout {
                     Kirigami.Heading { level: 2; text: qsTr("Sistema") }
                     Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: SystemBackend.osName }
-                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: SystemBackend.kernelVersion }
-                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: SystemBackend.storageSummary }
-                    Controls.Button {
-                        text: qsTr("Info Center")
-                        icon.name: "hwinfo"
-                        enabled: SystemBackend.toolAvailable("kinfocenter")
-                        onClicked: SystemBackend.launchTool("kinfocenter")
+                    Controls.Label { Layout.fillWidth: true; opacity: 0.7; text: SystemBackend.kernelVersion }
+                    Controls.Label { Layout.fillWidth: true; opacity: 0.7; text: SystemBackend.storageSummary }
+                    RowLayout {
+                        Controls.Button { text: qsTr("Salute"); icon.name: "tools-report-bug"; onClicked: root.openRequested("system") }
+                        Controls.Button { text: qsTr("Info Center"); icon.name: "hwinfo"; enabled: SystemBackend.toolAvailable("kinfocenter"); onClicked: SystemBackend.launchTool("kinfocenter") }
                     }
                 }
             }
@@ -55,16 +62,21 @@ Kirigami.ScrollablePage {
             Kirigami.AbstractCard {
                 Layout.fillWidth: true
                 contentItem: ColumnLayout {
-                    Kirigami.Heading { level: 2; text: qsTr("BootC") }
+                    Kirigami.Heading { level: 2; text: qsTr("Aggiornamenti") }
                     Controls.Label {
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
-                        text: BootcBackend.bootcAvailable ? qsTr("Deployment image-based attivo") : qsTr("bootc non rilevato")
+                        text: BootcBackend.bootcAvailable ? qsTr("KrisOS image-based attivo") : qsTr("BootC non rilevato")
+                    }
+                    Controls.Label {
+                        Layout.fillWidth: true
+                        opacity: 0.7
+                        text: qsTr("%1 pacchetti RPM persistenti").arg(BootcBackend.persistentPackageCount)
                     }
                     Controls.Button {
-                        text: qsTr("Deployment e aggiornamenti")
+                        text: qsTr("Apri centro aggiornamenti")
                         icon.name: "system-software-update"
-                        onClicked: root.openRequested("bootc")
+                        onClicked: root.openRequested("system")
                     }
                 }
             }
@@ -72,16 +84,15 @@ Kirigami.ScrollablePage {
             Kirigami.AbstractCard {
                 Layout.fillWidth: true
                 contentItem: ColumnLayout {
-                    Kirigami.Heading { level: 2; text: qsTr("Pacchetti persistenti") }
+                    Kirigami.Heading { level: 2; text: qsTr("Software") }
                     Controls.Label {
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
-                        text: qsTr("%1 pacchetti gestiti da rk").arg(BootcBackend.persistentPackageCount)
+                        text: qsTr("RPM persistenti tramite rk e applicazioni Flatpak utente.")
                     }
-                    Controls.Button {
-                        text: qsTr("Apri Software")
-                        icon.name: "system-software-install"
-                        onClicked: root.openRequested("software")
+                    RowLayout {
+                        Controls.Button { text: qsTr("RPM"); icon.name: "system-software-install"; onClicked: root.openRequested("software") }
+                        Controls.Button { text: qsTr("Flatpak"); icon.name: "package-x-generic"; onClicked: root.openRequested("flatpak") }
                     }
                 }
             }
@@ -93,7 +104,7 @@ Kirigami.ScrollablePage {
                     Controls.Label {
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
-                        text: SystemBackend.programAvailable("podman") ? qsTr("Gestione Podman disponibile") : qsTr("Podman non installato")
+                        text: SystemBackend.programAvailable("podman") ? qsTr("Podman disponibile per l'utente corrente") : qsTr("Podman non installato")
                     }
                     Controls.Button {
                         text: qsTr("Apri Container")
@@ -108,49 +119,29 @@ Kirigami.ScrollablePage {
         Kirigami.AbstractCard {
             Layout.fillWidth: true
             contentItem: ColumnLayout {
-                Kirigami.Heading { level: 2; text: qsTr("Quick System Info") }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Kirigami.Heading { Layout.fillWidth: true; level: 2; text: qsTr("Quick System Info") }
+                    Controls.Button {
+                        text: qsTr("Copia")
+                        icon.name: "edit-copy"
+                        onClicked: SystemBackend.copyToClipboard(quickInfo.text)
+                    }
+                }
                 Controls.TextArea {
                     id: quickInfo
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 210
+                    Layout.preferredHeight: 190
                     readOnly: true
                     wrapMode: TextEdit.WrapAnywhere
                     font.family: "monospace"
                     text: SystemBackend.quickSystemInfo()
                 }
                 RowLayout {
-                    Controls.Button {
-                        text: qsTr("Copia")
-                        icon.name: "edit-copy"
-                        onClicked: SystemBackend.copyToClipboard(quickInfo.text)
-                    }
-                    Controls.Button {
-                        text: qsTr("Strumenti")
-                        icon.name: "applications-utilities"
-                        onClicked: root.openRequested("tools")
-                    }
-                    Controls.Button {
-                        text: qsTr("Recovery / backup")
-                        icon.name: "document-save-all"
-                        onClicked: root.openRequested("recovery")
-                    }
-                }
-            }
-        }
-
-        Kirigami.AbstractCard {
-            Layout.fillWidth: true
-            contentItem: RowLayout {
-                Controls.Label {
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                    text: qsTr("Rete, utenti, firewall, display, audio e le altre preferenze desktop sono già gestite da Plasma.")
-                }
-                Controls.Button {
-                    text: qsTr("Impostazioni Plasma")
-                    icon.name: "settings-configure"
-                    enabled: SystemBackend.toolAvailable("systemsettings")
-                    onClicked: SystemBackend.launchTool("systemsettings")
+                    Controls.Button { text: qsTr("Comandi utili"); icon.name: "utilities-terminal"; onClicked: root.openRequested("commands") }
+                    Controls.Button { text: qsTr("Backup / recovery"); icon.name: "document-save-all"; onClicked: root.openRequested("recovery") }
+                    Item { Layout.fillWidth: true }
+                    Controls.Button { text: qsTr("Impostazioni Plasma"); icon.name: "settings-configure"; enabled: SystemBackend.toolAvailable("systemsettings"); onClicked: SystemBackend.launchTool("systemsettings") }
                 }
             }
         }
