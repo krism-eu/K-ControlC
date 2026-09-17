@@ -45,12 +45,17 @@ if grep -nE 'dnf5.*install|install.*--assumeno|--assumeno' src/UtilityBackend.cp
   exit 1
 fi
 
-# Package discovery must match the repositories enabled by rk.
+# Package discovery must match the repositories enabled by rk, while the
+# installed inventory remains local and must not be filtered by repository.
 grep -q 'QStringLiteral("--repo=fedora,updates")' src/PackageSearch.cpp
+grep -q 'filter != QStringLiteral("--installed")' src/PackageSearch.cpp
 grep -q 'id != QStringLiteral("fedora") && id != QStringLiteral("updates")' src/SoftwareBackend.cpp
 
-# Flatpak mutations remain rootless/per-user. Updates may target one application
-# or all user refs, while discovery remains read-only.
+# Flatpak management is deliberately per-user. Inventory, remotes and mutations
+# must all use the same installation scope so the UI never shows system refs it
+# cannot modify.
+grep -q 'QStringLiteral("list"), QStringLiteral("--user"), QStringLiteral("--app")' src/UtilityBackend.cpp
+grep -q 'QStringLiteral("remotes"), QStringLiteral("--user")' src/UtilityBackend.cpp
 grep -q 'mode == QStringLiteral("update-all")' src/UtilityBackend.cpp
 grep -q 'mode == QStringLiteral("update")' src/UtilityBackend.cpp
 grep -q 'QStringLiteral("update"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), QStringLiteral("--assumeyes")' src/UtilityBackend.cpp
