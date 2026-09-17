@@ -1,6 +1,6 @@
 Name:           krisCC
 Version:        0.4.0
-Release:        9%{?dist}
+Release:        10%{?dist}
 Summary:        krisCC personal control center for KrisOS and Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/krisCC
@@ -19,7 +19,6 @@ Requires:       kf6-kirigami
 Requires:       polkit
 Requires:       rpm
 Requires:       dnf5
-Requires:       dnf5-plugins
 Requires:       bootc
 Requires:       tar
 
@@ -31,7 +30,7 @@ Obsoletes:      k-controlc < %{version}-%{release}
 %description
 krisCC is a compact personal Kirigami control center for KrisOS and Fedora bootc
 systems. It focuses on persistent software management, Flatpak applications,
-Podman containers, bootc deployments, practical maintenance tools, diagnostics,
+Podman containers, bootc updates, practical maintenance tools, diagnostics,
 recovery and local configuration/home backups without duplicating Plasma System
 Settings.
 
@@ -55,6 +54,11 @@ Settings.
 %{_datadir}/icons/hicolor/scalable/apps/krisCC.svg
 
 %changelog
+* Thu Sep 17 2026 krism-eu - 0.4.0-10
+- Align BootC controls with KrisOS single-deployment update model
+- Route RPM previews through rk policy and limit discovery to supported repositories
+- Remove privileged rollback and arbitrary DNF repository mutations
+
 * Wed Sep 16 2026 krism-eu - 0.4.0-9
 - Preserve --background startup mode after the krisCC technical rename
 - Keep KrisOS session autostart from opening the main window
