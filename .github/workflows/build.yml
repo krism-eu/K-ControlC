@@ -121,23 +121,31 @@ jobs:
           name: krisCC-${{ github.sha }}
           path: artifacts
 
-      - name: Verify RPM checksum artifact
+      - name: Verify immutable component release
         shell: bash
-        run: |
-          set -euo pipefail
-          cd artifacts/rpm
-          sha256sum -c SHA256SUMS
-          test "$(find . -maxdepth 1 -type f -name 'krisCC-0.4.0-10*.rpm' | wc -l)" -ge 1
-
-      - name: Publish tagged RPM release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           tag="$GITHUB_REF_NAME"
-          if ! gh release view "$tag" >/dev/null 2>&1; then
-            gh release create "$tag" \
-              --title "krisCC $tag" \
-              --notes "krisCC RPM built and source-tested by CI from $GITHUB_SHA. SHA256SUMS identifies the exact component artifact; final runtime integration is validated by the KrisOS image pipeline."
+          test "$tag" = "v0.4.0-10"
+          cd artifacts/rpm
+          sha256sum -c SHA256SUMS
+          test "$(find . -maxdepth 1 -type f -name 'krisCC-0.4.0-10.fc44.x86_64.rpm' | wc -l)" -eq 1
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; refusing to replace component artifacts." >&2
+            exit 1
           fi
-          gh release upload "$tag" artifacts/rpm/krisCC-*.rpm artifacts/rpm/SHA256SUMS --clobber
+
+      - name: Publish immutable tagged RPM release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          gh release create "$tag" \
+            artifacts/rpm/krisCC-0.4.0-10.fc44.x86_64.rpm \
+            artifacts/rpm/SHA256SUMS \
+            --verify-tag \
+            --title "krisCC $tag" \
+            --notes "krisCC component artifact built and source-tested by CI from $GITHUB_SHA. The release is not replaced in place; final runtime integration is validated by the KrisOS image pipeline."
