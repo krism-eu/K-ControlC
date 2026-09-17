@@ -31,6 +31,8 @@ private:
     bool isPrivilegedInvocationAllowed(const QString &program, const QStringList &args) const;
     bool isUnprivilegedInvocationAllowed(const QString &program, const QStringList &args) const;
     bool isValidPackageName(const QString &package) const;
+    bool isSafeBootToken(const QString &token) const;
+    bool isSafeGrubEntry(const QString &entry) const;
     void consumeOutput(const QByteArray &data, bool flushPartial = false);
     void finishWithError(const QString &message);
 
@@ -38,4 +40,6 @@ private:
     QProcess *m_process = nullptr;
     QString m_allOutput;
     QByteArray m_lineBuffer;
+    QString m_program;
+    QStringList m_args;
 };
