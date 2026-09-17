@@ -6,7 +6,7 @@ krisCC 0.4 è un'applicazione standalone Qt 6/Kirigami pensata per uso personale
 
 - Qt 6 Core/Gui/Qml/Quick/DBus
 - KF6 Kirigami
-- `bootc`, `rpm`, `dnf5`, `dnf5-plugins`, `pkexec`, `tar`
+- `bootc`, `rpm`, `dnf5`, `pkexec`, `tar`
 - `/usr/bin/rk` come helper del layer persistente KrisOS
 - systemd/logind per sessione e restart servizi
 
@@ -30,25 +30,29 @@ Il nuovo percorso ha sempre precedenza. Il fallback legacy potrà essere rimosso
 
 ## Modello software
 
-La base del sistema resta image-based e si aggiorna esclusivamente tramite BootC. krisCC usa DNF5 in lettura per catalogo, inventario, aggiornamenti disponibili, pacchetti recenti e repository; `rk` resta il punto di modifica del layer persistente.
+La base del sistema resta image-based e si aggiorna esclusivamente tramite BootC. KrisOS supporta un solo deployment operativo; krisCC non espone rollback o gestione di deployment alternativi.
 
-L'abilitazione/disabilitazione dei repository usa `dnf5 config-manager`, che richiede il pacchetto `dnf5-plugins`.
+krisCC usa DNF5 solo in lettura per catalogo, inventario, aggiornamenti disponibili, pacchetti recenti e stato dei repository. Le query installabili sono limitate a `fedora` e `updates`, gli stessi repository che `rk` abilita durante le transazioni. L'installazione/rimozione del layer persistente passa sempre da `rk`.
+
+L'anteprima deve usare `rk plan <pacchetto>` e non un comando DNF5 parallelo: il piano mostrato all'utente deve essere prodotto dallo stesso solver, dalle stesse esclusioni e dalla stessa policy che verranno applicati da `rk add`.
 
 ## Privilegi
 
-Non aggiungere wrapper shell generici. `PolkitHelper` valida programma e argomenti completi. La policy usa `auth_admin` senza retention e restringe le azioni tramite `exec.path`/`exec.argv1` per `rk`, `bootc` e `dnf5 config-manager`.
+Non aggiungere wrapper shell generici. `PolkitHelper` valida programma e argomenti completi. La policy usa `auth_admin` senza retention e restringe le mutazioni a `rk sync/add/rm` e alle operazioni BootC di aggiornamento supportate. Le mutazioni DNF5 e il rollback BootC non sono esposti.
 
 ## Pipeline immagine
 
-Il repository produce l'RPM `krisCC`. Il flusso consigliato è:
+Il repository produce l'RPM `krisCC`. Il flusso di release previsto è:
 
 ```text
-krisCC source -> CI/test -> krisCC RPM -> build context KrisOS -> immagine BootC
+krisCC source -> CI/test -> RPM + SHA256 -> build KrisOS -> immagine BootC
 ```
 
-La build KrisOS può pescare l'RPM prodotto separatamente e installarlo nella base. L'ordine è importante: **`krisCC` deve essere installato prima che KrisOS generi `/usr/share/krisos/owned-packages.txt` e `owned-nevra.txt`**. In questo modo viene classificato correttamente come pacchetto della base immutabile e `rk` non proverà mai a trattarlo come pacchetto persistente dell'overlay.
+KrisOS deve consumare l'artefatto RPM già testato e identificarlo con un digest/hash verificato. La build dell'OS non deve fare un `git fetch` di krisCC per ricostruire implicitamente un secondo artefatto a partire da un repository esterno.
 
-La build deve fallire se l'RPM richiesto non è disponibile o non si installa correttamente. Dopo l'installazione dell'RPM, eseguire almeno:
+L'ordine resta importante: **`krisCC` deve essere installato prima che KrisOS generi `/usr/share/krisos/owned-packages.txt` e `owned-nevra.txt`**. In questo modo viene classificato correttamente come pacchetto della base immutabile e `rk` non proverà mai a trattarlo come pacchetto persistente dell'overlay.
+
+La build deve fallire se l'RPM richiesto non è disponibile, se l'hash non coincide o se l'RPM non si installa correttamente. Dopo l'installazione eseguire almeno:
 
 ```bash
 rpm -q krisCC
@@ -69,11 +73,10 @@ Provare sulla macchina reale:
 ```bash
 sudo bootc status --format json | head -c 500
 dnf5 repo list --all --json
-dnf5 config-manager --help
 rpm -q krisCC
 rpm -V krisCC
 ```
 
-Poi verificare manualmente `rk sync/add/rm`, ricerca RPM con dimensioni e preview dipendenze, Flatpak, Podman, repository enable/disable, upgrade/rollback BootC, restart NetworkManager/CUPS/Bluetooth e creazione dei backup.
+Poi verificare manualmente `rk plan/add/rm/sync`, ricerca RPM con dimensioni e piano dipendenze, Flatpak, Podman, update BootC, restart NetworkManager/CUPS/Bluetooth e creazione dei backup.
 
 Repository: https://github.com/krism-eu/krisCC
