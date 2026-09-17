@@ -43,7 +43,7 @@ jobs:
         run: |
           rpmspec -P packaging/krisCC.spec >/dev/null
           test "$(rpmspec -q --qf '%{NAME}\n' packaging/krisCC.spec | head -n1)" = "krisCC"
-          test "$(rpmspec -q --qf '%{VERSION}-%{RELEASE}\n' packaging/krisCC.spec | head -n1)" = "0.4.0-11.fc44"
+          test "$(rpmspec -q --qf '%{VERSION}-%{RELEASE}\n' packaging/krisCC.spec | head -n1)" = "0.5.0-1.fc44"
           ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Provides:[[:space:]]+(kcc|k-controlc)([[:space:]=]|$)'
           ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Obsoletes:[[:space:]]+(kcc|k-controlc)([[:space:]<=>]|$)'
           ! rpmspec -P packaging/krisCC.spec | grep -Eq '^Requires:[[:space:]]+dnf5-plugins([[:space:]]|$)'
@@ -72,8 +72,8 @@ jobs:
               --exclude='./stage' \
               --exclude='./artifacts' \
               --exclude='./krisCC-stage.tar.gz' \
-              --transform='s,^\./,krisCC-0.4.0/,' \
-              -czf "$HOME/rpmbuild/SOURCES/krisCC-0.4.0.tar.gz" .
+              --transform='s,^\./,krisCC-0.5.0/,' \
+              -czf "$HOME/rpmbuild/SOURCES/krisCC-0.5.0.tar.gz" .
             cp "$GITHUB_WORKSPACE/packaging/krisCC.spec" "$HOME/rpmbuild/SPECS/krisCC.spec"
             rpmbuild -ba "$HOME/rpmbuild/SPECS/krisCC.spec"
             mkdir -p "$GITHUB_WORKSPACE/artifacts/rpm" "$GITHUB_WORKSPACE/artifacts/srpm" "$GITHUB_WORKSPACE/artifacts/stage"
@@ -82,17 +82,17 @@ jobs:
             cp "$GITHUB_WORKSPACE/krisCC-stage.tar.gz" "$GITHUB_WORKSPACE/artifacts/stage/"
             cd "$GITHUB_WORKSPACE/artifacts/rpm"
             sha256sum krisCC-*.rpm > SHA256SUMS
-            grep -Eq '^[0-9a-f]{64}[[:space:]]+krisCC-0[.]4[.]0-11.*[.]rpm$' SHA256SUMS
+            grep -Eq '^[0-9a-f]{64}[[:space:]]+krisCC-0[.]5[.]0-1.*[.]rpm$' SHA256SUMS
           ) 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/logs/rpmbuild.log"
 
       - name: Inspect built RPM artifact
         shell: bash
         run: |
           set -euxo pipefail
-          rpm_file='artifacts/rpm/krisCC-0.4.0-11.fc44.x86_64.rpm'
+          rpm_file='artifacts/rpm/krisCC-0.5.0-1.fc44.x86_64.rpm'
           test -f "$rpm_file"
           test "$(rpm -qp --qf '%{NAME}\n' "$rpm_file")" = "krisCC"
-          test "$(rpm -qp --qf '%{VERSION}-%{RELEASE}\n' "$rpm_file")" = "0.4.0-11.fc44"
+          test "$(rpm -qp --qf '%{VERSION}-%{RELEASE}\n' "$rpm_file")" = "0.5.0-1.fc44"
           rpm -qpl "$rpm_file" | grep -Fxq '/usr/bin/krisCC'
           rpm -qpl "$rpm_file" | grep -Fxq '/usr/share/applications/krisCC.desktop'
           rpm -qpl "$rpm_file" | grep -Fxq '/usr/share/polkit-1/actions/org.kriscc.controlcenter.policy'
@@ -127,7 +127,7 @@ jobs:
           KRISCC_SMOKE_TEST: "1"
         run: |
           set -euxo pipefail
-          rpm_file="$GITHUB_WORKSPACE/artifacts/rpm/krisCC-0.4.0-11.fc44.x86_64.rpm"
+          rpm_file="$GITHUB_WORKSPACE/artifacts/rpm/krisCC-0.5.0-1.fc44.x86_64.rpm"
           test -f "$rpm_file"
           (cd "$GITHUB_WORKSPACE/artifacts/rpm" && sha256sum -c SHA256SUMS)
           dnf -y install "$rpm_file"
