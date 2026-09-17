@@ -1,14 +1,14 @@
 # krisCC
 
-krisCC è un **Control Center personale Kirigami per KrisOS / Fedora bootc**. Non vuole sostituire Plasma System Settings: rete, utenti, firewall, display, audio e preferenze desktop restano agli strumenti KDE già presenti.
+krisCC è un **Control Center personale Kirigami per KrisOS / Fedora bootc**. Non vuole sostituire Plasma System Settings: rete, utenti, firewall, display, audio e preferenze desktop restano agli strumenti KDE già presenti. L'interfaccia resta volutamente nello stile Breeze/Plasma, usando componenti Kirigami e icone KDE senza introdurre un tema proprietario.
 
 ## Cosa gestisce
 
 - **Panoramica**: sistema, BootC, storage, pacchetti persistenti e Quick System Info.
 - **Software RPM**: ricerca, installati, aggiornabili, pacchetti recenti, provenienza Base/Persistente/Locale e piano della transazione tramite la stessa policy `rk` usata per installare.
-- **Flatpak**: ricerca strutturata, installati, aggiornamenti, remote e integrazione Flathub senza dipendere da Discover.
+- **Flatpak**: ricerca strutturata, installati, aggiornamenti, update singolo o completo del profilo utente, remote e integrazione Flathub senza dipendere da Discover.
 - **Container / Podman**: elenco container, stato, immagine, dimensione, informazioni, log, start/stop/restart e rinomina. Nessuna rimozione automatica.
-- **BootC**: stato del deployment, controllo aggiornamenti, download/preparazione e applicazione. KrisOS supporta un solo deployment e krisCC non espone rollback.
+- **BootC**: stato del deployment, controllo del registry remoto con `bootc upgrade --check`, download/preparazione e applicazione. KrisOS supporta un solo deployment e krisCC non espone rollback.
 - **Strumenti e comandi**: utility amministrative mirate, servizi rapidi e launcher KDE disponibili sul sistema.
 - **Backup e recovery**: `rk sync`, azioni di sessione e snapshot `tar.gz` della configurazione o della home.
 
@@ -16,7 +16,7 @@ krisCC è un **Control Center personale Kirigami per KrisOS / Fedora bootc**. No
 
 Le modifiche privilegiate passano da `pkexec` con una allowlist C++ stretta. La policy non usa `auth_admin_keep`. Sono ammesse soltanto le combinazioni previste per `rk` e `bootc`; krisCC non espone più mutazioni arbitrarie dei repository DNF5 e non esegue shell root generiche.
 
-Le query DNF5 sono read-only e limitate ai repository `fedora` e `updates`, gli stessi repository ammessi da `rk`. L'anteprima RPM usa `rk plan`, quindi la UI non presenta una transazione che l'installazione reale rifiuterebbe. Le operazioni Podman dell'utente restano rootless.
+Le query DNF5 sono read-only e limitate ai repository `fedora` e `updates`, gli stessi repository ammessi da `rk`. L'anteprima RPM usa `rk plan`, quindi la UI non presenta una transazione che l'installazione reale rifiuterebbe. Le operazioni Flatpak restano rootless nel profilo utente; anche gli aggiornamenti usano `flatpak update --user`. Le operazioni Podman dell'utente restano rootless.
 
 ## Compatibilità KrisOS
 
@@ -29,6 +29,8 @@ krisCC usa in via primaria il layout corrente di KrisOS:
 Per la fase di migrazione mantiene un fallback in sola lettura verso i vecchi percorsi `/var/lib/raku-kris` e `/usr/share/raku-kris`. Il layout KrisOS ha sempre precedenza.
 
 Il pacchetto RPM e l'eseguibile si chiamano **`krisCC`**. Il nome è volutamente distinto dal pacchetto Fedora `kcc`, con il quale deve poter convivere. Lo spec mantiene `Provides/Obsoletes` soltanto per il vecchio pacchetto `k-controlc`, così DNF può sostituirlo senza lasciare duplicati.
+
+krisCC è parte della base immutabile di KrisOS: le release normali del control center arrivano insieme a una nuova immagine KrisOS, non tramite `rk` o un aggiornamento RPM separato sul sistema installato.
 
 ## Build locale
 
@@ -49,7 +51,7 @@ cmake --build build
 
 ## RPM e integrazione nell'immagine
 
-Lo spec RPM è `packaging/krisCC.spec` e produce **`krisCC-0.4.0-*.rpm`**. La CI Fedora 44 costruisce l'RPM, lo installa nel container, verifica la sostituzione di un vecchio pacchetto `k-controlc` e riesegue lo smoke test con `/usr/bin/krisCC`.
+Lo spec RPM è `packaging/krisCC.spec` e produce **`krisCC-0.4.0-*.rpm`**. La CI Fedora 44 costruisce l'RPM, lo installa nel container, verifica la sostituzione di un vecchio pacchetto `k-controlc`, riesegue lo smoke test e produce `SHA256SUMS` degli artefatti RPM/SRPM.
 
 Il flusso previsto per KrisOS è:
 
@@ -73,4 +75,4 @@ Repository: https://github.com/krism-eu/krisCC
 
 ## Test reale
 
-La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging, sostituzione `k-controlc` → `krisCC` e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk plan/add/rm/sync`, autenticazione Polkit, ricerca RPM con dimensioni e dipendenze, Flatpak, Podman, update BootC, restart servizi e backup della home/configurazione.
+La CI verifica compilazione, caricamento QML/Kirigami, controlli DNF5 locali, spec RPM, installazione di staging, sostituzione `k-controlc` → `krisCC` e installazione/smoke dell'RPM. Prima di considerare una release definitiva vanno comunque provati sulla macchina reale: `rk plan/add/rm/sync`, autenticazione Polkit, ricerca RPM con dimensioni e dipendenze, aggiornamenti Flatpak, Podman, `bootc upgrade --check`, download/apply BootC, restart servizi e backup della home/configurazione.
