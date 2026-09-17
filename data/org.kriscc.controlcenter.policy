@@ -46,4 +46,19 @@
     <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/bootc</annotate>
     <annotate key="org.freedesktop.policykit.exec.argv1">upgrade</annotate>
   </action>
+  <action id="org.kriscc.controlcenter.boot.next-uefi">
+    <description>Select the one-shot UEFI boot entry</description>
+    <message>Authentication is required to select the next UEFI boot entry</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/sbin/efibootmgr</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">-n</annotate>
+  </action>
+
+  <action id="org.kriscc.controlcenter.boot.next-grub">
+    <description>Select the one-shot GRUB boot entry</description>
+    <message>Authentication is required to select the next GRUB boot entry</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/sbin/grub2-reboot</annotate>
+  </action>
+
 </policyconfig>
