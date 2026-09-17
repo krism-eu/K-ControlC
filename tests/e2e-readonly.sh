@@ -107,7 +107,8 @@ test -f data/org.kriscc.KrisCC.metainfo.xml
 test ! -e data/org.kcontrolc.KControlC.metainfo.xml
 
 grep -q '^Name:[[:space:]]*krisCC$' packaging/krisCC.spec
-grep -q '^Release:[[:space:]]*10%{?dist}$' packaging/krisCC.spec
+grep -Eq '^Version:[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+$' packaging/krisCC.spec
+grep -Eq '^Release:[[:space:]]*[0-9]+%\{\?dist\}$' packaging/krisCC.spec
 if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
   echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
   exit 1
