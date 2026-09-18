@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 project(krisCC
-    VERSION 0.5.0
+    VERSION 0.5.1
     DESCRIPTION "Personal Control Center for KrisOS and Fedora bootc"
     LANGUAGES CXX
 )
