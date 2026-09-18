@@ -1,6 +1,6 @@
 Name:           krisCC
 Version:        0.5.1
-Release:        8%{?dist}
+Release:        9%{?dist}
 Summary:        krisCC personal control center for KrisOS and Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/krisCC
@@ -44,12 +44,18 @@ Settings.
 %license LICENSE
 %doc README.md
 %{_bindir}/krisCC
+%{_libexecdir}/kriscc/bootc-status
 %{_datadir}/applications/krisCC.desktop
 %{_datadir}/polkit-1/actions/org.kriscc.controlcenter.policy
 %{_datadir}/metainfo/org.kriscc.KrisCC.metainfo.xml
 %{_datadir}/icons/hicolor/scalable/apps/krisCC.svg
 
 %changelog
+* Fri Sep 18 2026 krism-eu - 0.5.1-9
+- Harden repository management to HTTPS-only and align it with the KrisOS rk gate
+- Separate read-only bootc status behind a fixed Polkit wrapper
+- Exclude rebuildable Flatpak/Podman stores from home backups and tighten Flatpak user scope
+
 * Fri Sep 18 2026 krism-eu - 0.5.1-8
 - K1.0 restyle integration candidate with complete UI review and validated repository/container/backup workflows
 - Keep 0.5.1-7 on main unchanged as the stable backup component
