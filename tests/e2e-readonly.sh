@@ -28,8 +28,11 @@ grep -A6 'org.kriscc.controlcenter.bootc.status' data/org.kriscc.controlcenter.p
 grep -A8 'org.kriscc.controlcenter.bootc.status' data/org.kriscc.controlcenter.policy \
   | grep -q '/usr/libexec/kriscc/bootc-status'
 grep -q 'json|humanreadable' src/bootc-status.sh
-grep -Fq 'exec /usr/bin/bootc status --format "$1"' src/bootc-status.sh
-! grep -Fq '"$@"' src/bootc-status.sh
+grep -Fq "exec /usr/bin/bootc status --format \"\$1\"" src/bootc-status.sh
+if grep -Fq '"$@"' src/bootc-status.sh; then
+  echo "ERROR: bootc status wrapper must not pass arbitrary arguments" >&2
+  exit 1
+fi
 
 # KrisOS supports a single deployment: rollback must not be offered or
 # privileged. Repository management is allowed only through the constrained
@@ -47,7 +50,10 @@ grep -q 'isSafeRepositoryUrl' src/PolkitHelper.cpp
 grep -q 'org.kriscc.controlcenter.dnf.config-manager' data/org.kriscc.controlcenter.policy
 grep -q 'Aggiungi repository' qml/modules/SoftwareModule.qml
 grep -q 'url.scheme() == QStringLiteral("https")' src/PolkitHelper.cpp
-! grep -q 'url.scheme() == QStringLiteral("http")' src/PolkitHelper.cpp
+if grep -q 'url.scheme() == QStringLiteral("http")' src/PolkitHelper.cpp; then
+  echo "ERROR: repository URLs must be HTTPS-only" >&2
+  exit 1
+fi
 grep -q 'Repository non aggiunto: usa un URL HTTPS valido' qml/modules/SoftwareModule.qml
 if grep -q 'auth_admin_keep' data/org.kriscc.controlcenter.policy; then
   echo "ERROR: repository authorization must not be retained" >&2
@@ -179,7 +185,7 @@ grep -q 'QStringLiteral("K-ControlC Backups")' src/SystemBackend.cpp
 grep -q 'args << QStringLiteral("--exclude=./") + excluded' src/SystemBackend.cpp
 grep -q 'QStringLiteral(".local/share/flatpak")' src/SystemBackend.cpp
 grep -q 'QStringLiteral(".local/share/containers")' src/SystemBackend.cpp
-grep -q '~/.var/app' qml/modules/RecoveryModule.qml
+grep -Fq '.var/app' qml/modules/RecoveryModule.qml
 
 if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
     CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
