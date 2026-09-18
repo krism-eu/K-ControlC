@@ -13,6 +13,7 @@ Kirigami.ScrollablePage {
     property string listError: ""
     property string installFilter: "all"
     property var detailPackage: null
+    property string repoValidationError: ""
 
     function humanSize(bytes) {
         if (!bytes || bytes <= 0)
@@ -366,7 +367,7 @@ Kirigami.ScrollablePage {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     opacity: 0.72
-                    text: qsTr("Repository DNF configurati nel sistema. Puoi aggiungere un file .repo remoto e abilitare o disabilitare repository esistenti. rk continua a validare ogni installazione persistente.")
+                    text: qsTr("Repository DNF configurati nel sistema. Puoi aggiungere un file .repo remoto via HTTPS e abilitare o disabilitare repository esistenti. rk usa solo repository abilitati e verifica le firme RPM prima di ogni transazione.")
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -381,6 +382,7 @@ Kirigami.ScrollablePage {
                 }
                 Controls.BusyIndicator { visible: SoftwareBackend.busy || PolkitHelper.running; running: visible; Layout.alignment: Qt.AlignHCenter }
                 Kirigami.InlineMessage { Layout.fillWidth: true; visible: SoftwareBackend.errorText.length > 0; type: Kirigami.MessageType.Error; text: SoftwareBackend.errorText }
+                Kirigami.InlineMessage { Layout.fillWidth: true; visible: root.repoValidationError.length > 0; type: Kirigami.MessageType.Error; text: root.repoValidationError }
 
                 Repeater {
                     model: SoftwareBackend.repositories
@@ -442,7 +444,7 @@ Kirigami.ScrollablePage {
             Controls.Label {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
-                text: qsTr("Inserisci l'URL HTTPS/HTTP di un file .repo. DNF5 ne verificherà la validità prima di salvarlo.")
+                text: qsTr("Inserisci l'URL HTTPS di un file .repo. HTTP e altri schemi non sono consentiti.")
             }
             Controls.TextField {
                 id: repoUrlField
@@ -453,9 +455,13 @@ Kirigami.ScrollablePage {
         }
         onAccepted: {
             var url = repoUrlField.text.trim()
-            if (url.length > 0)
+            root.repoValidationError = ""
+            if (!/^https:\/\/[^\s]+$/i.test(url)) {
+                root.repoValidationError = qsTr("Repository non aggiunto: usa un URL HTTPS valido.")
+            } else {
                 root.runPrivileged("/usr/bin/dnf5",
                     ["config-manager", "addrepo", "--from-repofile=" + url])
+            }
             repoUrlField.clear()
         }
         onRejected: repoUrlField.clear()
@@ -507,7 +513,7 @@ Kirigami.ScrollablePage {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
                 opacity: 0.72
-                text: qsTr("L'anteprima usa la stessa policy rk dell'installazione reale: repository Fedora supportati, base immutabile protetta e architetture consentite.")
+                text: qsTr("L'anteprima usa la stessa policy rk dell'installazione reale: repository DNF abilitati, firme RPM obbligatorie, base immutabile protetta e architetture consentite.")
             }
             Controls.BusyIndicator { visible: UtilityBackend.busy; running: visible; Layout.alignment: Qt.AlignHCenter }
 
