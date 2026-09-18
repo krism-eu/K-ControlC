@@ -161,7 +161,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cppcheck             --std=c++17             --enable=warning,performance,portability             --error-exitcode=1             --suppress=missingIncludeSystem             --inline-suppr             --quiet             src
+          cppcheck \
+            --std=c++17 \
+            --library=qt \
+            --enable=warning,performance,portability \
+            --error-exitcode=1 \
+            --suppress=missingIncludeSystem \
+            --inline-suppr \
+            --quiet \
+            src
 
   rpm-smoke:
     needs: build-fedora
