@@ -88,7 +88,236 @@ jobs:
             cp "$GITHUB_WORKSPACE/krisCC-stage.tar.gz" "$GITHUB_WORKSPACE/artifacts/stage/"
             cd "$GITHUB_WORKSPACE/artifacts/rpm"
             sha256sum krisCC-*.rpm > SHA256SUMS
-            grep -Eq '^[0-9a-f]{64}[[:space:]]+krisCC-0[.]5[.]1-3.*[.]rpm$' SHA256SUMS
+            grep -Eq '^[0-9a-f]{64}[[:space:]]+krisCC-0[.]5[.]1-4.*[.]rpm
+          ) 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/logs/rpmbuild.log"
+
+      - name: Inspect built RPM artifact
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rpm_file='artifacts/rpm/krisCC-0.5.1-4.fc44.x86_64.rpm'
+          test -f "$rpm_file"
+          test "$(rpm -qp --qf '%{NAME}\n' "$rpm_file")" = "krisCC"
+          test "$(rpm -qp --qf '%{VERSION}-%{RELEASE}\n' "$rpm_file")" = "0.5.1-4.fc44"
+          rpm -qpl "$rpm_file" | grep -Fxq '/usr/bin/krisCC'
+          rpm -qpl "$rpm_file" | grep -Fxq '/usr/share/applications/krisCC.desktop'
+          rpm -qpl "$rpm_file" | grep -Fxq '/usr/share/polkit-1/actions/org.kriscc.controlcenter.policy'
+          rpm -qpR "$rpm_file" | grep -Eq '^polkit([[:space:]<=>]|$)'
+          ! rpm -qp --provides "$rpm_file" | grep -Eq '^(kcc|k-controlc)([[:space:]=]|$)'
+          (cd artifacts/rpm && sha256sum -c SHA256SUMS)
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: krisCC-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: warn
+
+  release-audit:
+    runs-on: ubuntu-24.04
+    container: fedora:44
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install strict audit tooling
+        run: >-
+          dnf -y install gcc-c++ cmake ninja-build python3
+          qt6-qtbase-devel qt6-qtdeclarative-devel kf6-kirigami-devel
+          ShellCheck cppcheck libxml2 appstream desktop-file-utils
+
+      - name: Semantic release contract
+        run: python3 ./tests/release-audit.py
+
+      - name: Shell syntax and ShellCheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tests/e2e-readonly.sh
+          find tests -maxdepth 1 -type f -name '*.sh' -print0 | xargs -0 shellcheck -x
+
+      - name: XML AppStream and desktop metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          xmllint --noout data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml
+          desktop-file-validate data/krisCC.desktop
+          appstreamcli validate --no-net data/org.kriscc.KrisCC.metainfo.xml
+
+      - name: Strict C++ build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B audit-build -G Ninja             -DCMAKE_BUILD_TYPE=Release             -DCMAKE_CXX_FLAGS='-Wall -Wextra -Wpedantic -Werror'
+          cmake --build audit-build
+
+      - name: QML lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --build audit-build --target krisCC_qmllint
+
+      - name: C++ static analysis
+        shell: bash
+        run: |
+          set -euo pipefail
+          cppcheck \
+            --std=c++17 \
+            --library=qt \
+            --enable=warning,performance,portability \
+            --error-exitcode=1 \
+            --suppress=missingIncludeSystem \
+            --inline-suppr \
+            --quiet \
+            src
+
+  rpm-smoke:
+    needs: build-fedora
+    runs-on: ubuntu-24.04
+    container: fedora:44
+    steps:
+      - name: Download built artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: krisCC-${{ github.sha }}
+          path: artifacts
+
+      - name: Install and smoke-test built RPM
+        shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+          QT_QUICK_CONTROLS_STYLE: Basic
+          KRISCC_SMOKE_TEST: "1"
+        run: |
+          set -euxo pipefail
+          rpm_file="$GITHUB_WORKSPACE/artifacts/rpm/krisCC-0.5.1-4.fc44.x86_64.rpm"
+          test -f "$rpm_file"
+          (cd "$GITHUB_WORKSPACE/artifacts/rpm" && sha256sum -c SHA256SUMS)
+          dnf -y install "$rpm_file"
+          rpm -q krisCC
+          rpm -V krisCC
+          /usr/bin/krisCC
+
+
+  integration-prerelease:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/kriscc-0.5-minimal'
+    needs: [build-fedora, rpm-smoke, release-audit]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download validated RPM
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: krisCC-${{ github.sha }}
+          path: artifacts
+
+      - name: Publish immutable ISO-integration prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd artifacts/rpm
+          sha256sum -c SHA256SUMS
+
+          rpm_file='krisCC-0.5.1-4.fc44.x86_64.rpm'
+          tag='v0.5.1-4'
+          test -f "$rpm_file"
+          test "$(rpm -qp --qf '%{NAME}' "$rpm_file")" = 'krisCC'
+          test "$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$rpm_file")" = '0.5.1-4.fc44'
+
+          checksum="$(awk -v f="$rpm_file" '$2 == f || $2 == "./" f {print $1}' SHA256SUMS)"
+          [[ "$checksum" =~ ^[0-9a-f]{64}$ ]]
+
+          mkdir -p /tmp/kriscc-existing
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY"               -p "$rpm_file" -p SHA256SUMS -D /tmp/kriscc-existing
+            existing="$(awk -v f="$rpm_file" '$2 == f || $2 == "./" f {print $1}' /tmp/kriscc-existing/SHA256SUMS)"
+            test "$existing" = "$checksum"
+            (cd /tmp/kriscc-existing && sha256sum -c SHA256SUMS)
+            echo "Prerelease $tag already contains the exact validated RPM."
+            exit 0
+          fi
+
+          gh release create "$tag"             --repo "$GITHUB_REPOSITORY"             --target "$GITHUB_SHA"             --prerelease             --title "krisCC $tag — ISO integration candidate"             --notes "Validated krisCC integration candidate for the separate KrisOS ISO branch. This is not the stable KrisOS component until promoted from main."             "$rpm_file" SHA256SUMS
+
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build-fedora, rpm-smoke, release-audit]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download validated artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: krisCC-${{ github.sha }}
+          path: artifacts
+
+      - name: Resolve immutable component release
+        id: component
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd artifacts/rpm
+          sha256sum -c SHA256SUMS
+
+          rpm_file=''
+          while IFS= read -r candidate; do
+            if [[ "$(rpm -qp --qf '%{NAME}' "$candidate")" == 'krisCC' ]]; then
+              if [[ -n "$rpm_file" ]]; then
+                echo 'More than one runtime krisCC RPM found.' >&2
+                exit 1
+              fi
+              rpm_file="$candidate"
+            fi
+          done < <(find . -maxdepth 1 -type f -name 'krisCC-*.x86_64.rpm' -print | sort)
+
+          test -n "$rpm_file"
+          base="$(basename "$rpm_file")"
+          if [[ ! "$base" =~ ^krisCC-([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)\.fc44\.x86_64\.rpm$ ]]; then
+            echo "Unexpected RPM filename: $base" >&2
+            exit 1
+          fi
+          tag="v${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
+          checksum="$(awk -v f="$base" '$2 == f || $2 == "./" f {print $1}' SHA256SUMS)"
+          [[ "$checksum" =~ ^[0-9a-f]{64}$ ]]
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "rpm=$base" >> "$GITHUB_OUTPUT"
+          echo "sha256=$checksum" >> "$GITHUB_OUTPUT"
+
+      - name: Publish or verify component release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.component.outputs.tag }}
+          RPM: ${{ steps.component.outputs.rpm }}
+          SHA256: ${{ steps.component.outputs.sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/kriscc-existing
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p SHA256SUMS -D /tmp/kriscc-existing
+            existing="$(awk -v f="$RPM" '$2 == f || $2 == "./" f {print $1}' /tmp/kriscc-existing/SHA256SUMS)"
+            if [[ "$existing" != "$SHA256" ]]; then
+              echo "Release $TAG already exists with different RPM content; bump packaging Release before publishing new krisCC code." >&2
+              exit 1
+            fi
+            echo "Release $TAG already contains this exact component."
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
+            echo "Release $TAG promoted to stable."
+            exit 0
+          fi
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "krisCC $TAG" \
+            --notes "Validated krisCC component built from $GITHUB_SHA. KrisOS performs final runtime integration before adopting this release." \
+            "artifacts/rpm/$RPM" \
+            artifacts/rpm/SHA256SUMS
+ SHA256SUMS
           ) 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/logs/rpmbuild.log"
 
       - name: Inspect built RPM artifact
