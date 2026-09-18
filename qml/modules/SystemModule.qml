@@ -534,7 +534,7 @@ Kirigami.ScrollablePage {
         onAccepted: {
             root.ownBootAction = true
             root.bootActionKind = "uefi"
-            PolkitHelper.execute("/usr/sbin/efibootmgr", ["-n", nextUefiDialog.token])
+            PolkitHelper.execute("/usr/bin/efibootmgr", ["-n", nextUefiDialog.token])
         }
     }
 
@@ -549,7 +549,7 @@ Kirigami.ScrollablePage {
         onAccepted: {
             root.ownBootAction = true
             root.bootActionKind = "grub"
-            PolkitHelper.execute("/usr/sbin/grub2-reboot", [nextGrubDialog.entryId])
+            PolkitHelper.execute("/usr/bin/grub2-reboot", [nextGrubDialog.entryId])
         }
     }
 }
