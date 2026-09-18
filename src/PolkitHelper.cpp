@@ -112,10 +112,10 @@ bool PolkitHelper::isSafeBootToken(const QString &token) const
 
 bool PolkitHelper::isSafeGrubEntry(const QString &entry) const
 {
-    if (entry.isEmpty() || entry.size() > 256)
+    if (entry.isEmpty() || entry.size() > 256 || entry.startsWith(QLatin1Char('-')))
         return false;
     for (const QChar ch : entry) {
-        if (ch.isNull() || ch == QLatin1Char('\n') || ch == QLatin1Char('\r'))
+        if (ch.isNull() || ch.unicode() < 0x20 || ch.unicode() == 0x7f)
             return false;
     }
     return true;
