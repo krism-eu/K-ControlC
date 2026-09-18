@@ -7,17 +7,17 @@ krisCC è un **Control Center personale Kirigami per KrisOS / Fedora bootc**. No
 - **Panoramica**: stato essenziale di sistema, aggiornamenti, storage e Quick System Info.
 - **Software RPM**: ricerca, installati, aggiornabili, pacchetti recenti, provenienza Base/Persistente/Locale e piano della transazione tramite la stessa policy `rk` usata per installare.
 - **Flatpak**: ricerca strutturata, installati, aggiornamenti, update singolo o completo del profilo utente, remote e integrazione Flathub senza dipendere da Discover.
-- **Container / Podman**: elenco container, stato, immagine, dimensione, informazioni, log, start/stop/restart e rinomina. Nessuna rimozione automatica.
+- **Container / Podman**: elenco container e immagini locali, stato, nome/tag, dimensione, informazioni, log, start/stop/restart, rinomina e rimozione esplicita delle immagini senza force.
 - **Sistema**: centro aggiornamenti BootC/Flatpak/rk, salute e sicurezza read-only, storage, voci UEFI e GRUB/BLS, selezione one-shot del prossimo avvio e strumenti KDE essenziali.
 - **Comandi**: bookmark read-only per systemd, journal, rete, mount, partizioni, processi, rk, Flatpak, Podman e boot, con comando visibile/copiabile.
-- **Backup e recovery**: creazione, elenco, verifica e ripristino degli snapshot `tar.gz`, più `rk status/sync` e azioni di sessione.
+- **Backup e recovery**: creazione, anteprima precisa di inclusioni/esclusioni, elenco, verifica e ripristino degli snapshot `tar.gz`, più `rk status/sync`.
 - **Cronologia**: registro locale delle operazioni mutanti eseguite da krisCC. Non vengono salvati output completi dei comandi.
 
 ## Sicurezza
 
-Le modifiche privilegiate passano da `pkexec` con una allowlist C++ stretta. La policy non usa `auth_admin_keep`. Sono ammesse soltanto le combinazioni previste per `rk`, `bootc` e la selezione one-shot del prossimo boot; krisCC non espone più mutazioni arbitrarie dei repository DNF5 e non esegue shell root generiche.
+Le modifiche privilegiate passano da `pkexec` con una allowlist C++ stretta. La policy non usa `auth_admin_keep`. Sono ammesse soltanto le combinazioni previste per `rk`, `bootc`, `dnf5 config-manager` e la selezione one-shot del prossimo boot. La gestione repository accetta solo add da URL HTTP(S) validato e enable/disable di ID validi; krisCC non esegue shell root generiche.
 
-Le query DNF5 sono read-only e limitate ai repository `fedora` e `updates`, gli stessi repository ammessi da `rk`. L'anteprima RPM usa `rk plan`, quindi la UI non presenta una transazione che l'installazione reale rifiuterebbe. Le operazioni Flatpak restano rootless nel profilo utente; anche gli aggiornamenti usano `flatpak update --user`. Le operazioni Podman dell'utente restano rootless.
+Le query DNF5 leggono i repository attualmente abilitati nel sistema. L'aggiunta e l'abilitazione/disabilitazione passano dal plugin `dnf5 config-manager`; l'anteprima e ogni installazione/rimozione RPM persistente continuano invece a passare da `rk plan/add/rm`, che resta il gate finale della policy KrisOS. Le operazioni Flatpak e Podman restano rootless nel profilo utente.
 
 ## Compatibilità KrisOS
 
