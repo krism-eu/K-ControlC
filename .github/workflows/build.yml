@@ -34,7 +34,14 @@ jobs:
           QT_QUICK_BACKEND: software
           QT_QUICK_CONTROLS_STYLE: Basic
           KRISCC_SMOKE_TEST: "1"
-        run: ./build/krisCC
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./build/krisCC 2>&1 | tee /tmp/kriscc-qml-smoke.log
+          if grep -Ei 'Binding loop detected|Unable to assign .*QQuickTextInput|Created graphical object was not placed in the graphics scene|QQmlApplicationEngine failed|Type .* unavailable' /tmp/kriscc-qml-smoke.log; then
+            echo "ERROR: QML runtime smoke detected a known UI regression" >&2
+            exit 1
+          fi
 
       - name: Validate integration test syntax
         run: bash -n ./tests/e2e-readonly.sh
