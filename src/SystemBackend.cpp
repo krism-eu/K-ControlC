@@ -221,7 +221,8 @@ bool SystemBackend::launchQuickAction(const QString &actionId) const
         const QString flatpak = resolveExecutable(QStringLiteral("flatpak"));
         return !flatpak.isEmpty()
             && QProcess::startDetached(konsole, {QStringLiteral("-e"), flatpak,
-                                                 QStringLiteral("uninstall"), QStringLiteral("--unused")});
+                                                 QStringLiteral("uninstall"), QStringLiteral("--user"),
+                                                 QStringLiteral("--unused")});
     }
     if (actionId == QStringLiteral("journal-errors")) {
         const QString journalctl = resolveExecutable(QStringLiteral("journalctl"));
@@ -403,7 +404,8 @@ bool SystemBackend::verifySnapshot(const QString &path)
     const QPointer<QProcess> guarded(process);
     m_backupProcess = process;
     m_backupCancelled = false;
-    process->setProcessChannelMode(QProcess::MergedChannels);
+    process->setProcessChannelMode(QProcess::SeparateChannels);
+    process->setStandardOutputFile(QProcess::nullDevice());
     setBackupBusy(true);
     setBackupResult(tr("Verifica archivio in corso…"), canonical, QStringLiteral("running"));
 
@@ -411,7 +413,7 @@ bool SystemBackend::verifySnapshot(const QString &path)
             [this, guarded, canonical](int exitCode, QProcess::ExitStatus status) {
         if (!guarded || guarded != m_backupProcess)
             return;
-        const QString details = QString::fromUtf8(guarded->readAllStandardOutput()).trimmed();
+        const QString details = QString::fromUtf8(guarded->readAllStandardError()).trimmed();
         const bool cancelled = m_backupCancelled;
         m_backupProcess = nullptr;
         guarded->deleteLater();
@@ -429,6 +431,21 @@ bool SystemBackend::verifySnapshot(const QString &path)
             return;
         }
         setBackupResult(details.isEmpty() ? tr("Archivio non valido o danneggiato.") : details,
+                        canonical, QStringLiteral("error"));
+        OperationLog::append(QStringLiteral("Backup"), QStringLiteral("verify"),
+                             QStringLiteral("error"), QFileInfo(canonical).fileName());
+    });
+
+    connect(process, &QProcess::errorOccurred, this,
+            [this, guarded, canonical](QProcess::ProcessError error) {
+        if (!guarded || guarded != m_backupProcess || error != QProcess::FailedToStart)
+            return;
+        const QString message = guarded->errorString();
+        m_backupProcess = nullptr;
+        guarded->deleteLater();
+        m_backupCancelled = false;
+        setBackupBusy(false);
+        setBackupResult(tr("Impossibile avviare la verifica: %1").arg(message),
                         canonical, QStringLiteral("error"));
         OperationLog::append(QStringLiteral("Backup"), QStringLiteral("verify"),
                              QStringLiteral("error"), QFileInfo(canonical).fileName());
@@ -491,6 +508,21 @@ bool SystemBackend::restoreSnapshot(const QString &path)
             return;
         }
         setBackupResult(details.isEmpty() ? tr("Ripristino non riuscito.") : details,
+                        canonical, QStringLiteral("error"));
+        OperationLog::append(QStringLiteral("Backup"), QStringLiteral("restore"),
+                             QStringLiteral("error"), QFileInfo(canonical).fileName());
+    });
+
+    connect(process, &QProcess::errorOccurred, this,
+            [this, guarded, canonical](QProcess::ProcessError error) {
+        if (!guarded || guarded != m_backupProcess || error != QProcess::FailedToStart)
+            return;
+        const QString message = guarded->errorString();
+        m_backupProcess = nullptr;
+        guarded->deleteLater();
+        m_backupCancelled = false;
+        setBackupBusy(false);
+        setBackupResult(tr("Impossibile avviare il ripristino: %1").arg(message),
                         canonical, QStringLiteral("error"));
         OperationLog::append(QStringLiteral("Backup"), QStringLiteral("restore"),
                              QStringLiteral("error"), QFileInfo(canonical).fileName());
