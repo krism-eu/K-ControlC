@@ -27,16 +27,22 @@ grep -A6 'org.kriscc.controlcenter.bootc.status' data/org.kriscc.controlcenter.p
   | grep -q '<allow_active>yes</allow_active>'
 
 # KrisOS supports a single deployment: rollback must not be offered or
-# privileged, and repository mutations must not bypass rk policy.
+# privileged. Repository management is allowed only through the constrained
+# DNF5 config-manager path; rk remains the final policy gate for persistent RPMs.
 if grep -RniE 'bootc[^\n]*rollback|"rollback"|Rollback \+ apply|Prepara rollback' \
     qml/modules/SystemModule.qml qml/modules/RecoveryModule.qml \
     src/PolkitHelper.cpp data/org.kriscc.controlcenter.policy; then
   echo "ERROR: unsupported BootC rollback remains exposed" >&2
   exit 1
 fi
-if grep -RniE 'config-manager|addrepo|Aggiungi repository' \
-    qml/modules/SoftwareModule.qml src/PolkitHelper.cpp data/org.kriscc.controlcenter.policy; then
-  echo "ERROR: arbitrary DNF repository mutation remains exposed" >&2
+grep -q 'QStringLiteral("/usr/bin/dnf5")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("config-manager")' src/PolkitHelper.cpp
+grep -q 'isSafeRepositoryId' src/PolkitHelper.cpp
+grep -q 'isSafeRepositoryUrl' src/PolkitHelper.cpp
+grep -q 'org.kriscc.controlcenter.dnf.config-manager' data/org.kriscc.controlcenter.policy
+grep -q 'Aggiungi repository' qml/modules/SoftwareModule.qml
+if grep -q 'auth_admin_keep' data/org.kriscc.controlcenter.policy; then
+  echo "ERROR: repository authorization must not be retained" >&2
   exit 1
 fi
 
@@ -48,11 +54,19 @@ if grep -nE 'dnf5.*install|install.*--assumeno|--assumeno' src/UtilityBackend.cp
   exit 1
 fi
 
-# Package discovery must match the repositories enabled by rk, while the
-# installed inventory remains local and must not be filtered by repository.
-grep -q 'QStringLiteral("--repo=fedora,updates")' src/PackageSearch.cpp
-grep -q 'filter != QStringLiteral("--installed")' src/PackageSearch.cpp
-grep -q 'id != QStringLiteral("fedora") && id != QStringLiteral("updates")' src/SoftwareBackend.cpp
+# Package discovery follows the repositories currently enabled in DNF.
+# Persistent installation still goes through rk, which may reject a package or
+# repository that is outside the KrisOS policy. Installed inventory stays local.
+if grep -q 'QStringLiteral("--repo=fedora,updates")' src/PackageSearch.cpp; then
+  echo "ERROR: package discovery is still hard-coded to fedora,updates" >&2
+  exit 1
+fi
+if grep -q 'id != QStringLiteral("fedora") && id != QStringLiteral("updates")' src/SoftwareBackend.cpp; then
+  echo "ERROR: repository UI still hides configured repositories" >&2
+  exit 1
+fi
+grep -q 'QStringLiteral("repoquery"), QStringLiteral("--available")' src/PackageSearch.cpp
+grep -q 'args << QStringLiteral("list") << filter << QStringLiteral("--json")' src/PackageSearch.cpp
 
 # Flatpak management is deliberately per-user. Inventory, remotes and mutations
 # must all use the same installation scope so the UI never shows system refs it
@@ -196,6 +210,9 @@ grep -A5 'flatpak-unused' src/SystemBackend.cpp | grep -q 'QStringLiteral("--use
 grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
 grep -q 'OperationLog::append' src/SystemBackend.cpp
 grep -q 'src/OperationLog.cpp src/OperationLog.h' CMakeLists.txt
+grep -q 'Q_INVOKABLE QVariantList backupPreview' src/SystemBackend.h
+grep -q 'Q_INVOKABLE QVariantList operationHistoryEntries' src/SystemBackend.h
+grep -q 'Q_INVOKABLE QString flatpakIconPath' src/SystemBackend.h
 
 # Next-boot selection is one-shot only: BootNext or grub2-reboot, never a permanent BootOrder rewrite.
 grep -q 'QStringLiteral("/usr/bin/efibootmgr")' src/PolkitHelper.cpp
@@ -238,8 +255,30 @@ dnf5 list --installed --json >/dev/null
 echo "Checking repository-backed DNF5 queries when metadata is available..."
 if dnf5 repo list --all --json >/dev/null 2>&1; then
   dnf5 repo list --all --json >/dev/null
-  if dnf5 --repo=fedora,updates repoquery --available \
-      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+  if dnf5 repoquery --available \
+      --queryformat     grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+  dnf5 config-manager --help >/dev/null 2>&1 || { echo "ERROR: dnf5 config-manager runtime is unavailable" >&2; exit 1; }
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
       'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
     grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
     if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
