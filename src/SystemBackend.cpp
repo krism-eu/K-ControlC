@@ -74,6 +74,8 @@ const QStringList &backupHomeExcludes()
     static const QStringList entries = {
         QStringLiteral(".cache"),
         QStringLiteral(".local/share/Trash"),
+        QStringLiteral(".local/share/flatpak"),
+        QStringLiteral(".local/share/containers"),
         QStringLiteral("krisCC Backups"),
         QStringLiteral("KCC Backups"),
         QStringLiteral("K-ControlC Backups")
