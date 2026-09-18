@@ -12,6 +12,7 @@ Kirigami.ApplicationWindow {
     minimumHeight: 600
     visible: !KrisccStartHidden
     title: qsTr("krisCC")
+    Kirigami.Theme.highlightColor: "#c62828"
 
     function replaceForIndex(index) {
         if (index === 1) pageStack.replace(softwarePage)
@@ -69,13 +70,13 @@ Kirigami.ApplicationWindow {
                         root.replaceForIndex(currentIndex)
                 }
 
-                Controls.TabButton { width: topTabs.width / 7; implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Panoramica") }
-                Controls.TabButton { width: topTabs.width / 7; implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("RPM") }
-                Controls.TabButton { width: topTabs.width / 7; implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Flatpak") }
-                Controls.TabButton { width: topTabs.width / 7; implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Container") }
-                Controls.TabButton { width: topTabs.width / 7; implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Sistema") }
-                Controls.TabButton { width: topTabs.width / 7; implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Comandi") }
-                Controls.TabButton { width: topTabs.width / 7; implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Backup") }
+                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Panoramica") }
+                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("RPM") }
+                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Flatpak") }
+                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Container") }
+                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Sistema") }
+                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Comandi") }
+                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Backup") }
             }
         }
     }
