@@ -1,6 +1,6 @@
 Name:           krisCC
 Version:        0.5.1
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        krisCC personal control center for KrisOS and Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/krisCC
@@ -49,6 +49,10 @@ Settings.
 %{_datadir}/icons/hicolor/scalable/apps/krisCC.svg
 
 %changelog
+* Fri Sep 18 2026 krism-eu - 0.5.1-4
+- Optimize backend state accessors without changing the QML architecture
+- Remove the unused duplicate rkStatus API after strict release audit
+
 * Fri Sep 18 2026 krism-eu - 0.5.1-3
 - Correct Fedora 44 usr-merged paths for efibootmgr, grubby and grub2-reboot
 - Supersede the pre-audit 0.5.1-2 candidate
