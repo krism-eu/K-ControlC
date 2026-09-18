@@ -5,6 +5,7 @@
 #include <QDebug>
 #include <QFileInfo>
 #include <QRegularExpression>
+#include <QUrl>
 
 PolkitHelper::PolkitHelper(QObject *parent)
     : QObject(parent)
