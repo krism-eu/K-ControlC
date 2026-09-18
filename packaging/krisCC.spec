@@ -1,6 +1,6 @@
 Name:           krisCC
 Version:        0.5.1
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        krisCC personal control center for KrisOS and Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/krisCC
@@ -49,6 +49,10 @@ Settings.
 %{_datadir}/icons/hicolor/scalable/apps/krisCC.svg
 
 %changelog
+* Fri Sep 18 2026 krism-eu - 0.5.1-6
+- Publish runtime-only release checksums and verify the exact prerelease artifact on promotion
+- Supersede the 0.5.1-5 release-pipeline candidate without changing application behavior
+
 * Fri Sep 18 2026 krism-eu - 0.5.1-5
 - Promote the exact integration-tested RPM when the candidate source tree matches main
 - Avoid treating independent RPM rebuilds as byte-reproducible release artifacts
