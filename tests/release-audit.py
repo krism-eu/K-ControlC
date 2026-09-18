@@ -73,8 +73,8 @@ require(not missing, f"QML bookmark(s) without backend implementation: {missing}
 expected_programs = {
     "/usr/bin/rk",
     "/usr/bin/bootc",
-    "/usr/sbin/efibootmgr",
-    "/usr/sbin/grub2-reboot",
+    "/usr/bin/efibootmgr",
+    "/usr/bin/grub2-reboot",
 }
 qml_privileged_programs = set()
 for qml_path in ("qml/modules/SystemModule.qml", "qml/modules/RecoveryModule.qml"):
@@ -105,8 +105,8 @@ expected_actions = {
     "org.kriscc.controlcenter.rk.add": ("/usr/bin/rk", "add", "auth_admin"),
     "org.kriscc.controlcenter.rk.rm": ("/usr/bin/rk", "rm", "auth_admin"),
     "org.kriscc.controlcenter.bootc.upgrade": ("/usr/bin/bootc", "upgrade", "auth_admin"),
-    "org.kriscc.controlcenter.boot.next-uefi": ("/usr/sbin/efibootmgr", "-n", "auth_admin"),
-    "org.kriscc.controlcenter.boot.next-grub": ("/usr/sbin/grub2-reboot", None, "auth_admin"),
+    "org.kriscc.controlcenter.boot.next-uefi": ("/usr/bin/efibootmgr", "-n", "auth_admin"),
+    "org.kriscc.controlcenter.boot.next-grub": ("/usr/bin/grub2-reboot", None, "auth_admin"),
 }
 require(set(actions) == set(expected_actions), "Polkit action set changed unexpectedly")
 for action_id, (path, argv1, allow_active) in expected_actions.items():
