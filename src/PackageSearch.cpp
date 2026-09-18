@@ -279,8 +279,7 @@ void PackageSearch::startRepoQuery(const QString &term)
 
     const QString packageSpec = QStringLiteral("*") + term + QStringLiteral("*");
     rawProcess->start(QStringLiteral("/usr/bin/dnf5"),
-                      {QStringLiteral("--repo=fedora,updates"),
-                       QStringLiteral("repoquery"), QStringLiteral("--available"),
+                      {QStringLiteral("repoquery"), QStringLiteral("--available"),
                        QStringLiteral("--queryformat"),
                        QStringLiteral("%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n"),
                        packageSpec});
@@ -394,8 +393,6 @@ void PackageSearch::startListQuery(const QString &filter, bool installedEntries)
     });
 
     QStringList args;
-    if (filter != QStringLiteral("--installed"))
-        args << QStringLiteral("--repo=fedora,updates");
     args << QStringLiteral("list") << filter << QStringLiteral("--json");
     rawProcess->start(QStringLiteral("/usr/bin/dnf5"), args);
     QTimer::singleShot(2 * 60 * 1000, rawProcess, [this, process, generation] {
