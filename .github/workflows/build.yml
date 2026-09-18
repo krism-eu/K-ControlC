@@ -65,6 +65,7 @@ jobs:
         run: |
           DESTDIR="$PWD/stage" cmake --install build --prefix /usr
           test -x stage/usr/bin/krisCC
+          test -x stage/usr/libexec/kriscc/bootc-status
           test -f stage/usr/share/applications/krisCC.desktop
           test -f stage/usr/share/icons/hicolor/scalable/apps/krisCC.svg
           test -f stage/usr/share/polkit-1/actions/org.kriscc.controlcenter.policy
@@ -107,6 +108,7 @@ jobs:
           test "$(rpm -qp --qf '%{NAME}\n' "$rpm_file")" = "krisCC"
           test "$(rpm -qp --qf '%{VERSION}-%{RELEASE}\n' "$rpm_file")" = "0.5.1-9.fc44"
           rpm -qpl "$rpm_file" | grep -Fxq '/usr/bin/krisCC'
+          rpm -qpl "$rpm_file" | grep -Fxq '/usr/libexec/kriscc/bootc-status'
           rpm -qpl "$rpm_file" | grep -Fxq '/usr/share/applications/krisCC.desktop'
           rpm -qpl "$rpm_file" | grep -Fxq '/usr/share/polkit-1/actions/org.kriscc.controlcenter.policy'
           rpm -qpR "$rpm_file" | grep -Eq '^polkit([[:space:]<=>]|$)'
@@ -204,6 +206,7 @@ jobs:
           dnf -y install "$rpm_file"
           rpm -q krisCC
           rpm -V krisCC
+          test -x /usr/libexec/kriscc/bootc-status
           /usr/bin/krisCC
 
 
