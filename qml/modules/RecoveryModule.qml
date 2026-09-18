@@ -42,7 +42,7 @@ Kirigami.ScrollablePage {
             Layout.fillWidth: true
             contentItem: ColumnLayout {
                 spacing: Kirigami.Units.largeSpacing
-                Kirigami.Heading { level: 2; text: qsTr("Crea backup") }
+                Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Crea backup") }
                 Controls.Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
@@ -72,8 +72,45 @@ Kirigami.ScrollablePage {
                     wrapMode: Text.WordWrap
                     opacity: 0.68
                     text: backupProfile.currentIndex === 0
-                          ? qsTr("Include configurazioni Plasma/Konsole e file utente supportati. Minimo 1 GiB libero.")
+                          ? qsTr("Include le configurazioni utente supportate. Minimo 1 GiB libero.")
                           : qsTr("Include la home, escludendo cache, cestino e backup precedenti. Minimo 5 GiB liberi.")
+                }
+
+                Kirigami.AbstractCard {
+                    Layout.fillWidth: true
+                    contentItem: ColumnLayout {
+                        Kirigami.Heading { level: 3; font.bold: true; text: qsTr("Contenuto del backup") }
+                        Controls.Label {
+                            Layout.fillWidth: true
+                            opacity: 0.68
+                            text: qsTr("Destinazione: ~/krisCC Backups")
+                        }
+                        Repeater {
+                            model: {
+                                root.backupProfileIndex
+                                return SystemBackend.backupPreview(backupProfile.currentIndex === 0 ? "config" : "home")
+                            }
+                            delegate: RowLayout {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                Kirigami.Icon {
+                                    Layout.preferredWidth: 20
+                                    Layout.preferredHeight: 20
+                                    source: modelData.included ? "dialog-ok-apply" : "list-remove"
+                                }
+                                Controls.Label {
+                                    Layout.fillWidth: true
+                                    font.bold: modelData.included
+                                    text: (modelData.included ? qsTr("Incluso: ") : qsTr("Escluso: ")) + modelData.path
+                                }
+                                Controls.Label {
+                                    visible: modelData.exists !== undefined
+                                    opacity: 0.62
+                                    text: modelData.exists ? qsTr("presente") : qsTr("assente")
+                                }
+                            }
+                        }
+                    }
                 }
 
                 RowLayout {
@@ -112,7 +149,7 @@ Kirigami.ScrollablePage {
             contentItem: ColumnLayout {
                 RowLayout {
                     Layout.fillWidth: true
-                    Kirigami.Heading { Layout.fillWidth: true; level: 2; text: qsTr("Backup disponibili") }
+                    Kirigami.Heading { Layout.fillWidth: true; level: 2; font.bold: true; text: qsTr("Backup disponibili") }
                     Controls.Button {
                         text: qsTr("Aggiorna")
                         icon.name: "view-refresh"
@@ -169,7 +206,7 @@ Kirigami.ScrollablePage {
         Kirigami.AbstractCard {
             Layout.fillWidth: true
             contentItem: ColumnLayout {
-                Kirigami.Heading { level: 2; text: qsTr("Recovery KrisOS") }
+                Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Recovery KrisOS") }
                 Controls.Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
@@ -198,18 +235,6 @@ Kirigami.ScrollablePage {
                     wrapMode: TextEdit.WrapAnywhere
                     font.family: "monospace"
                     text: UtilityBackend.output
-                }
-            }
-        }
-
-        Kirigami.AbstractCard {
-            Layout.fillWidth: true
-            contentItem: ColumnLayout {
-                Kirigami.Heading { level: 2; text: qsTr("Sessione") }
-                RowLayout {
-                    Controls.Button { text: qsTr("Sospendi"); icon.name: "system-suspend"; onClicked: SystemBackend.sessionAction("suspend") }
-                    Controls.Button { text: qsTr("Riavvia"); icon.name: "system-reboot"; onClicked: rebootDialog.open() }
-                    Controls.Button { text: qsTr("Spegni"); icon.name: "system-shutdown"; onClicked: powerDialog.open() }
                 }
             }
         }
@@ -250,7 +275,4 @@ Kirigami.ScrollablePage {
         }
         onAccepted: PolkitHelper.execute("/usr/bin/rk", ["sync"])
     }
-
-    Controls.Dialog { id: rebootDialog; modal: true; title: qsTr("Riavviare il sistema?"); standardButtons: Controls.Dialog.Yes | Controls.Dialog.No; onAccepted: SystemBackend.sessionAction("reboot") }
-    Controls.Dialog { id: powerDialog; modal: true; title: qsTr("Spegnere il sistema?"); standardButtons: Controls.Dialog.Yes | Controls.Dialog.No; onAccepted: SystemBackend.sessionAction("poweroff") }
 }
