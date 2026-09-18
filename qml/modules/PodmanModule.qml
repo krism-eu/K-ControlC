@@ -7,30 +7,56 @@ Kirigami.ScrollablePage {
     id: root
     title: qsTr("Container")
 
+    property string mode: "containers"
     property var containers: []
+    property var images: []
     property string parseError: ""
     property string selectedName: ""
+    property string selectedImageId: ""
+    property string selectedImageName: ""
     property bool refreshAfterAction: false
+
+    function humanSize(bytes) {
+        if (bytes === undefined || bytes === null || bytes === "")
+            return qsTr("n/d")
+        if (typeof bytes === "string")
+            return bytes
+        if (bytes >= 1024 * 1024 * 1024)
+            return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GiB"
+        if (bytes >= 1024 * 1024)
+            return (bytes / (1024 * 1024)).toFixed(1) + " MiB"
+        if (bytes >= 1024)
+            return (bytes / 1024).toFixed(1) + " KiB"
+        return bytes + " B"
+    }
 
     function refresh() {
         root.parseError = ""
-        UtilityBackend.runPodman("list")
+        UtilityBackend.runPodman(root.mode === "images" ? "images" : "list")
     }
 
-    function parseList() {
-        if (UtilityBackend.busy || UtilityBackend.operationId !== "podman.list")
+    function parseResult() {
+        if (UtilityBackend.busy)
+            return
+        var expected = root.mode === "images" ? "podman.images" : "podman.list"
+        if (UtilityBackend.operationId !== expected)
             return
         if (UtilityBackend.resultState !== "success") {
-            root.containers = []
-            root.parseError = UtilityBackend.output.length > 0 ? UtilityBackend.output : qsTr("Impossibile leggere l'elenco Podman.")
+            if (root.mode === "images") root.images = []
+            else root.containers = []
+            root.parseError = UtilityBackend.output.length > 0 ? UtilityBackend.output : qsTr("Impossibile leggere i dati Podman.")
             return
         }
         try {
             var data = JSON.parse(UtilityBackend.output || "[]")
-            root.containers = Array.isArray(data) ? data : []
+            if (root.mode === "images")
+                root.images = Array.isArray(data) ? data : []
+            else
+                root.containers = Array.isArray(data) ? data : []
             root.parseError = ""
         } catch (e) {
-            root.containers = []
+            if (root.mode === "images") root.images = []
+            else root.containers = []
             root.parseError = UtilityBackend.output.length > 0 ? UtilityBackend.output : qsTr("Output Podman non leggibile.")
         }
     }
@@ -55,9 +81,35 @@ Kirigami.ScrollablePage {
         if (item.SizeRw !== undefined || item.SizeRootFs !== undefined) {
             var rw = item.SizeRw !== undefined ? item.SizeRw : 0
             var rootfs = item.SizeRootFs !== undefined ? item.SizeRootFs : 0
-            return qsTr("RW %1 · totale %2").arg(rw).arg(rootfs)
+            return qsTr("RW %1 · totale %2").arg(root.humanSize(rw)).arg(root.humanSize(rootfs))
         }
         return qsTr("n/d")
+    }
+
+    function imageId(item) {
+        if (!item) return ""
+        return item.Id || item.ID || item.id || ""
+    }
+
+    function imageName(item) {
+        if (!item) return qsTr("<senza tag>")
+        if (Array.isArray(item.Names) && item.Names.length > 0)
+            return item.Names.join(", ")
+        if (item.Repository && item.Tag && item.Repository !== "<none>" && item.Tag !== "<none>")
+            return item.Repository + ":" + item.Tag
+        if (item.Names)
+            return item.Names
+        return qsTr("<senza tag>")
+    }
+
+    function imageCreated(item) {
+        if (!item) return ""
+        return item.CreatedAt || item.CreatedSince || item.Created || ""
+    }
+
+    function imageSize(item) {
+        if (!item) return qsTr("n/d")
+        return root.humanSize(item.Size !== undefined ? item.Size : item.VirtualSize)
     }
 
     function runAction(mode, name) {
@@ -76,7 +128,7 @@ Kirigami.ScrollablePage {
                 root.refreshAfterAction = false
                 refreshTimer.restart()
             } else {
-                root.parseList()
+                root.parseResult()
             }
         }
     }
@@ -95,12 +147,33 @@ Kirigami.ScrollablePage {
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 2
-            Kirigami.Heading { level: 2; text: qsTr("Podman") }
+            Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Podman") }
             Controls.Label {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
                 opacity: 0.75
-                text: qsTr("Container dell'utente corrente: stato, immagine e dimensione, con le azioni più comuni. Nessuna cancellazione automatica.")
+                text: qsTr("Container e immagini locali dell'utente corrente, con stato, dimensione e azioni esplicite.")
+            }
+        }
+
+        Controls.TabBar {
+            Layout.fillWidth: true
+            currentIndex: root.mode === "images" ? 1 : 0
+            Controls.TabButton {
+                text: qsTr("Container")
+                font.bold: checked
+                onClicked: {
+                    root.mode = "containers"
+                    root.refresh()
+                }
+            }
+            Controls.TabButton {
+                text: qsTr("Immagini")
+                font.bold: checked
+                onClicked: {
+                    root.mode = "images"
+                    root.refresh()
+                }
             }
         }
 
@@ -115,7 +188,9 @@ Kirigami.ScrollablePage {
             Item { Layout.fillWidth: true }
             Controls.Label {
                 opacity: 0.65
-                text: qsTr("%1 container").arg(root.containers.length)
+                text: root.mode === "images"
+                      ? qsTr("%1 immagini").arg(root.images.length)
+                      : qsTr("%1 container").arg(root.containers.length)
             }
         }
 
@@ -139,72 +214,133 @@ Kirigami.ScrollablePage {
             Layout.alignment: Qt.AlignHCenter
         }
 
-        Repeater {
-            model: root.containers
-            delegate: Kirigami.AbstractCard {
-                required property var modelData
-                Layout.fillWidth: true
-                contentItem: ColumnLayout {
-                    spacing: Kirigami.Units.smallSpacing
-                    RowLayout {
-                        Layout.fillWidth: true
+        ColumnLayout {
+            Layout.fillWidth: true
+            visible: root.mode === "containers"
+
+            Repeater {
+                model: root.containers
+                delegate: Kirigami.AbstractCard {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    contentItem: ColumnLayout {
+                        spacing: Kirigami.Units.smallSpacing
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                font.bold: true
+                                font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
+                                text: root.containerName(modelData)
+                                elide: Text.ElideRight
+                            }
+                            Controls.Label {
+                                font.bold: true
+                                opacity: 0.72
+                                text: root.containerState(modelData)
+                            }
+                        }
                         Controls.Label {
                             Layout.fillWidth: true
-                            font.bold: true
-                            font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
-                            text: root.containerName(modelData)
-                            elide: Text.ElideRight
+                            text: root.containerImage(modelData)
+                            opacity: 0.72
+                            elide: Text.ElideMiddle
                         }
                         Controls.Label {
-                            font.bold: true
+                            Layout.fillWidth: true
+                            text: qsTr("Dimensione: %1").arg(root.containerSize(modelData))
                             opacity: 0.72
-                            text: root.containerState(modelData)
                         }
-                    }
-                    Controls.Label {
-                        Layout.fillWidth: true
-                        text: root.containerImage(modelData)
-                        opacity: 0.72
-                        elide: Text.ElideMiddle
-                    }
-                    Controls.Label {
-                        Layout.fillWidth: true
-                        text: qsTr("Dimensione: %1").arg(root.containerSize(modelData))
-                        opacity: 0.72
-                    }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Controls.Button { text: qsTr("Info"); icon.name: "documentinfo"; onClicked: UtilityBackend.runPodman("info", root.containerName(modelData)) }
-                        Controls.Button { text: qsTr("Log"); icon.name: "text-x-log"; onClicked: UtilityBackend.runPodman("logs", root.containerName(modelData)) }
-                        Item { Layout.fillWidth: true }
-                        Controls.Button { text: qsTr("Avvia"); enabled: !UtilityBackend.busy; onClicked: root.runAction("start", root.containerName(modelData)) }
-                        Controls.Button { text: qsTr("Ferma"); enabled: !UtilityBackend.busy; onClicked: root.runAction("stop", root.containerName(modelData)) }
-                        Controls.Button { text: qsTr("Riavvia"); enabled: !UtilityBackend.busy; onClicked: root.runAction("restart", root.containerName(modelData)) }
-                        Controls.Button {
-                            text: qsTr("Rinomina")
-                            enabled: !UtilityBackend.busy
-                            onClicked: {
-                                root.selectedName = root.containerName(modelData)
-                                renameField.text = root.selectedName
-                                renameDialog.open()
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Controls.Button { text: qsTr("Info"); icon.name: "documentinfo"; onClicked: UtilityBackend.runPodman("info", root.containerName(modelData)) }
+                            Controls.Button { text: qsTr("Log"); icon.name: "text-x-log"; onClicked: UtilityBackend.runPodman("logs", root.containerName(modelData)) }
+                            Item { Layout.fillWidth: true }
+                            Controls.Button { text: qsTr("Avvia"); enabled: !UtilityBackend.busy; onClicked: root.runAction("start", root.containerName(modelData)) }
+                            Controls.Button { text: qsTr("Ferma"); enabled: !UtilityBackend.busy; onClicked: root.runAction("stop", root.containerName(modelData)) }
+                            Controls.Button { text: qsTr("Riavvia"); enabled: !UtilityBackend.busy; onClicked: root.runAction("restart", root.containerName(modelData)) }
+                            Controls.Button {
+                                text: qsTr("Rinomina")
+                                enabled: !UtilityBackend.busy
+                                onClicked: {
+                                    root.selectedName = root.containerName(modelData)
+                                    renameField.text = root.selectedName
+                                    renameDialog.open()
+                                }
                             }
                         }
                     }
                 }
             }
+
+            Kirigami.InlineMessage {
+                Layout.fillWidth: true
+                visible: SystemBackend.programAvailable("podman") && !UtilityBackend.busy && root.containers.length === 0 && root.parseError.length === 0
+                type: Kirigami.MessageType.Information
+                text: qsTr("Nessun container Podman presente per l'utente.")
+            }
         }
 
-        Kirigami.InlineMessage {
+        ColumnLayout {
             Layout.fillWidth: true
-            visible: SystemBackend.programAvailable("podman") && !UtilityBackend.busy && root.containers.length === 0 && root.parseError.length === 0
-            type: Kirigami.MessageType.Information
-            text: qsTr("Nessun container Podman presente per l'utente.")
+            visible: root.mode === "images"
+
+            Repeater {
+                model: root.images
+                delegate: Kirigami.AbstractCard {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    contentItem: RowLayout {
+                        Layout.fillWidth: true
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                font.bold: true
+                                font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
+                                text: root.imageName(modelData)
+                                elide: Text.ElideMiddle
+                            }
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                opacity: 0.66
+                                text: qsTr("ID %1").arg(root.imageId(modelData).substring(0, 20))
+                                elide: Text.ElideRight
+                            }
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                opacity: 0.66
+                                text: [root.imageCreated(modelData), root.imageSize(modelData)].filter(function(x) { return !!x }).join(" · ")
+                            }
+                        }
+                        Controls.Button {
+                            text: qsTr("Elimina")
+                            icon.name: "edit-delete"
+                            enabled: !UtilityBackend.busy && root.imageId(modelData).length > 0
+                            onClicked: {
+                                root.selectedImageId = root.imageId(modelData)
+                                root.selectedImageName = root.imageName(modelData)
+                                imageRemoveDialog.open()
+                            }
+                        }
+                    }
+                }
+            }
+
+            Kirigami.InlineMessage {
+                Layout.fillWidth: true
+                visible: SystemBackend.programAvailable("podman") && !UtilityBackend.busy && root.images.length === 0 && root.parseError.length === 0
+                type: Kirigami.MessageType.Information
+                text: qsTr("Nessuna immagine Podman presente per l'utente.")
+            }
         }
 
         Kirigami.AbstractCard {
             Layout.fillWidth: true
             visible: UtilityBackend.operationId.indexOf("podman.") === 0
-                  && UtilityBackend.operationId !== "podman.list" && UtilityBackend.output.length > 0
+                  && UtilityBackend.operationId !== "podman.list"
+                  && UtilityBackend.operationId !== "podman.images"
+                  && UtilityBackend.output.length > 0
             contentItem: ColumnLayout {
                 Controls.Label { font.bold: true; text: UtilityBackend.title }
                 Controls.TextArea {
@@ -234,6 +370,21 @@ Kirigami.ScrollablePage {
                 root.refreshAfterAction = true
                 UtilityBackend.runPodman("rename", root.selectedName, next)
             }
+        }
+    }
+
+    Controls.Dialog {
+        id: imageRemoveDialog
+        modal: true
+        title: qsTr("Eliminare l'immagine?")
+        standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
+        contentItem: Controls.Label {
+            wrapMode: Text.WordWrap
+            text: qsTr("%1\n\nL'immagine viene rimossa senza --force. Se è ancora usata da un container Podman rifiuterà l'operazione.").arg(root.selectedImageName)
+        }
+        onAccepted: {
+            root.refreshAfterAction = true
+            UtilityBackend.runPodman("image-remove", root.selectedImageId)
         }
     }
 }
