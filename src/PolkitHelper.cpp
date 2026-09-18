@@ -121,6 +121,22 @@ bool PolkitHelper::isSafeGrubEntry(const QString &entry) const
     return true;
 }
 
+bool PolkitHelper::isSafeRepositoryId(const QString &repoId) const
+{
+    static const QRegularExpression pattern(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"));
+    return pattern.match(repoId).hasMatch();
+}
+
+bool PolkitHelper::isSafeRepositoryUrl(const QString &value) const
+{
+    if (value.isEmpty() || value.size() > 2048 || value.contains(QRegularExpression(QStringLiteral("[\\s\\x00-\\x1f]"))))
+        return false;
+    const QUrl url(value);
+    return url.isValid()
+        && (url.scheme() == QStringLiteral("https") || url.scheme() == QStringLiteral("http"))
+        && !url.host().isEmpty();
+}
+
 bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const QStringList &args) const
 {
     if (program == QStringLiteral("/usr/bin/rk")) {
@@ -140,6 +156,21 @@ bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const Q
             {QStringLiteral("upgrade"), QStringLiteral("--apply")}
         };
         return allowed.contains(args);
+    }
+
+    if (program == QStringLiteral("/usr/bin/dnf5")) {
+        if (args.size() == 3
+            && args.at(0) == QStringLiteral("config-manager")
+            && (args.at(1) == QStringLiteral("enable") || args.at(1) == QStringLiteral("disable")))
+            return isSafeRepositoryId(args.at(2));
+
+        const QString prefix = QStringLiteral("--from-repofile=");
+        if (args.size() == 3
+            && args.at(0) == QStringLiteral("config-manager")
+            && args.at(1) == QStringLiteral("addrepo")
+            && args.at(2).startsWith(prefix))
+            return isSafeRepositoryUrl(args.at(2).mid(prefix.size()));
+        return false;
     }
 
     if (program == QStringLiteral("/usr/bin/efibootmgr"))
