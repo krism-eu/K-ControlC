@@ -134,7 +134,7 @@ bool PolkitHelper::isSafeRepositoryUrl(const QString &value) const
         return false;
     const QUrl url(value);
     return url.isValid()
-        && (url.scheme() == QStringLiteral("https") || url.scheme() == QStringLiteral("http"))
+        && url.scheme() == QStringLiteral("https")
         && !url.host().isEmpty();
 }
 
