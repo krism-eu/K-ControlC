@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, kriscc-0.5-minimal]
   pull_request:
     branches: [main]
 
@@ -138,6 +138,50 @@ jobs:
           rpm -V krisCC
           /usr/bin/krisCC
 
+
+  integration-prerelease:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/kriscc-0.5-minimal'
+    needs: [build-fedora, rpm-smoke]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download validated RPM
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: krisCC-${{ github.sha }}
+          path: artifacts
+
+      - name: Publish immutable ISO-integration prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd artifacts/rpm
+          sha256sum -c SHA256SUMS
+
+          rpm_file='krisCC-0.5.0-1.fc44.x86_64.rpm'
+          tag='v0.5.0-1'
+          test -f "$rpm_file"
+          test "$(rpm -qp --qf '%{NAME}' "$rpm_file")" = 'krisCC'
+          test "$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$rpm_file")" = '0.5.0-1.fc44'
+
+          checksum="$(awk -v f="$rpm_file" '$2 == f || $2 == "./" f {print $1}' SHA256SUMS)"
+          [[ "$checksum" =~ ^[0-9a-f]{64}$ ]]
+
+          mkdir -p /tmp/kriscc-existing
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY"               -p "$rpm_file" -p SHA256SUMS -D /tmp/kriscc-existing
+            existing="$(awk -v f="$rpm_file" '$2 == f || $2 == "./" f {print $1}' /tmp/kriscc-existing/SHA256SUMS)"
+            test "$existing" = "$checksum"
+            (cd /tmp/kriscc-existing && sha256sum -c SHA256SUMS)
+            echo "Prerelease $tag already contains the exact validated RPM."
+            exit 0
+          fi
+
+          gh release create "$tag"             --repo "$GITHUB_REPOSITORY"             --target "$GITHUB_SHA"             --prerelease             --title "krisCC $tag — ISO integration candidate"             --notes "Validated krisCC integration candidate for the separate KrisOS ISO branch. This is not the stable KrisOS component until promoted from main."             "$rpm_file" SHA256SUMS
+
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [build-fedora, rpm-smoke]
@@ -200,7 +244,9 @@ jobs:
               echo "Release $TAG already exists with different RPM content; bump packaging Release before publishing new krisCC code." >&2
               exit 1
             fi
-            echo "Release $TAG already contains this exact component; nothing to republish."
+            echo "Release $TAG already contains this exact component."
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
+            echo "Release $TAG promoted to stable."
             exit 0
           fi
           gh release create "$TAG" \
