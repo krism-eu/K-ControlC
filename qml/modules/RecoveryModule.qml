@@ -246,7 +246,7 @@ Kirigami.ScrollablePage {
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
             wrapMode: Text.WordWrap
-            text: qsTr("Esegue sudo rk sync sulle richieste persistenti già salvate.")
+            text: qsTr("Esegue rk sync con autorizzazione amministrativa sulle richieste persistenti già salvate.")
         }
         onAccepted: PolkitHelper.execute("/usr/bin/rk", ["sync"])
     }
