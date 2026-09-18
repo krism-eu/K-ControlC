@@ -36,6 +36,9 @@ jobs:
           KRISCC_SMOKE_TEST: "1"
         run: ./build/krisCC
 
+      - name: Validate integration test syntax
+        run: bash -n ./tests/e2e-readonly.sh
+
       - name: Read-only integration checks
         run: ./tests/e2e-readonly.sh
 
