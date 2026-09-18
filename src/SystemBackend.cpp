@@ -15,6 +15,9 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
 #include <QHash>
 #include <QProcess>
 #include <QRegularExpression>
@@ -205,7 +208,7 @@ QString SystemBackend::flatpakIconPath(const QString &appId) const
     for (const QString &root : iconRoots) {
         for (const QString &relative : iconPaths) {
             const QString candidate = QDir(root).filePath(relative);
-            if (QFileInfo::isFile(candidate))
+            if (QFileInfo(candidate).isFile())
                 return QUrl::fromLocalFile(candidate).toString();
         }
     }
@@ -224,7 +227,7 @@ QString SystemBackend::flatpakIconPath(const QString &appId) const
                     remote + QLatin1Char('/') + arch
                     + QStringLiteral("/active/icons/") + size
                     + QLatin1Char('/') + id + QStringLiteral(".png"));
-                if (QFileInfo::isFile(candidate))
+                if (QFileInfo(candidate).isFile())
                     return QUrl::fromLocalFile(candidate).toString();
             }
         }
