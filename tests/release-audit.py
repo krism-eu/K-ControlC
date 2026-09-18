@@ -142,9 +142,10 @@ require('case "$1" in' in bootc_wrapper
         and 'json|humanreadable' in bootc_wrapper
         and '"$@"' not in bootc_wrapper,
         "bootc status wrapper must expose only fixed status formats")
-require("/usr/libexec/kriscc/bootc-status" in cmake
-        or "bootc-status.sh" in cmake,
-        "bootc status wrapper is not installed")
+require("bootc-status.sh" in cmake,
+        "bootc status wrapper is not installed by CMake")
+require("%{_libexecdir}/kriscc/bootc-status" in spec,
+        "bootc status wrapper is missing from RPM files")
 
 # Backup contract: canonical path validation, safe extraction and all async start failures
 # must leave the UI out of the busy state.
