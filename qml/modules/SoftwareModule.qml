@@ -131,12 +131,12 @@ Kirigami.ScrollablePage {
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 2
-            Kirigami.Heading { level: 2; text: qsTr("Pacchetti RPM") }
+            Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Pacchetti RPM") }
             Controls.Label {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
                 opacity: 0.72
-                text: qsTr("Base immutabile, pacchetti persistenti gestiti da rk e pacchetti locali vengono distinti chiaramente. La ricerca installabile usa solo i repository Fedora supportati da KrisOS.")
+                text: qsTr("Base immutabile, pacchetti persistenti gestiti da rk e pacchetti locali vengono distinti chiaramente. La ricerca usa i repository DNF abilitati; l'installazione persistente resta validata dalla policy rk.")
             }
         }
 
@@ -147,7 +147,7 @@ Kirigami.ScrollablePage {
             Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Cerca") }
             Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Installati") }
             Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Aggiornabili") }
-            Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Recenti") }
+            Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Novità repository") }
             Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Repository") }
         }
 
@@ -278,6 +278,13 @@ Kirigami.ScrollablePage {
                     Item { Layout.fillWidth: true }
                 }
                 Controls.BusyIndicator { visible: installedModel.searching; running: visible; Layout.alignment: Qt.AlignHCenter }
+                Kirigami.InlineMessage {
+                    Layout.fillWidth: true
+                    visible: root.installFilter === "persistent" && !installedModel.searching
+                             && BootcBackend.persistentPackageCount === 0
+                    type: Kirigami.MessageType.Information
+                    text: qsTr("Nessun pacchetto RPM persistente richiesto.")
+                }
                 ListView {
                     Layout.fillWidth: true
                     Layout.preferredHeight: Math.min(contentHeight, 500)
@@ -309,7 +316,7 @@ Kirigami.ScrollablePage {
 
             ColumnLayout {
                 RowLayout {
-                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Aggiornamenti RPM disponibili nei repository Fedora supportati. La base resta aggiornata tramite BootC.") }
+                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Aggiornamenti RPM disponibili nei repository DNF abilitati. La base resta aggiornata tramite BootC.") }
                     Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: upgradesModel.loadUpgrades() }
                 }
                 Controls.BusyIndicator { visible: upgradesModel.searching; running: visible; Layout.alignment: Qt.AlignHCenter }
@@ -332,7 +339,7 @@ Kirigami.ScrollablePage {
 
             ColumnLayout {
                 RowLayout {
-                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Pacchetti cambiati di recente nei repository Fedora supportati.") }
+                    Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Pacchetti cambiati di recente nei repository DNF abilitati. Non indica la cronologia delle installazioni locali.") }
                     Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: recentModel.loadRecent() }
                 }
                 Controls.BusyIndicator { visible: recentModel.searching; running: visible; Layout.alignment: Qt.AlignHCenter }
@@ -359,14 +366,20 @@ Kirigami.ScrollablePage {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                     opacity: 0.72
-                    text: qsTr("krisCC usa soltanto i repository Fedora supportati dalla policy rk. La gestione di repository RPM arbitrari non è esposta dal Control Center.")
+                    text: qsTr("Repository DNF configurati nel sistema. Puoi aggiungere un file .repo remoto e abilitare o disabilitare repository esistenti. rk continua a validare ogni installazione persistente.")
                 }
                 RowLayout {
                     Layout.fillWidth: true
+                    Controls.Button {
+                        text: qsTr("Aggiungi repository")
+                        icon.name: "list-add"
+                        enabled: !SoftwareBackend.busy && !PolkitHelper.running
+                        onClicked: addRepoDialog.open()
+                    }
                     Item { Layout.fillWidth: true }
                     Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: SoftwareBackend.refreshRepositories() }
                 }
-                Controls.BusyIndicator { visible: SoftwareBackend.busy; running: visible; Layout.alignment: Qt.AlignHCenter }
+                Controls.BusyIndicator { visible: SoftwareBackend.busy || PolkitHelper.running; running: visible; Layout.alignment: Qt.AlignHCenter }
                 Kirigami.InlineMessage { Layout.fillWidth: true; visible: SoftwareBackend.errorText.length > 0; type: Kirigami.MessageType.Error; text: SoftwareBackend.errorText }
 
                 Repeater {
@@ -381,9 +394,19 @@ Kirigami.ScrollablePage {
                                 Controls.Label { text: modelData.id; opacity: 0.62 }
                             }
                             Controls.Label {
+                                Layout.preferredWidth: 110
+                                horizontalAlignment: Text.AlignHCenter
                                 text: modelData.enabled ? qsTr("attivo") : qsTr("inattivo")
-                                font.bold: modelData.enabled
+                                font.bold: true
                                 opacity: modelData.enabled ? 1.0 : 0.68
+                            }
+                            Controls.Button {
+                                Layout.preferredWidth: 120
+                                enabled: !PolkitHelper.running
+                                text: modelData.enabled ? qsTr("Disattiva") : qsTr("Attiva")
+                                icon.name: modelData.enabled ? "media-playback-stop" : "media-playback-start"
+                                onClicked: root.runPrivileged("/usr/bin/dnf5",
+                                    ["config-manager", modelData.enabled ? "disable" : "enable", modelData.id])
                             }
                         }
                     }
@@ -395,7 +418,7 @@ Kirigami.ScrollablePage {
             Layout.fillWidth: true
             visible: root.progressLines.length > 0
             contentItem: ColumnLayout {
-                Kirigami.Heading { level: 3; text: qsTr("Operazione") }
+                Kirigami.Heading { level: 3; font.bold: true; text: qsTr("Operazione") }
                 Repeater {
                     model: root.progressLines
                     delegate: Controls.Label {
@@ -408,6 +431,34 @@ Kirigami.ScrollablePage {
                 }
             }
         }
+    }
+
+    Controls.Dialog {
+        id: addRepoDialog
+        modal: true
+        title: qsTr("Aggiungi repository DNF")
+        standardButtons: Controls.Dialog.Ok | Controls.Dialog.Cancel
+        contentItem: ColumnLayout {
+            Controls.Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: qsTr("Inserisci l'URL HTTPS/HTTP di un file .repo. DNF5 ne verificherà la validità prima di salvarlo.")
+            }
+            Controls.TextField {
+                id: repoUrlField
+                Layout.fillWidth: true
+                placeholderText: qsTr("https://esempio.invalid/repository.repo")
+                selectByMouse: true
+            }
+        }
+        onAccepted: {
+            var url = repoUrlField.text.trim()
+            if (url.length > 0)
+                root.runPrivileged("/usr/bin/dnf5",
+                    ["config-manager", "addrepo", "--from-repofile=" + url])
+            repoUrlField.clear()
+        }
+        onRejected: repoUrlField.clear()
     }
 
     Controls.Dialog {
@@ -451,7 +502,7 @@ Kirigami.ScrollablePage {
             }
 
             Kirigami.Separator { Layout.fillWidth: true }
-            Kirigami.Heading { level: 3; text: qsTr("Piano rk") }
+            Kirigami.Heading { level: 3; font.bold: true; text: qsTr("Piano rk") }
             Controls.Label {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
