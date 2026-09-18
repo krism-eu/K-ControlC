@@ -6,7 +6,7 @@ krisCC 0.5 è un'applicazione standalone Qt 6/Kirigami pensata per uso personale
 
 - Qt 6 Core/Gui/Qml/Quick/DBus
 - KF6 Kirigami
-- `bootc`, `rpm`, `dnf5`, `pkexec`, `tar`
+- `bootc`, `rpm`, `dnf5`, `dnf5-plugins` (config-manager), `pkexec`, `tar`
 - `/usr/bin/rk` come helper del layer persistente KrisOS
 - systemd/logind per sessione e restart servizi
 
@@ -32,13 +32,13 @@ Il nuovo percorso ha sempre precedenza. Il fallback legacy potrà essere rimosso
 
 La base del sistema resta image-based e si aggiorna esclusivamente tramite BootC. KrisOS supporta un solo deployment operativo; krisCC non espone rollback o gestione di deployment alternativi.
 
-krisCC usa DNF5 solo in lettura per catalogo, inventario, aggiornamenti disponibili, pacchetti recenti e stato dei repository. Le query installabili sono limitate a `fedora` e `updates`, gli stessi repository che `rk` abilita durante le transazioni. L'installazione/rimozione del layer persistente passa sempre da `rk`.
+krisCC usa DNF5 per catalogo, inventario, aggiornamenti disponibili, pacchetti recenti e stato dei repository abilitati. La gestione esplicita dei repository usa soltanto `dnf5 config-manager`: add da URL HTTP(S) validato e enable/disable di un ID validato. L'installazione/rimozione del layer persistente passa sempre da `rk`, che può rifiutare pacchetti o origini non compatibili con la policy KrisOS.
 
 L'anteprima deve usare `rk plan <pacchetto>` e non un comando DNF5 parallelo: il piano mostrato all'utente deve essere prodotto dallo stesso solver, dalle stesse esclusioni e dalla stessa policy che verranno applicati da `rk add`.
 
 ## Privilegi
 
-Non aggiungere wrapper shell generici. `PolkitHelper` valida programma e argomenti completi. La policy usa `auth_admin` senza retention e restringe le mutazioni a `rk sync/add/rm`, alle operazioni BootC di aggiornamento supportate e alla sola selezione one-shot del prossimo boot tramite `efibootmgr -n` o `grub2-reboot`. Le mutazioni DNF5 e il rollback BootC non sono esposti.
+Non aggiungere wrapper shell generici. `PolkitHelper` valida programma e argomenti completi. La policy usa `auth_admin` senza retention e restringe le mutazioni a `rk sync/add/rm`, `dnf5 config-manager` con forme allowlistate, alle operazioni BootC di aggiornamento supportate e alla sola selezione one-shot del prossimo boot tramite `efibootmgr -n` o `grub2-reboot`. Il rollback BootC non è esposto.
 
 ## Pipeline immagine
 
