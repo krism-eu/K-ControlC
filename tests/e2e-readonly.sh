@@ -163,8 +163,9 @@ if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
 fi
 grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
 grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
-grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
-grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("K-ControlC Backups")' src/SystemBackend.cpp
+grep -q 'args << QStringLiteral("--exclude=./") + excluded' src/SystemBackend.cpp
 
 if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
     CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
