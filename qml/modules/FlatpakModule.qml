@@ -9,6 +9,7 @@ Kirigami.ScrollablePage {
     property string mode: "search"
     property string lastQuery: ""
     property bool refreshUpdatesAfterAction: false
+    property bool refreshSearchAfterInstall: false
 
     function expectedOperationId() {
         return "flatpak." + root.mode
@@ -44,12 +45,24 @@ Kirigami.ScrollablePage {
         UtilityBackend.runFlatpak(action, query || "")
     }
 
+    function installFlatpak(appId) {
+        root.refreshSearchAfterInstall = true
+        UtilityBackend.runFlatpak("install", appId)
+    }
+
     Connections {
         target: UtilityBackend
         function onStateChanged() {
             if (root.refreshUpdatesAfterAction && !UtilityBackend.busy) {
                 root.refreshUpdatesAfterAction = false
                 root.run("updates", "")
+                return
+            }
+            if (root.refreshSearchAfterInstall && !UtilityBackend.busy
+                    && UtilityBackend.operationId === "flatpak.install") {
+                root.refreshSearchAfterInstall = false
+                if (root.lastQuery.length >= 2)
+                    root.run("search", root.lastQuery)
             }
         }
     }
@@ -226,7 +239,7 @@ Kirigami.ScrollablePage {
                             text: qsTr("Installa")
                             icon.name: "list-add"
                             enabled: !UtilityBackend.busy
-                            onClicked: root.run("install", modelData[2])
+                            onClicked: root.installFlatpak(modelData[2])
                         }
 
                         Controls.Button {
