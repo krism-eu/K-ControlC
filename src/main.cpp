@@ -87,6 +87,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty(QStringLiteral("SystemBackend"), &systemBackend);
     engine.rootContext()->setContextProperty(QStringLiteral("UtilityBackend"), &utilityBackend);
     engine.rootContext()->setContextProperty(QStringLiteral("KrisccStartHidden"), startHidden);
+    const bool smokeTest = qEnvironmentVariableIsSet("KRISCC_SMOKE_TEST");
+    engine.rootContext()->setContextProperty(QStringLiteral("KrisccSmokeTest"), smokeTest);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
                      &app, [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
@@ -98,8 +100,8 @@ int main(int argc, char *argv[])
             instanceController.setWindow(window);
     }
 
-    if (qEnvironmentVariableIsSet("KRISCC_SMOKE_TEST"))
-        QTimer::singleShot(900, &app, &QCoreApplication::quit);
+    if (smokeTest)
+        QTimer::singleShot(2200, &app, &QCoreApplication::quit);
 
     return app.exec();
 }
