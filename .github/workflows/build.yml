@@ -20,7 +20,7 @@ jobs:
         run: >-
           dnf -y install gcc-c++ cmake ninja-build git gzip python3
           qt6-qtbase-devel qt6-qtdeclarative-devel kf6-kirigami-devel
-          dnf5 rpm rpm-build tar
+          dnf5 dnf5-plugins rpm rpm-build tar
 
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
