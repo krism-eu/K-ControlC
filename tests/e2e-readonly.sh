@@ -256,7 +256,9 @@ echo "Checking repository-backed DNF5 queries when metadata is available..."
 if dnf5 repo list --all --json >/dev/null 2>&1; then
   dnf5 repo list --all --json >/dev/null
   if dnf5 repoquery --available \
-      --queryformat     grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
     if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
       awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
         || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
@@ -267,29 +269,6 @@ if dnf5 repo list --all --json >/dev/null 2>&1; then
   dnf5 list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
   dnf5 list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
   dnf5 config-manager --help >/dev/null 2>&1 || { echo "ERROR: dnf5 config-manager runtime is unavailable" >&2; exit 1; }
-else
-  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
-fi
-
-if command -v bootc >/dev/null 2>&1; then
-  echo "bootc detected; validating the exact JSON command used by krisCC"
-  bootc status --format json > /tmp/kriscc-bootc-status.json
-  grep -q '"status"' /tmp/kriscc-bootc-status.json
-else
-  echo "bootc not available in this CI container; static command/schema guards passed"
-fi
-%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
-      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
-    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
-    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
-      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
-        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
-    fi
-  else
-    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
-  fi
-  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
-  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
 else
   echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
 fi
