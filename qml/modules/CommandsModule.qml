@@ -41,7 +41,7 @@ Kirigami.ScrollablePage {
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 2
-            Kirigami.Heading { level: 2; text: qsTr("Comandi comuni") }
+            Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Comandi comuni") }
             Controls.Label {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
@@ -61,6 +61,9 @@ Kirigami.ScrollablePage {
                 delegate: Kirigami.AbstractCard {
                     required property var modelData
                     Layout.fillWidth: true
+                    Layout.preferredWidth: root.width > 820
+                                           ? (root.width - Kirigami.Units.largeSpacing) / 2
+                                           : root.width
                     contentItem: ColumnLayout {
                         spacing: Kirigami.Units.smallSpacing
                         RowLayout {
@@ -109,7 +112,7 @@ Kirigami.ScrollablePage {
             contentItem: ColumnLayout {
                 RowLayout {
                     Layout.fillWidth: true
-                    Kirigami.Heading { Layout.fillWidth: true; level: 3; text: UtilityBackend.title || qsTr("Output") }
+                    Kirigami.Heading { Layout.fillWidth: true; level: 3; font.bold: true; text: UtilityBackend.title || qsTr("Output") }
                     Controls.Button {
                         visible: UtilityBackend.busy
                         text: qsTr("Annulla")
