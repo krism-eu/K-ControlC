@@ -142,11 +142,11 @@ bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const Q
         return allowed.contains(args);
     }
 
-    if (program == QStringLiteral("/usr/sbin/efibootmgr"))
+    if (program == QStringLiteral("/usr/bin/efibootmgr"))
         return args.size() == 2 && args.at(0) == QStringLiteral("-n")
             && isSafeBootToken(args.at(1));
 
-    if (program == QStringLiteral("/usr/sbin/grub2-reboot"))
+    if (program == QStringLiteral("/usr/bin/grub2-reboot"))
         return args.size() == 1 && isSafeGrubEntry(args.at(0));
 
     return false;
