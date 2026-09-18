@@ -50,7 +50,7 @@ require(TAG in workflow, "workflow does not publish the expected immutable tag")
 require(f'<release version="{VERSION}"' in read("data/org.kriscc.KrisCC.metainfo.xml"),
         "AppStream metadata is missing the current version")
 require(f"krisCC-{VERSION}-*.rpm" in readme, "README RPM version mismatch")
-require(f"^Release:[[:space:]]*{RELEASE}%{{?dist}}$" in e2e,
+require(f"grep -Fxq 'Release:        {RELEASE}%{{?dist}}' packaging/krisCC.spec" in e2e,
         "e2e RPM release assertion mismatch")
 
 # Only the consolidated System page is shipped; legacy pages can remain in git history
