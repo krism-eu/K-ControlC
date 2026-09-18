@@ -279,11 +279,13 @@ bool UtilityBackend::runFlatpak(const QString &mode, const QString &query)
                      tr("Remote Flatpak"), QStringLiteral("flatpak.remotes"), kRepositoryQueryTimeoutMs);
     if (mode == QStringLiteral("search") && query.trimmed().size() >= 2)
         return start(QStringLiteral("/usr/bin/flatpak"),
-                     {QStringLiteral("search"), QStringLiteral("--columns=name,description,application,version,branch,remotes"), query.trimmed()},
+                     {QStringLiteral("search"), QStringLiteral("--user"),
+                      QStringLiteral("--columns=name,description,application,version,branch,remotes"), query.trimmed()},
                      tr("Ricerca Flatpak: %1").arg(query.trimmed()), QStringLiteral("flatpak.search"), kRepositoryQueryTimeoutMs);
     if (mode == QStringLiteral("install") && validPackageName(query.trimmed()))
         return start(QStringLiteral("/usr/bin/flatpak"),
-                     {QStringLiteral("install"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), QStringLiteral("flathub"), query.trimmed()},
+                     {QStringLiteral("install"), QStringLiteral("--user"), QStringLiteral("--noninteractive"),
+                      QStringLiteral("--assumeyes"), QStringLiteral("flathub"), query.trimmed()},
                      tr("Installazione Flatpak: %1").arg(query.trimmed()), QStringLiteral("flatpak.install"));
     if (mode == QStringLiteral("remove") && validPackageName(query.trimmed()))
         return start(QStringLiteral("/usr/bin/flatpak"),
