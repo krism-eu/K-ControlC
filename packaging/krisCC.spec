@@ -19,6 +19,7 @@ Requires:       kf6-kirigami
 Requires:       polkit
 Requires:       rpm
 Requires:       dnf5
+Requires:       dnf5-plugins
 Requires:       bootc
 Requires:       tar
 
