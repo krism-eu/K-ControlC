@@ -198,9 +198,9 @@ grep -q 'OperationLog::append' src/SystemBackend.cpp
 grep -q 'src/OperationLog.cpp src/OperationLog.h' CMakeLists.txt
 
 # Next-boot selection is one-shot only: BootNext or grub2-reboot, never a permanent BootOrder rewrite.
-grep -q 'QStringLiteral("/usr/sbin/efibootmgr")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("/usr/bin/efibootmgr")' src/PolkitHelper.cpp
 grep -q 'QStringLiteral("-n")' src/PolkitHelper.cpp
-grep -q 'QStringLiteral("/usr/sbin/grub2-reboot")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("/usr/bin/grub2-reboot")' src/PolkitHelper.cpp
 grep -q "entry.startsWith(QLatin1Char('-'))" src/PolkitHelper.cpp
 grep -q 'org.kriscc.controlcenter.boot.next-uefi' data/org.kriscc.controlcenter.policy
 grep -q 'org.kriscc.controlcenter.boot.next-grub' data/org.kriscc.controlcenter.policy
@@ -345,9 +345,9 @@ grep -q 'OperationLog::append' src/SystemBackend.cpp
 grep -q 'src/OperationLog.cpp src/OperationLog.h' CMakeLists.txt
 
 # Next-boot selection is one-shot only: BootNext or grub2-reboot, never a permanent BootOrder rewrite.
-grep -q 'QStringLiteral("/usr/sbin/efibootmgr")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("/usr/bin/efibootmgr")' src/PolkitHelper.cpp
 grep -q 'QStringLiteral("-n")' src/PolkitHelper.cpp
-grep -q 'QStringLiteral("/usr/sbin/grub2-reboot")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("/usr/bin/grub2-reboot")' src/PolkitHelper.cpp
 grep -q 'org.kriscc.controlcenter.boot.next-uefi' data/org.kriscc.controlcenter.policy
 grep -q 'org.kriscc.controlcenter.boot.next-grub' data/org.kriscc.controlcenter.policy
 grep -q 'BootNext vale per un solo riavvio' qml/modules/SystemModule.qml
