@@ -18,8 +18,8 @@ public:
     explicit UtilityBackend(QObject *parent = nullptr);
 
     bool busy() const { return m_busy; }
-    QString title() const { return m_title; }
-    QString output() const { return m_output; }
+    const QString &title() const { return m_title; }
+    const QString &output() const { return m_output; }
     const QString &operationId() const { return m_operationId; }
     const QString &resultState() const { return m_resultState; }
 
