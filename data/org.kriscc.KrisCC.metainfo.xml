@@ -6,13 +6,19 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <description>
-    <p>krisCC provides persistent software management, Flatpak applications, Podman containers, bootc deployments, practical maintenance tools, diagnostics, recovery and local configuration/home backups without duplicating Plasma System Settings.</p>
+    <p>krisCC provides persistent software management, Flatpak applications, Podman containers, KrisOS updates, system health and boot diagnostics, practical maintenance tools, recovery and local backup/restore without duplicating Plasma System Settings.</p>
   </description>
   <launchable type="desktop-id">krisCC.desktop</launchable>
   <url type="homepage">https://github.com/krism-eu/krisCC</url>
   <provides><binary>krisCC</binary></provides>
   <categories><category>Settings</category><category>System</category></categories>
   <releases>
+    <release version="0.5.1" date="2026-09-18">
+      <description><p>Integration release for the complete KrisOS ISO with the validated 0.5 feature set unchanged.</p></description>
+    </release>
+    <release version="0.5.0" date="2026-09-18">
+      <description><p>Minimal unified KrisOS system center, health and boot tools, backup restore, local history and expanded safe terminal bookmarks.</p></description>
+    </release>
     <release version="0.4.0" date="2026-09-16">
       <description><p>Kirigami UI, RPM and Flatpak management, Podman container tools, maintenance and personal backup snapshots.</p></description>
     </release>

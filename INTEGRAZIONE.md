@@ -1,6 +1,6 @@
 # Integrazione krisCC in KrisOS / Fedora bootc
 
-krisCC 0.4 è un'applicazione standalone Qt 6/Kirigami pensata per uso personale su Fedora bootc. Non duplica Plasma System Settings: integra solo le funzioni specifiche del sistema e gli strumenti di manutenzione che è utile avere in un unico posto.
+krisCC 0.5 è un'applicazione standalone Qt 6/Kirigami pensata per uso personale su Fedora bootc. Non duplica Plasma System Settings: integra solo le funzioni specifiche del sistema e gli strumenti di manutenzione che è utile avere in un unico posto.
 
 ## Runtime
 
@@ -10,7 +10,7 @@ krisCC 0.4 è un'applicazione standalone Qt 6/Kirigami pensata per uso personale
 - `/usr/bin/rk` come helper del layer persistente KrisOS
 - systemd/logind per sessione e restart servizi
 
-Info Center, Partition Manager, KSystemLog, System Monitor, Konsole, Flatpak, Podman e fwupd sono opzionali: i relativi controlli vengono disabilitati o mostrano lo stato non disponibile se il programma non è presente.
+Info Center, Partition Manager, KSystemLog, System Monitor, Konsole, Flatpak, Podman, `efibootmgr`, `grubby` e `grub2-reboot` sono opzionali: i relativi controlli vengono disabilitati o mostrano lo stato non disponibile se il programma non è presente.
 
 ## Compatibilità dati KrisOS
 
@@ -38,7 +38,7 @@ L'anteprima deve usare `rk plan <pacchetto>` e non un comando DNF5 parallelo: il
 
 ## Privilegi
 
-Non aggiungere wrapper shell generici. `PolkitHelper` valida programma e argomenti completi. La policy usa `auth_admin` senza retention e restringe le mutazioni a `rk sync/add/rm` e alle operazioni BootC di aggiornamento supportate. Le mutazioni DNF5 e il rollback BootC non sono esposti.
+Non aggiungere wrapper shell generici. `PolkitHelper` valida programma e argomenti completi. La policy usa `auth_admin` senza retention e restringe le mutazioni a `rk sync/add/rm`, alle operazioni BootC di aggiornamento supportate e alla sola selezione one-shot del prossimo boot tramite `efibootmgr -n` o `grub2-reboot`. Le mutazioni DNF5 e il rollback BootC non sono esposti.
 
 ## Pipeline immagine
 
@@ -77,6 +77,6 @@ rpm -q krisCC
 rpm -V krisCC
 ```
 
-Poi verificare manualmente `rk plan/add/rm/sync`, ricerca RPM con dimensioni e piano dipendenze, Flatpak, Podman, update BootC, restart NetworkManager/CUPS/Bluetooth e creazione dei backup.
+Poi verificare manualmente `rk plan/add/rm/sync`, ricerca RPM, Flatpak, Podman, update BootC, backup create/verify/restore, cronologia locale e selezione one-shot UEFI/GRUB quando disponibile.
 
 Repository: https://github.com/krism-eu/krisCC

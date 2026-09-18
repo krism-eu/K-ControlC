@@ -1,5 +1,7 @@
 #include "UtilityBackend.h"
 
+#include "OperationLog.h"
+
 #include <QDebug>
 #include <QFileInfo>
 #include <QRegularExpression>
@@ -10,6 +12,19 @@ namespace {
 constexpr int kShortQueryTimeoutMs = 30 * 1000;
 constexpr int kRepositoryQueryTimeoutMs = 2 * 60 * 1000;
 constexpr int kContainerQueryTimeoutMs = 60 * 1000;
+
+bool shouldLogOperation(const QString &id)
+{
+    return id == QStringLiteral("flatpak.update")
+        || id == QStringLiteral("flatpak.update-all")
+        || id == QStringLiteral("flatpak.install")
+        || id == QStringLiteral("flatpak.remove")
+        || id == QStringLiteral("flatpak.flathub-add")
+        || id == QStringLiteral("podman.start")
+        || id == QStringLiteral("podman.stop")
+        || id == QStringLiteral("podman.restart")
+        || id == QStringLiteral("podman.rename");
+}
 }
 
 UtilityBackend::UtilityBackend(QObject *parent)
@@ -115,6 +130,7 @@ bool UtilityBackend::start(const QString &program, const QStringList &args, cons
 
 void UtilityBackend::finish(const QString &message, const QString &state)
 {
+    const QString completedOperation = m_operationId;
     if (m_process) {
         m_process->deleteLater();
         m_process = nullptr;
@@ -124,6 +140,8 @@ void UtilityBackend::finish(const QString &message, const QString &state)
     m_timedOut = false;
     m_output = message;
     m_resultState = state;
+    if (shouldLogOperation(completedOperation))
+        OperationLog::append(QStringLiteral("krisCC"), completedOperation, state);
     emit stateChanged();
 }
 
@@ -161,6 +179,60 @@ bool UtilityBackend::runBookmark(const QString &id)
         return start(QStringLiteral("getenforce"), {}, tr("SELinux"), QStringLiteral("bookmark.selinux"), kShortQueryTimeoutMs);
     if (id == QStringLiteral("services-active"))
         return start(QStringLiteral("systemctl"), {QStringLiteral("list-units"), QStringLiteral("--type=service"), QStringLiteral("--state=running"), QStringLiteral("--no-pager"), QStringLiteral("--plain")}, tr("Servizi attivi"), QStringLiteral("bookmark.services-active"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("uptime"))
+        return start(QStringLiteral("uptime"), {QStringLiteral("-p")}, tr("Tempo di attività"), QStringLiteral("bookmark.uptime"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("boot-time"))
+        return start(QStringLiteral("systemd-analyze"), {QStringLiteral("time")}, tr("Tempo di avvio"), QStringLiteral("bookmark.boot-time"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("blame"))
+        return start(QStringLiteral("systemd-analyze"), {QStringLiteral("blame")}, tr("Servizi più lenti all'avvio"), QStringLiteral("bookmark.blame"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("disk-space"))
+        return start(QStringLiteral("df"), {QStringLiteral("-hT"), QStringLiteral("-x"), QStringLiteral("tmpfs"), QStringLiteral("-x"), QStringLiteral("devtmpfs")}, tr("Spazio filesystem"), QStringLiteral("bookmark.disk-space"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("partitions") || id == QStringLiteral("block-devices"))
+        return start(QStringLiteral("lsblk"), {QStringLiteral("-e"), QStringLiteral("7"), QStringLiteral("-o"), QStringLiteral("NAME,PARTN,SIZE,FSTYPE,FSVER,LABEL,UUID,MOUNTPOINTS")}, tr("Dischi e partizioni"), QStringLiteral("bookmark.partitions"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("network"))
+        return start(QStringLiteral("ip"), {QStringLiteral("-brief"), QStringLiteral("address")}, tr("Interfacce di rete"), QStringLiteral("bookmark.network"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("routes"))
+        return start(QStringLiteral("ip"), {QStringLiteral("route")}, tr("Route di rete"), QStringLiteral("bookmark.routes"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("dns"))
+        return start(QStringLiteral("resolvectl"), {QStringLiteral("status")}, tr("DNS"), QStringLiteral("bookmark.dns"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("journal-errors"))
+        return start(QStringLiteral("journalctl"), {QStringLiteral("-b"), QStringLiteral("-p"), QStringLiteral("warning"), QStringLiteral("--no-pager"), QStringLiteral("-n"), QStringLiteral("200")}, tr("Warning ed errori dell'avvio"), QStringLiteral("bookmark.journal-errors"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("kernel-errors"))
+        return start(QStringLiteral("journalctl"), {QStringLiteral("-k"), QStringLiteral("-b"), QStringLiteral("-p"), QStringLiteral("warning"), QStringLiteral("--no-pager"), QStringLiteral("-n"), QStringLiteral("200")}, tr("Warning kernel"), QStringLiteral("bookmark.kernel-errors"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("rk-status"))
+        return start(QStringLiteral("/usr/bin/rk"), {QStringLiteral("status")}, tr("Stato layer RPM persistente"), QStringLiteral("bookmark.rk-status"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("flatpak-list"))
+        return start(QStringLiteral("/usr/bin/flatpak"), {QStringLiteral("list"), QStringLiteral("--user"), QStringLiteral("--app")}, tr("Flatpak utente"), QStringLiteral("bookmark.flatpak-list"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("podman-images"))
+        return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("images")}, tr("Immagini Podman"), QStringLiteral("bookmark.podman-images"), kContainerQueryTimeoutMs);
+    if (id == QStringLiteral("uefi"))
+        return start(QStringLiteral("/usr/bin/efibootmgr"), {}, tr("Voci di avvio UEFI"), QStringLiteral("bookmark.uefi"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("grub-entries"))
+        return start(QStringLiteral("/usr/bin/grubby"), {QStringLiteral("--info=ALL")}, tr("Voci GRUB/BLS"), QStringLiteral("bookmark.grub-entries"), kShortQueryTimeoutMs);
+    if (id == QStringLiteral("fstab-order"))
+        return start(QStringLiteral("findmnt"), {QStringLiteral("--fstab"), QStringLiteral("--evaluate"), QStringLiteral("-o"), QStringLiteral("TARGET,SOURCE,FSTYPE,OPTIONS")}, tr("Ordine mount configurato"), QStringLiteral("bookmark.fstab-order"), kShortQueryTimeoutMs);
+
+    if (id == QStringLiteral("health")) {
+        const QString script = QStringLiteral(
+            "printf '=== Unità fallite ===\\n'; systemctl --failed --no-legend --plain || true; "
+            "printf '\\n=== Overlay /usr ===\\n'; findmnt -n -o SOURCE,FSTYPE,OPTIONS /usr 2>/dev/null || true; "
+            "printf '\\n=== Spazio ===\\n'; df -h / /var /home 2>/dev/null || df -h /; "
+            "printf '\\n=== rk ===\\n'; /usr/bin/rk status 2>&1 || true; "
+            "printf '\\n=== BootC ===\\n'; /usr/bin/bootc status 2>&1 || true");
+        return start(QStringLiteral("/usr/bin/bash"), {QStringLiteral("-c"), script},
+                     tr("Salute KrisOS"), QStringLiteral("bookmark.health"), kRepositoryQueryTimeoutMs);
+    }
+
+    if (id == QStringLiteral("security")) {
+        const QString script = QStringLiteral(
+            "printf 'SELinux: '; if command -v getenforce >/dev/null; then getenforce; else echo 'n/d'; fi; "
+            "printf 'Firewalld: '; systemctl is-active firewalld.service 2>/dev/null || true; "
+            "if [ -d /sys/firmware/efi ]; then echo 'Boot mode: UEFI'; else echo 'Boot mode: BIOS'; fi; "
+            "if command -v mokutil >/dev/null; then mokutil --sb-state 2>&1; else echo 'Secure Boot: verifica non disponibile (mokutil assente)'; fi");
+        return start(QStringLiteral("/usr/bin/bash"), {QStringLiteral("-c"), script},
+                     tr("Sicurezza"), QStringLiteral("bookmark.security"), kShortQueryTimeoutMs);
+    }
+
     return false;
 }
 

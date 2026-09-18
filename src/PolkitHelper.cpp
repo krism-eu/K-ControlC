@@ -1,6 +1,9 @@
 #include "PolkitHelper.h"
 
+#include "OperationLog.h"
+
 #include <QDebug>
+#include <QFileInfo>
 #include <QRegularExpression>
 
 PolkitHelper::PolkitHelper(QObject *parent)
@@ -23,6 +26,8 @@ void PolkitHelper::execute(const QString &program, const QStringList &args)
     m_running = true;
     m_allOutput.clear();
     m_lineBuffer.clear();
+    m_program = program;
+    m_args = args;
     emit runningChanged();
 
     m_process = new QProcess(this);
@@ -70,11 +75,18 @@ void PolkitHelper::onProcessFinished(int exitCode, QProcess::ExitStatus status)
             output = tr("Operazione terminata con codice %1.").arg(exitCode);
     }
 
+    const QString action = QFileInfo(m_program).fileName()
+        + (m_args.isEmpty() ? QString() : QStringLiteral(" ") + m_args.join(QLatin1Char(' ')));
+    OperationLog::append(QStringLiteral("Amministrazione"), action,
+                         success ? QStringLiteral("success") : QStringLiteral("error"));
+
     m_process->deleteLater();
     m_process = nullptr;
     m_running = false;
     m_lineBuffer.clear();
     m_allOutput.clear();
+    m_program.clear();
+    m_args.clear();
     emit runningChanged();
     emit finished(success, output);
 }
@@ -90,6 +102,23 @@ bool PolkitHelper::isValidPackageName(const QString &package) const
 {
     static const QRegularExpression pattern(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._+:-]{0,127}$"));
     return pattern.match(package).hasMatch();
+}
+
+bool PolkitHelper::isSafeBootToken(const QString &token) const
+{
+    static const QRegularExpression pattern(QStringLiteral("^[0-9A-Fa-f]{4}$"));
+    return pattern.match(token).hasMatch();
+}
+
+bool PolkitHelper::isSafeGrubEntry(const QString &entry) const
+{
+    if (entry.isEmpty() || entry.size() > 256 || entry.startsWith(QLatin1Char('-')))
+        return false;
+    for (const QChar ch : entry) {
+        if (ch.isNull() || ch.unicode() < 0x20 || ch.unicode() == 0x7f)
+            return false;
+    }
+    return true;
 }
 
 bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const QStringList &args) const
@@ -112,6 +141,13 @@ bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const Q
         };
         return allowed.contains(args);
     }
+
+    if (program == QStringLiteral("/usr/bin/efibootmgr"))
+        return args.size() == 2 && args.at(0) == QStringLiteral("-n")
+            && isSafeBootToken(args.at(1));
+
+    if (program == QStringLiteral("/usr/bin/grub2-reboot"))
+        return args.size() == 1 && isSafeGrubEntry(args.at(0));
 
     return false;
 }
@@ -148,6 +184,11 @@ void PolkitHelper::consumeOutput(const QByteArray &data, bool flushPartial)
 
 void PolkitHelper::finishWithError(const QString &message)
 {
+    const QString action = QFileInfo(m_program).fileName()
+        + (m_args.isEmpty() ? QString() : QStringLiteral(" ") + m_args.join(QLatin1Char(' ')));
+    if (!action.trimmed().isEmpty())
+        OperationLog::append(QStringLiteral("Amministrazione"), action, QStringLiteral("error"));
+
     if (m_process) {
         m_process->deleteLater();
         m_process = nullptr;
@@ -155,6 +196,8 @@ void PolkitHelper::finishWithError(const QString &message)
     m_running = false;
     m_lineBuffer.clear();
     m_allOutput.clear();
+    m_program.clear();
+    m_args.clear();
     emit runningChanged();
     emit finished(false, message);
 }

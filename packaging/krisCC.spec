@@ -1,6 +1,6 @@
 Name:           krisCC
-Version:        0.4.0
-Release:        11%{?dist}
+Version:        0.5.1
+Release:        5%{?dist}
 Summary:        krisCC personal control center for KrisOS and Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/krisCC
@@ -49,6 +49,36 @@ Settings.
 %{_datadir}/icons/hicolor/scalable/apps/krisCC.svg
 
 %changelog
+* Fri Sep 18 2026 krism-eu - 0.5.1-5
+- Promote the exact integration-tested RPM when the candidate source tree matches main
+- Avoid treating independent RPM rebuilds as byte-reproducible release artifacts
+
+* Fri Sep 18 2026 krism-eu - 0.5.1-4
+- Optimize backend state accessors without changing the QML architecture
+- Remove the unused duplicate rkStatus API after strict release audit
+
+* Fri Sep 18 2026 krism-eu - 0.5.1-3
+- Correct Fedora 44 usr-merged paths for efibootmgr, grubby and grub2-reboot
+- Supersede the pre-audit 0.5.1-2 candidate
+
+* Fri Sep 18 2026 krism-eu - 0.5.1-2
+- Harden backup process failure handling and keep verification output bounded
+- Keep Flatpak cleanup in user scope and avoid duplicate QML page recreation
+- Tighten one-shot GRUB argument validation
+- Add cross-layer release audit and strict lint/static-analysis gates
+
+* Fri Sep 18 2026 krism-eu - 0.5.1-1
+- Integration release for the complete KrisOS ISO
+- Keep the validated 0.5 feature set unchanged
+
+* Fri Sep 18 2026 krism-eu - 0.5.0-1
+- Add a unified minimal KrisOS system/update center
+- Add health, security, storage, UEFI and GRUB/BLS read-only diagnostics
+- Support one-shot UEFI BootNext and GRUB next-entry selection when available
+- Add backup inventory, verification and user-level restore
+- Add local operation history and expand safe terminal command bookmarks
+- Keep firmware and first-run/welcome tooling out of krisCC
+
 * Thu Sep 17 2026 krism-eu - 0.4.0-11
 - Use structured backend operation identifiers and result states in QML
 - Make backup archives atomic with warning/cancellation handling

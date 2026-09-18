@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 project(krisCC
-    VERSION 0.4.0
+    VERSION 0.5.1
     DESCRIPTION "Personal Control Center for KrisOS and Fedora bootc"
     LANGUAGES CXX
 )
@@ -24,6 +24,7 @@ qt_add_executable(krisCC
     src/PolkitHelper.cpp src/PolkitHelper.h
     src/UtilityBackend.cpp src/UtilityBackend.h
     src/InstanceController.cpp src/InstanceController.h
+    src/OperationLog.cpp src/OperationLog.h
 )
 
 set(KRISCC_QML_FILES
@@ -32,8 +33,7 @@ set(KRISCC_QML_FILES
     qml/modules/SoftwareModule.qml
     qml/modules/FlatpakModule.qml
     qml/modules/PodmanModule.qml
-    qml/modules/BootcModule.qml
-    qml/modules/ToolsModule.qml
+    qml/modules/SystemModule.qml
     qml/modules/CommandsModule.qml
     qml/modules/RecoveryModule.qml
 )

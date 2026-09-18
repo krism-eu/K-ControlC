@@ -1,5 +1,7 @@
 #include "SystemBackend.h"
 
+#include "OperationLog.h"
+
 #include <QClipboard>
 #include <QDateTime>
 #include <QDBusInterface>
@@ -15,6 +17,7 @@
 #include <QGuiApplication>
 #include <QHash>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QSet>
 #include <QStandardPaths>
 #include <QStorageInfo>
@@ -23,6 +26,7 @@
 #include <QTimeZone>
 #include <QTimer>
 #include <QUrl>
+#include <QVariantMap>
 
 #include <sys/sysinfo.h>
 
@@ -143,6 +147,7 @@ QString SystemBackend::quickSystemInfo() const
     out << "Storage dati: " << storageSummary() << '\n';
     out << "Desktop: " << desktopSession() << '\n';
     out << "Timezone: " << systemTimeZoneName() << '\n';
+    out << "Boot mode: " << (QFileInfo::exists(QStringLiteral("/sys/firmware/efi")) ? "UEFI" : "BIOS") << '\n';
     out << "Qt: " << qVersion() << '\n';
     return text.trimmed();
 }
@@ -161,7 +166,15 @@ QString SystemBackend::resolveExecutable(const QString &program) const
         const QFileInfo info(program);
         return info.exists() && info.isExecutable() ? info.absoluteFilePath() : QString();
     }
-    return QStandardPaths::findExecutable(program);
+    const QString found = QStandardPaths::findExecutable(program);
+    if (!found.isEmpty())
+        return found;
+    for (const QString &prefix : {QStringLiteral("/usr/sbin/"), QStringLiteral("/usr/bin/")}) {
+        const QFileInfo info(prefix + program);
+        if (info.exists() && info.isExecutable())
+            return info.absoluteFilePath();
+    }
+    return {};
 }
 
 QString SystemBackend::toolProgram(const QString &toolId) const
@@ -208,7 +221,8 @@ bool SystemBackend::launchQuickAction(const QString &actionId) const
         const QString flatpak = resolveExecutable(QStringLiteral("flatpak"));
         return !flatpak.isEmpty()
             && QProcess::startDetached(konsole, {QStringLiteral("-e"), flatpak,
-                                                 QStringLiteral("uninstall"), QStringLiteral("--unused")});
+                                                 QStringLiteral("uninstall"), QStringLiteral("--user"),
+                                                 QStringLiteral("--unused")});
     }
     if (actionId == QStringLiteral("journal-errors")) {
         const QString journalctl = resolveExecutable(QStringLiteral("journalctl"));
@@ -222,12 +236,6 @@ bool SystemBackend::launchQuickAction(const QString &actionId) const
             && QProcess::startDetached(konsole, {QStringLiteral("-e"), dnf5,
                                                  QStringLiteral("repoquery"), QStringLiteral("--installed"),
                                                  QStringLiteral("--unneeded")});
-    }
-    if (actionId == QStringLiteral("firmware")) {
-        const QString fwupdmgr = resolveExecutable(QStringLiteral("fwupdmgr"));
-        return !fwupdmgr.isEmpty()
-            && QProcess::startDetached(konsole, {QStringLiteral("-e"), fwupdmgr,
-                                                 QStringLiteral("get-updates")});
     }
     if (actionId == QStringLiteral("disks")) {
         const QString lsblk = resolveExecutable(QStringLiteral("lsblk"));
@@ -330,6 +338,212 @@ void SystemBackend::notify(const QString &summary, const QString &body) const
                             QStringList(), QVariantMap(), 5000);
 }
 
+QVariantList SystemBackend::backups() const
+{
+    QVariantList result;
+    const QDir backupDir(QDir::homePath() + QStringLiteral("/krisCC Backups"));
+    if (!backupDir.exists())
+        return result;
+
+    const QFileInfoList files = backupDir.entryInfoList(
+        {QStringLiteral("config-*.tar.gz"), QStringLiteral("home-*.tar.gz")},
+        QDir::Files | QDir::Readable, QDir::Time);
+    for (const QFileInfo &info : files) {
+        QVariantMap item;
+        item.insert(QStringLiteral("name"), info.fileName());
+        item.insert(QStringLiteral("path"), info.absoluteFilePath());
+        item.insert(QStringLiteral("size"), info.size());
+        item.insert(QStringLiteral("modified"), info.lastModified().toString(Qt::ISODate));
+        item.insert(QStringLiteral("kind"), info.fileName().startsWith(QStringLiteral("home-"))
+                                               ? QStringLiteral("home") : QStringLiteral("config"));
+        result.append(item);
+    }
+    return result;
+}
+
+bool SystemBackend::validateBackupPath(const QString &path, QString *canonicalPath) const
+{
+    const QDir backupDir(QDir::homePath() + QStringLiteral("/krisCC Backups"));
+    const QString backupRoot = QFileInfo(backupDir.absolutePath()).canonicalFilePath();
+    const QFileInfo info(path);
+    const QString canonical = info.canonicalFilePath();
+    if (backupRoot.isEmpty() || canonical.isEmpty() || !info.isFile())
+        return false;
+    if (!canonical.startsWith(backupRoot + QLatin1Char('/')))
+        return false;
+
+    static const QRegularExpression namePattern(
+        QStringLiteral("^(config|home)-[0-9]{8}-[0-9]{6}\\.tar\\.gz$"));
+    if (!namePattern.match(info.fileName()).hasMatch())
+        return false;
+
+    if (canonicalPath)
+        *canonicalPath = canonical;
+    return true;
+}
+
+bool SystemBackend::verifySnapshot(const QString &path)
+{
+    if (m_backupBusy)
+        return false;
+
+    QString canonical;
+    if (!validateBackupPath(path, &canonical)) {
+        setBackupResult(tr("Archivio di backup non valido o fuori dalla cartella krisCC Backups."),
+                        QString(), QStringLiteral("error"));
+        return false;
+    }
+
+    const QString tar = resolveExecutable(QStringLiteral("tar"));
+    if (tar.isEmpty()) {
+        setBackupResult(tr("tar non disponibile."), QString(), QStringLiteral("error"));
+        return false;
+    }
+
+    auto *process = new QProcess(this);
+    const QPointer<QProcess> guarded(process);
+    m_backupProcess = process;
+    m_backupCancelled = false;
+    process->setProcessChannelMode(QProcess::SeparateChannels);
+    process->setStandardOutputFile(QProcess::nullDevice());
+    setBackupBusy(true);
+    setBackupResult(tr("Verifica archivio in corso…"), canonical, QStringLiteral("running"));
+
+    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+            [this, guarded, canonical](int exitCode, QProcess::ExitStatus status) {
+        if (!guarded || guarded != m_backupProcess)
+            return;
+        const QString details = QString::fromUtf8(guarded->readAllStandardError()).trimmed();
+        const bool cancelled = m_backupCancelled;
+        m_backupProcess = nullptr;
+        guarded->deleteLater();
+        setBackupBusy(false);
+        m_backupCancelled = false;
+
+        if (cancelled) {
+            setBackupResult(tr("Verifica annullata."), canonical, QStringLiteral("cancelled"));
+            return;
+        }
+        if (status == QProcess::NormalExit && exitCode == 0) {
+            setBackupResult(tr("Archivio verificato correttamente."), canonical, QStringLiteral("success"));
+            OperationLog::append(QStringLiteral("Backup"), QStringLiteral("verify"),
+                                 QStringLiteral("success"), QFileInfo(canonical).fileName());
+            return;
+        }
+        setBackupResult(details.isEmpty() ? tr("Archivio non valido o danneggiato.") : details,
+                        canonical, QStringLiteral("error"));
+        OperationLog::append(QStringLiteral("Backup"), QStringLiteral("verify"),
+                             QStringLiteral("error"), QFileInfo(canonical).fileName());
+    });
+
+    connect(process, &QProcess::errorOccurred, this,
+            [this, guarded, canonical](QProcess::ProcessError error) {
+        if (!guarded || guarded != m_backupProcess || error != QProcess::FailedToStart)
+            return;
+        const QString message = guarded->errorString();
+        m_backupProcess = nullptr;
+        guarded->deleteLater();
+        m_backupCancelled = false;
+        setBackupBusy(false);
+        setBackupResult(tr("Impossibile avviare la verifica: %1").arg(message),
+                        canonical, QStringLiteral("error"));
+        OperationLog::append(QStringLiteral("Backup"), QStringLiteral("verify"),
+                             QStringLiteral("error"), QFileInfo(canonical).fileName());
+    });
+
+    process->start(tar, {QStringLiteral("-tzf"), canonical});
+    return true;
+}
+
+bool SystemBackend::restoreSnapshot(const QString &path)
+{
+    if (m_backupBusy)
+        return false;
+
+    QString canonical;
+    if (!validateBackupPath(path, &canonical)) {
+        setBackupResult(tr("Archivio di backup non valido o fuori dalla cartella krisCC Backups."),
+                        QString(), QStringLiteral("error"));
+        return false;
+    }
+
+    const QString tar = resolveExecutable(QStringLiteral("tar"));
+    if (tar.isEmpty()) {
+        setBackupResult(tr("tar non disponibile."), QString(), QStringLiteral("error"));
+        return false;
+    }
+
+    auto *process = new QProcess(this);
+    const QPointer<QProcess> guarded(process);
+    m_backupProcess = process;
+    m_backupCancelled = false;
+    process->setProcessChannelMode(QProcess::MergedChannels);
+    setBackupBusy(true);
+    setBackupResult(tr("Ripristino in corso…"), canonical, QStringLiteral("running"));
+
+    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+            [this, guarded, canonical](int exitCode, QProcess::ExitStatus status) {
+        if (!guarded || guarded != m_backupProcess)
+            return;
+        const QString details = QString::fromUtf8(guarded->readAllStandardOutput()).trimmed();
+        const bool cancelled = m_backupCancelled;
+        m_backupProcess = nullptr;
+        guarded->deleteLater();
+        setBackupBusy(false);
+        m_backupCancelled = false;
+
+        if (cancelled) {
+            setBackupResult(tr("Ripristino annullato. Alcuni file potrebbero essere già stati ripristinati."),
+                            canonical, QStringLiteral("warning"));
+            OperationLog::append(QStringLiteral("Backup"), QStringLiteral("restore"),
+                                 QStringLiteral("cancelled"), QFileInfo(canonical).fileName());
+            return;
+        }
+        if (status == QProcess::NormalExit && exitCode == 0) {
+            setBackupResult(tr("Backup ripristinato. Disconnettersi o riavviare le applicazioni interessate per applicare tutte le configurazioni."),
+                            canonical, QStringLiteral("success"));
+            OperationLog::append(QStringLiteral("Backup"), QStringLiteral("restore"),
+                                 QStringLiteral("success"), QFileInfo(canonical).fileName());
+            notify(tr("Ripristino completato"), QFileInfo(canonical).fileName());
+            return;
+        }
+        setBackupResult(details.isEmpty() ? tr("Ripristino non riuscito.") : details,
+                        canonical, QStringLiteral("error"));
+        OperationLog::append(QStringLiteral("Backup"), QStringLiteral("restore"),
+                             QStringLiteral("error"), QFileInfo(canonical).fileName());
+    });
+
+    connect(process, &QProcess::errorOccurred, this,
+            [this, guarded, canonical](QProcess::ProcessError error) {
+        if (!guarded || guarded != m_backupProcess || error != QProcess::FailedToStart)
+            return;
+        const QString message = guarded->errorString();
+        m_backupProcess = nullptr;
+        guarded->deleteLater();
+        m_backupCancelled = false;
+        setBackupBusy(false);
+        setBackupResult(tr("Impossibile avviare il ripristino: %1").arg(message),
+                        canonical, QStringLiteral("error"));
+        OperationLog::append(QStringLiteral("Backup"), QStringLiteral("restore"),
+                             QStringLiteral("error"), QFileInfo(canonical).fileName());
+    });
+
+    process->start(tar, {QStringLiteral("-xzf"), canonical,
+                         QStringLiteral("--no-same-owner"), QStringLiteral("--no-same-permissions"),
+                         QStringLiteral("-C"), QDir::homePath()});
+    return true;
+}
+
+QString SystemBackend::operationHistory() const
+{
+    return OperationLog::recent(50);
+}
+
+bool SystemBackend::clearOperationHistory()
+{
+    return OperationLog::clear();
+}
+
 bool SystemBackend::createSnapshot(const QString &kind)
 {
     if (m_backupBusy)
@@ -350,11 +564,12 @@ bool SystemBackend::createSnapshot(const QString &kind)
 
     const QStorageInfo backupStorage(backupDir.absolutePath());
     if (backupStorage.isValid() && backupStorage.isReady()) {
-        const quint64 oneGiB = 1024ULL * 1024ULL * 1024ULL;
-        const quint64 minimumFree = kind == QStringLiteral("home") ? 5ULL * oneGiB : oneGiB;
+        const qint64 oneGiB = 1024LL * 1024LL * 1024LL;
+        const qint64 minimumFree = kind == QStringLiteral("home") ? 5LL * oneGiB : oneGiB;
         if (backupStorage.bytesAvailable() < minimumFree) {
             setBackupResult(tr("Spazio libero insufficiente per lo snapshot: disponibili %1, richiesti almeno %2.")
-                                .arg(humanGiB(backupStorage.bytesAvailable()), humanGiB(minimumFree)),
+                                .arg(humanGiB(quint64(backupStorage.bytesAvailable())),
+                                     humanGiB(quint64(minimumFree))),
                             QString(), QStringLiteral("error"));
             return false;
         }
@@ -425,6 +640,8 @@ bool SystemBackend::createSnapshot(const QString &kind)
             m_backupPartialPath.clear();
             m_backupCancelled = false;
             setBackupResult(tr("Backup annullato; il file parziale è stato rimosso."), QString(), QStringLiteral("cancelled"));
+            OperationLog::append(QStringLiteral("Backup"), QStringLiteral("create"),
+                                 QStringLiteral("cancelled"), QFileInfo(output).fileName());
             return;
         }
 
@@ -441,12 +658,16 @@ bool SystemBackend::createSnapshot(const QString &kind)
             m_backupPartialPath.clear();
             if (exitCode == 0) {
                 setBackupResult(tr("Snapshot creato correttamente."), output, QStringLiteral("success"));
+                OperationLog::append(QStringLiteral("Backup"), QStringLiteral("create"),
+                                     QStringLiteral("success"), QFileInfo(output).fileName());
                 notify(tr("Backup completato"), output);
             } else {
                 const QString warning = details.isEmpty()
                     ? tr("Snapshot creato con avvisi da tar. Verificare l'archivio prima di usarlo per un ripristino.")
                     : tr("Snapshot creato con avvisi da tar. Verificare l'archivio prima di usarlo per un ripristino.\n%1").arg(details);
                 setBackupResult(warning, output, QStringLiteral("warning"));
+                OperationLog::append(QStringLiteral("Backup"), QStringLiteral("create"),
+                                     QStringLiteral("warning"), QFileInfo(output).fileName());
                 notify(tr("Backup completato con avvisi"), output);
             }
             return;
@@ -458,6 +679,8 @@ bool SystemBackend::createSnapshot(const QString &kind)
             ? tr("Snapshot non riuscito (codice %1).").arg(exitCode)
             : details;
         setBackupResult(message, QString(), QStringLiteral("error"));
+        OperationLog::append(QStringLiteral("Backup"), QStringLiteral("create"),
+                             QStringLiteral("error"), QFileInfo(output).fileName());
     });
 
     connect(process, &QProcess::errorOccurred, this,

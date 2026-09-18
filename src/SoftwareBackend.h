@@ -15,9 +15,9 @@ class SoftwareBackend : public QObject
 public:
     explicit SoftwareBackend(QObject *parent = nullptr);
 
-    QVariantList repositories() const { return m_repositories; }
+    const QVariantList &repositories() const { return m_repositories; }
     bool busy() const { return m_busy; }
-    QString errorText() const { return m_errorText; }
+    const QString &errorText() const { return m_errorText; }
 
     Q_INVOKABLE void refreshRepositories();
 

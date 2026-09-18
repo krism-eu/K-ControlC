@@ -29,7 +29,7 @@ grep -A6 'org.kriscc.controlcenter.bootc.status' data/org.kriscc.controlcenter.p
 # KrisOS supports a single deployment: rollback must not be offered or
 # privileged, and repository mutations must not bypass rk policy.
 if grep -RniE 'bootc[^\n]*rollback|"rollback"|Rollback \+ apply|Prepara rollback' \
-    qml/modules/BootcModule.qml qml/modules/RecoveryModule.qml \
+    qml/modules/SystemModule.qml qml/modules/RecoveryModule.qml \
     src/PolkitHelper.cpp data/org.kriscc.controlcenter.policy; then
   echo "ERROR: unsupported BootC rollback remains exposed" >&2
   exit 1
@@ -66,8 +66,8 @@ grep -q 'text: qsTr("Aggiorna tutto")' qml/modules/FlatpakModule.qml
 grep -q 'text: qsTr("Aggiorna")' qml/modules/FlatpakModule.qml
 
 # The BootC check is an explicit registry check and must remain non-applying.
-grep -Fq 'root.runBootc(["upgrade", "--check"])' qml/modules/BootcModule.qml
-grep -q 'text: qsTr("Controlla GHCR")' qml/modules/BootcModule.qml
+grep -Fq 'root.runBootc(["upgrade", "--check"])' qml/modules/SystemModule.qml
+grep -q 'text: qsTr("Controlla immagine")' qml/modules/SystemModule.qml
 
 if grep -Eq 'QStringLiteral\("--json"\)|QStringLiteral\("--format-version' src/BootcBackend.cpp; then
   echo "ERROR: BootcBackend must use bootc status --format json without legacy JSON flags" >&2
@@ -110,7 +110,8 @@ test -f data/org.kriscc.KrisCC.metainfo.xml
 test ! -e data/org.kcontrolc.KControlC.metainfo.xml
 
 grep -q '^Name:[[:space:]]*krisCC$' packaging/krisCC.spec
-grep -q '^Release:[[:space:]]*11%{?dist}$' packaging/krisCC.spec
+grep -Fxq 'Version:        0.5.1' packaging/krisCC.spec
+grep -Fxq 'Release:        5%{?dist}' packaging/krisCC.spec
 if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
   echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
   exit 1
@@ -175,28 +176,60 @@ grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
 grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
 grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
 grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
-grep -q 'UtilityBackend.operationId === "bookmark.services-active"' qml/modules/ToolsModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.health"' qml/modules/SystemModule.qml
 if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
   echo "ERROR: translated UI strings are still used as backend state" >&2
   exit 1
 fi
 
-# Backups are written under a temporary name and expose structured outcomes.
+# Backups are atomic and the UI supports explicit verification and restore.
 grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
 grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
 grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool verifySnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool restoreSnapshot' src/SystemBackend.h
+grep -q 'validateBackupPath' src/SystemBackend.cpp
+grep -q 'QProcess::nullDevice()' src/SystemBackend.cpp
+grep -q 'Impossibile avviare la verifica' src/SystemBackend.cpp
+grep -q 'Impossibile avviare il ripristino' src/SystemBackend.cpp
+grep -A5 'flatpak-unused' src/SystemBackend.cpp | grep -q 'QStringLiteral("--user")'
 grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+grep -q 'OperationLog::append' src/SystemBackend.cpp
+grep -q 'src/OperationLog.cpp src/OperationLog.h' CMakeLists.txt
+
+# Next-boot selection is one-shot only: BootNext or grub2-reboot, never a permanent BootOrder rewrite.
+grep -q 'QStringLiteral("/usr/bin/efibootmgr")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("-n")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("/usr/bin/grub2-reboot")' src/PolkitHelper.cpp
+grep -q "entry.startsWith(QLatin1Char('-'))" src/PolkitHelper.cpp
+grep -q 'org.kriscc.controlcenter.boot.next-uefi' data/org.kriscc.controlcenter.policy
+grep -q 'org.kriscc.controlcenter.boot.next-grub' data/org.kriscc.controlcenter.policy
+grep -q 'BootNext vale per un solo riavvio' qml/modules/SystemModule.qml
+if grep -q 'efibootmgr.*-[Oo]' src/PolkitHelper.cpp qml/modules/SystemModule.qml; then
+  echo "ERROR: permanent UEFI BootOrder mutation must not be exposed" >&2
+  exit 1
+fi
+
+# Minimal scope: no firmware updater or first-run/welcome workflow is shipped by the new system page.
+if grep -niE 'fwupdmgr|firmware|welcome|first.?run' qml/modules/SystemModule.qml qml/modules/DashboardModule.qml qml/modules/RecoveryModule.qml; then
+  echo "ERROR: firmware/welcome scope leaked into krisCC 0.5 UI" >&2
+  exit 1
+fi
 
 # --background must be a single activatable session instance, not an unreachable duplicate.
 grep -q 'org.kriscc.ControlCenter' src/main.cpp
 grep -q 'registerService(serviceName)' src/main.cpp
 grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
 grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+grep -q 'Q_CLASSINFO("D-Bus Interface", "org.kriscc.ControlCenter")' src/InstanceController.h
+grep -q 'qml/modules/SystemModule.qml' CMakeLists.txt
+grep -q 'function replaceForIndex(index)' qml/Main.qml
+test "$(grep -c 'pageStack.replace(' qml/Main.qml)" -eq 7
 
 # The released RPM is validated in a fresh Fedora job before release publication.
 grep -q '^  rpm-smoke:' .github/workflows/build.yml
-grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
-grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -Fq 'needs: [build-fedora, rpm-smoke, release-audit]' .github/workflows/build.yml
+grep -Fq "dnf -y install \"\$rpm_file\"" .github/workflows/build.yml
 grep -q '/usr/bin/krisCC' .github/workflows/build.yml
 
 echo "Checking mandatory local DNF5 behavior..."

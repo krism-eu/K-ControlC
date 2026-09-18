@@ -22,15 +22,14 @@ public:
 
     bool bootcAvailable() const;
     bool busy() const { return m_busy; }
-    QString statusText() const { return m_statusText; }
-    QString errorText() const { return m_errorText; }
-    QVariantList deployments() const { return m_deployments; }
-    QString persistentPackages() const { return m_persistentPackages; }
+    const QString &statusText() const { return m_statusText; }
+    const QString &errorText() const { return m_errorText; }
+    const QVariantList &deployments() const { return m_deployments; }
+    const QString &persistentPackages() const { return m_persistentPackages; }
     int persistentPackageCount() const { return m_persistentPackageCount; }
 
     Q_INVOKABLE void refreshStatus();
     Q_INVOKABLE void refreshPackages();
-    Q_INVOKABLE QString rkStatus() const { return m_persistentPackages; }
 
 signals:
     void busyChanged();
