@@ -39,6 +39,14 @@
     <annotate key="org.freedesktop.policykit.exec.argv1">rm</annotate>
   </action>
 
+  <action id="org.kriscc.controlcenter.dnf.config-manager">
+    <description>Manage DNF repositories</description>
+    <message>Authentication is required to manage software repositories</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/dnf5</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">config-manager</annotate>
+  </action>
+
   <action id="org.kriscc.controlcenter.bootc.upgrade">
     <description>Manage bootc upgrades</description>
     <message>Authentication is required to update the operating system</message>
