@@ -61,7 +61,7 @@ Kirigami.ScrollablePage {
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 2
-            Kirigami.Heading { level: 2; text: qsTr("Applicazioni Flatpak") }
+            Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Applicazioni Flatpak") }
             Controls.Label {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
@@ -74,7 +74,16 @@ Kirigami.ScrollablePage {
             id: flatpakTabs
             Layout.fillWidth: true
             currentIndex: root.mode === "installed" ? 1 : root.mode === "updates" ? 2 : root.mode === "remotes" ? 3 : 0
-            Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Cerca"); onClicked: root.mode = "search" }
+            Controls.TabButton {
+                implicitHeight: Kirigami.Units.gridUnit * 2.1
+                font.bold: checked
+                text: qsTr("Cerca")
+                onClicked: {
+                    root.mode = "search"
+                    root.lastQuery = ""
+                    searchField.clear()
+                }
+            }
             Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Installati"); onClicked: root.run("installed", "") }
             Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Aggiornamenti"); onClicked: root.run("updates", "") }
             Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.1; font.bold: checked; text: qsTr("Remote"); onClicked: root.run("remotes", "") }
@@ -159,6 +168,7 @@ Kirigami.ScrollablePage {
             Layout.fillWidth: true
             visible: !UtilityBackend.busy && UtilityBackend.operationId.indexOf("flatpak.") === 0
                      && UtilityBackend.resultState !== "idle" && UtilityBackend.output.length > 0 && root.rows().length === 0
+                     && !(root.mode === "search" && root.lastQuery.length < 2)
             type: UtilityBackend.resultState === "success" ? Kirigami.MessageType.Information : Kirigami.MessageType.Error
             text: UtilityBackend.output
         }
@@ -168,7 +178,7 @@ Kirigami.ScrollablePage {
             Layout.preferredHeight: Math.min(contentHeight, 620)
             clip: true
             spacing: Kirigami.Units.smallSpacing
-            model: root.rows()
+            model: root.mode === "search" && root.lastQuery.length < 2 ? [] : root.rows()
 
             delegate: Kirigami.AbstractCard {
                 required property var modelData
@@ -179,6 +189,17 @@ Kirigami.ScrollablePage {
 
                     RowLayout {
                         Layout.fillWidth: true
+
+                        Kirigami.Icon {
+                            Layout.preferredWidth: 48
+                            Layout.preferredHeight: 48
+                            source: {
+                                var appId = root.mode === "search" ? (modelData[2] || "") : (modelData[1] || "")
+                                var resolved = SystemBackend.flatpakIconPath(appId)
+                                return resolved.length > 0 ? resolved : "package-x-generic"
+                            }
+                        }
+
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 1
@@ -239,6 +260,13 @@ Kirigami.ScrollablePage {
                     }
                 }
             }
+        }
+
+        Kirigami.InlineMessage {
+            Layout.fillWidth: true
+            visible: root.mode === "search" && root.lastQuery.length < 2 && !UtilityBackend.busy
+            type: Kirigami.MessageType.Information
+            text: qsTr("Inserisci almeno due caratteri per cercare applicazioni.")
         }
 
         Kirigami.InlineMessage {
