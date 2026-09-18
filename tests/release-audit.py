@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = "0.5.1"
-RELEASE = "8"
+RELEASE = "9"
 RPM_EVR = f"{VERSION}-{RELEASE}.fc44"
 RPM_FILE = f"krisCC-{RPM_EVR}.x86_64.rpm"
 TAG = f"v{VERSION}-{RELEASE}"
@@ -96,8 +96,9 @@ require('args.at(0) == QStringLiteral("config-manager")' in polkit_cpp,
         "DNF repository mutations are not restricted to config-manager")
 require("isSafeRepositoryId" in polkit_cpp and "isSafeRepositoryUrl" in polkit_cpp,
         "DNF repository validators are missing")
-require('url.scheme() == QStringLiteral("https") || url.scheme() == QStringLiteral("http")' in polkit_cpp,
-        "DNF repository URLs must be constrained to HTTP(S)")
+require('url.scheme() == QStringLiteral("https")' in polkit_cpp
+        and 'QStringLiteral("http")' not in polkit_cpp,
+        "DNF repository URLs must be HTTPS-only")
 require("entry.startsWith(QLatin1Char('-'))" in polkit_cpp,
         "GRUB entry validator does not reject option-shaped values")
 for forbidden in ('QStringLiteral("-o")', 'QStringLiteral("-O")', "--bootorder"):
@@ -109,7 +110,7 @@ require("/usr/bin/bash" not in polkit_cpp and "/usr/bin/sh" not in polkit_cpp,
 policy_root = ET.parse(ROOT / "data/org.kriscc.controlcenter.policy").getroot()
 actions = {node.attrib["id"]: node for node in policy_root.findall("action")}
 expected_actions = {
-    "org.kriscc.controlcenter.bootc.status": ("/usr/bin/bootc", "status", "yes"),
+    "org.kriscc.controlcenter.bootc.status": ("/usr/libexec/kriscc/bootc-status", None, "yes"),
     "org.kriscc.controlcenter.rk.sync": ("/usr/bin/rk", "sync", "auth_admin"),
     "org.kriscc.controlcenter.rk.add": ("/usr/bin/rk", "add", "auth_admin"),
     "org.kriscc.controlcenter.rk.rm": ("/usr/bin/rk", "rm", "auth_admin"),
@@ -135,6 +136,16 @@ for action_id, (path, argv1, allow_active) in expected_actions.items():
 require("auth_admin_keep" not in read("data/org.kriscc.controlcenter.policy"),
         "Polkit authorization retention is forbidden")
 
+bootc_wrapper = read("src/bootc-status.sh")
+require('case "$1" in' in bootc_wrapper
+        and 'exec /usr/bin/bootc status --format "$1"' in bootc_wrapper
+        and 'json|humanreadable' in bootc_wrapper
+        and '"$@"' not in bootc_wrapper,
+        "bootc status wrapper must expose only fixed status formats")
+require("/usr/libexec/kriscc/bootc-status" in cmake
+        or "bootc-status.sh" in cmake,
+        "bootc status wrapper is not installed")
+
 # Backup contract: canonical path validation, safe extraction and all async start failures
 # must leave the UI out of the busy state.
 for token in (
@@ -150,6 +161,10 @@ for token in (
 require(system_cpp.count("&QProcess::errorOccurred") >= 3,
         "create/verify/restore must all handle FailedToStart")
 require("setBackupBusy(false);" in system_cpp, "backup failure paths do not clear busy state")
+require('QStringLiteral(".local/share/flatpak")' in system_cpp,
+        "home backup must exclude Flatpak runtime/application store")
+require('QStringLiteral(".local/share/containers")' in system_cpp,
+        "home backup must exclude Podman container store")
 
 # The Flatpak contract is per-user everywhere, including the external cleanup shortcut.
 flatpak_cleanup = re.search(
@@ -159,6 +174,11 @@ require(flatpak_cleanup is not None, "flatpak-unused action missing")
 require('QStringLiteral("--user")' in flatpak_cleanup.group(1)
         and 'QStringLiteral("--unused")' in flatpak_cleanup.group(1),
         "Flatpak unused cleanup must stay in user scope")
+require('QStringLiteral("search"), QStringLiteral("--user")' in utility_cpp,
+        "Flatpak search must stay in user scope")
+require('QStringLiteral("install"), QStringLiteral("--user"), QStringLiteral("--noninteractive")' in utility_cpp
+        and 'QStringLiteral("--assumeyes")' in utility_cpp,
+        "Flatpak install must be noninteractive in user scope")
 
 # Navigation should replace a page once, not once from showIndex and again from TabBar.
 require("function replaceForIndex(index)" in main_qml, "central page replacement function missing")
