@@ -206,9 +206,9 @@ bool UtilityBackend::runBookmark(const QString &id)
     if (id == QStringLiteral("podman-images"))
         return start(QStringLiteral("/usr/bin/podman"), {QStringLiteral("images")}, tr("Immagini Podman"), QStringLiteral("bookmark.podman-images"), kContainerQueryTimeoutMs);
     if (id == QStringLiteral("uefi"))
-        return start(QStringLiteral("/usr/sbin/efibootmgr"), {}, tr("Voci di avvio UEFI"), QStringLiteral("bookmark.uefi"), kShortQueryTimeoutMs);
+        return start(QStringLiteral("/usr/bin/efibootmgr"), {}, tr("Voci di avvio UEFI"), QStringLiteral("bookmark.uefi"), kShortQueryTimeoutMs);
     if (id == QStringLiteral("grub-entries"))
-        return start(QStringLiteral("/usr/sbin/grubby"), {QStringLiteral("--info=ALL")}, tr("Voci GRUB/BLS"), QStringLiteral("bookmark.grub-entries"), kShortQueryTimeoutMs);
+        return start(QStringLiteral("/usr/bin/grubby"), {QStringLiteral("--info=ALL")}, tr("Voci GRUB/BLS"), QStringLiteral("bookmark.grub-entries"), kShortQueryTimeoutMs);
     if (id == QStringLiteral("fstab-order"))
         return start(QStringLiteral("findmnt"), {QStringLiteral("--fstab"), QStringLiteral("--evaluate"), QStringLiteral("-o"), QStringLiteral("TARGET,SOURCE,FSTYPE,OPTIONS")}, tr("Ordine mount configurato"), QStringLiteral("bookmark.fstab-order"), kShortQueryTimeoutMs);
 
