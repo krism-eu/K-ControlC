@@ -1,6 +1,6 @@
 Name:           krisCC
 Version:        0.5.1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        krisCC personal control center for KrisOS and Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/krisCC
@@ -49,6 +49,12 @@ Settings.
 %{_datadir}/icons/hicolor/scalable/apps/krisCC.svg
 
 %changelog
+* Fri Sep 18 2026 krism-eu - 0.5.1-2
+- Harden backup process failure handling and keep verification output bounded
+- Keep Flatpak cleanup in user scope and avoid duplicate QML page recreation
+- Tighten one-shot GRUB argument validation
+- Add cross-layer release audit and strict lint/static-analysis gates
+
 * Fri Sep 18 2026 krism-eu - 0.5.1-1
 - Integration release for the complete KrisOS ISO
 - Keep the validated 0.5 feature set unchanged
