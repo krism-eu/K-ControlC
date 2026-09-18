@@ -13,8 +13,7 @@ Kirigami.ApplicationWindow {
     visible: !KrisccStartHidden
     title: qsTr("krisCC")
 
-    function showIndex(index) {
-        topTabs.currentIndex = index
+    function replaceForIndex(index) {
         if (index === 1) pageStack.replace(softwarePage)
         else if (index === 2) pageStack.replace(flatpakPage)
         else if (index === 3) pageStack.replace(podmanPage)
@@ -22,6 +21,13 @@ Kirigami.ApplicationWindow {
         else if (index === 5) pageStack.replace(commandsPage)
         else if (index === 6) pageStack.replace(recoveryPage)
         else pageStack.replace(dashboardPage)
+    }
+
+    function showIndex(index) {
+        if (topTabs.currentIndex === index)
+            replaceForIndex(index)
+        else
+            topTabs.currentIndex = index
     }
 
     function openById(pageId) {
@@ -59,16 +65,8 @@ Kirigami.ApplicationWindow {
                 id: topTabs
                 Layout.fillWidth: true
                 onCurrentIndexChanged: {
-                    if (pageStack.depth > 0) {
-                        var i = currentIndex
-                        if (i === 1) pageStack.replace(softwarePage)
-                        else if (i === 2) pageStack.replace(flatpakPage)
-                        else if (i === 3) pageStack.replace(podmanPage)
-                        else if (i === 4) pageStack.replace(systemPage)
-                        else if (i === 5) pageStack.replace(commandsPage)
-                        else if (i === 6) pageStack.replace(recoveryPage)
-                        else pageStack.replace(dashboardPage)
-                    }
+                    if (pageStack.depth > 0)
+                        root.replaceForIndex(currentIndex)
                 }
 
                 Controls.TabButton { width: topTabs.width / 7; implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Panoramica") }
