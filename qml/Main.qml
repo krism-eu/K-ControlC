@@ -13,6 +13,7 @@ Kirigami.ApplicationWindow {
     visible: !KrisccStartHidden
     title: qsTr("krisCC")
     Kirigami.Theme.highlightColor: "#c62828"
+    palette.highlight: "#c62828"
 
     function replaceForIndex(index) {
         if (index === 1) pageStack.replace(softwarePage)
@@ -82,6 +83,20 @@ Kirigami.ApplicationWindow {
     }
 
     pageStack.initialPage: dashboardPage
+
+    Timer {
+        id: smokePager
+        property int nextIndex: 0
+        interval: 180
+        repeat: true
+        running: KrisccSmokeTest
+        onTriggered: {
+            root.showIndex(nextIndex)
+            nextIndex++
+            if (nextIndex > 6)
+                stop()
+        }
+    }
 
     Component {
         id: dashboardPage
