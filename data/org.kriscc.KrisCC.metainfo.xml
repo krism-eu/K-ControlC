@@ -13,6 +13,9 @@
   <provides><binary>krisCC</binary></provides>
   <categories><category>Settings</category><category>System</category></categories>
   <releases>
+    <release version="0.5.1" date="2026-09-18">
+      <description><p>Integration release for the complete KrisOS ISO with the validated 0.5 feature set unchanged.</p></description>
+    </release>
     <release version="0.5.0" date="2026-09-18">
       <description><p>Minimal unified KrisOS system center, health and boot tools, backup restore, local history and expanded safe terminal bookmarks.</p></description>
     </release>
