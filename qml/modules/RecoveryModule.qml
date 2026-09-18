@@ -11,6 +11,7 @@ Kirigami.ScrollablePage {
     property var backupFiles: []
     property string restorePath: ""
     property string restoreName: ""
+    property string restoreKind: ""
 
     function humanSize(bytes) {
         if (!bytes || bytes <= 0) return "0 B"
@@ -194,6 +195,7 @@ Kirigami.ScrollablePage {
                                 onClicked: {
                                     root.restorePath = modelData.path
                                     root.restoreName = modelData.name
+                                    root.restoreKind = modelData.kind
                                     restoreDialog.open()
                                 }
                             }
@@ -247,7 +249,7 @@ Kirigami.ScrollablePage {
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
             wrapMode: Text.WordWrap
-            text: qsTr("La home può essere grande e contenere dati sensibili. Cache, cestino e backup precedenti vengono esclusi.")
+            text: qsTr("La home può essere grande e contenere dati sensibili. Cache, cestino, runtime/app Flatpak (~/.local/share/flatpak), storage Podman inclusi volumi (~/.local/share/containers) e backup precedenti vengono esclusi. I dati personali delle app Flatpak in ~/.var/app restano inclusi.")
         }
         onAccepted: SystemBackend.createSnapshot("home")
     }
@@ -259,7 +261,9 @@ Kirigami.ScrollablePage {
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
             wrapMode: Text.WordWrap
-            text: qsTr("I file presenti nella home con lo stesso percorso possono essere sovrascritti. Il ripristino avviene come utente, senza modificare il deployment KrisOS.")
+            text: root.restoreKind === "home"
+                  ? qsTr("ATTENZIONE: il ripristino della home sovrascrive i file esistenti con lo stesso percorso. Runtime/app Flatpak e storage Podman esclusi dal backup non vengono ripristinati; i dati in ~/.var/app possono invece essere sovrascritti. Il deployment KrisOS non viene modificato.")
+                  : qsTr("Le configurazioni esistenti con lo stesso percorso possono essere sovrascritte. Il ripristino avviene come utente, senza modificare il deployment KrisOS.")
         }
         onAccepted: SystemBackend.restoreSnapshot(root.restorePath)
     }
