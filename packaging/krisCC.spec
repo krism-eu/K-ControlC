@@ -1,5 +1,5 @@
 Name:           krisCC
-Version:        0.5.0
+Version:        0.5.1
 Release:        1%{?dist}
 Summary:        krisCC personal control center for KrisOS and Fedora bootc
 License:        MIT
@@ -49,6 +49,10 @@ Settings.
 %{_datadir}/icons/hicolor/scalable/apps/krisCC.svg
 
 %changelog
+* Fri Sep 18 2026 krism-eu - 0.5.1-1
+- Integration release for the complete KrisOS ISO
+- Keep the validated 0.5 feature set unchanged
+
 * Fri Sep 18 2026 krism-eu - 0.5.0-1
 - Add a unified minimal KrisOS system/update center
 - Add health, security, storage, UEFI and GRUB/BLS read-only diagnostics
