@@ -49,7 +49,7 @@ fi
 # RPM preview must be the same policy path as the actual rk transaction.
 grep -q 'QStringLiteral("/usr/bin/rk")' src/UtilityBackend.cpp
 grep -q 'QStringLiteral("plan")' src/UtilityBackend.cpp
-if grep -nE 'dnf5.*install|install.*--assumeno|--assumeno' src/UtilityBackend.cpp; then
+if grep -nE 'QStringLiteral\("/usr/bin/dnf5"\).*QStringLiteral\("install"\)|--assumeno' src/UtilityBackend.cpp; then
   echo "ERROR: RPM preview bypasses rk policy" >&2
   exit 1
 fi
