@@ -33,6 +33,8 @@ private:
     bool isValidPackageName(const QString &package) const;
     bool isSafeBootToken(const QString &token) const;
     bool isSafeGrubEntry(const QString &entry) const;
+    bool isSafeRepositoryId(const QString &repoId) const;
+    bool isSafeRepositoryUrl(const QString &url) const;
     void consumeOutput(const QByteArray &data, bool flushPartial = false);
     void finishWithError(const QString &message);
 
