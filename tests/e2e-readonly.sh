@@ -154,6 +154,8 @@ grep -q 'install(TARGETS krisCC' CMakeLists.txt
 grep -q 'data/krisCC.desktop' CMakeLists.txt
 grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
 grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'src/bootc-status.sh' CMakeLists.txt
+grep -Fq '%{_libexecdir}/kriscc/bootc-status' packaging/krisCC.spec
 grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
 grep -q '^Name=krisCC$' data/krisCC.desktop
 grep -q '^Exec=krisCC$' data/krisCC.desktop
