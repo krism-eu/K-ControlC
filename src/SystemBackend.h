@@ -34,9 +34,9 @@ public:
     QString desktopSession() const;
 
     bool backupBusy() const { return m_backupBusy; }
-    QString backupStatus() const { return m_backupStatus; }
-    QString backupPath() const { return m_backupPath; }
-    QString backupState() const { return m_backupState; }
+    const QString &backupStatus() const { return m_backupStatus; }
+    const QString &backupPath() const { return m_backupPath; }
+    const QString &backupState() const { return m_backupState; }
 
     Q_INVOKABLE QString quickSystemInfo() const;
     Q_INVOKABLE void copyToClipboard(const QString &text) const;
