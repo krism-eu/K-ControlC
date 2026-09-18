@@ -564,11 +564,12 @@ bool SystemBackend::createSnapshot(const QString &kind)
 
     const QStorageInfo backupStorage(backupDir.absolutePath());
     if (backupStorage.isValid() && backupStorage.isReady()) {
-        const quint64 oneGiB = 1024ULL * 1024ULL * 1024ULL;
-        const quint64 minimumFree = kind == QStringLiteral("home") ? 5ULL * oneGiB : oneGiB;
+        const qint64 oneGiB = 1024LL * 1024LL * 1024LL;
+        const qint64 minimumFree = kind == QStringLiteral("home") ? 5LL * oneGiB : oneGiB;
         if (backupStorage.bytesAvailable() < minimumFree) {
             setBackupResult(tr("Spazio libero insufficiente per lo snapshot: disponibili %1, richiesti almeno %2.")
-                                .arg(humanGiB(backupStorage.bytesAvailable()), humanGiB(minimumFree)),
+                                .arg(humanGiB(quint64(backupStorage.bytesAvailable())),
+                                     humanGiB(quint64(minimumFree))),
                             QString(), QStringLiteral("error"));
             return false;
         }
