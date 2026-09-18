@@ -82,6 +82,7 @@ for qml_path in ("qml/modules/SystemModule.qml", "qml/modules/RecoveryModule.qml
                  "qml/modules/SoftwareModule.qml"):
     qml = read(qml_path)
     qml_privileged_programs.update(re.findall(r'PolkitHelper\.execute\("([^"]+)"', qml))
+    qml_privileged_programs.update(re.findall(r'root\.runPrivileged\("([^"]+)"', qml))
 require(qml_privileged_programs == expected_programs,
         f"unexpected privileged QML programs: {sorted(qml_privileged_programs)}")
 for program in expected_programs:
