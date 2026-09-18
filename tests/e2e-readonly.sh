@@ -110,7 +110,2305 @@ test -f data/org.kriscc.KrisCC.metainfo.xml
 test ! -e data/org.kcontrolc.KControlC.metainfo.xml
 
 grep -q '^Name:[[:space:]]*krisCC$' packaging/krisCC.spec
-grep -q '^Version:[[:space:]]*0[.]5[.]0 '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+grep -q '^Version:[[:space:]]*0[.]5[.]0
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.health"' qml/modules/SystemModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are atomic and the UI supports explicit verification and restore.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool verifySnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool restoreSnapshot' src/SystemBackend.h
+grep -q 'validateBackupPath' src/SystemBackend.cpp
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+grep -q 'OperationLog::append' src/SystemBackend.cpp
+grep -q 'src/OperationLog.cpp src/OperationLog.h' CMakeLists.txt
+
+# Next-boot selection is one-shot only: BootNext or grub2-reboot, never a permanent BootOrder rewrite.
+grep -q 'QStringLiteral("/usr/sbin/efibootmgr")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("-n")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("/usr/sbin/grub2-reboot")' src/PolkitHelper.cpp
+grep -q 'org.kriscc.controlcenter.boot.next-uefi' data/org.kriscc.controlcenter.policy
+grep -q 'org.kriscc.controlcenter.boot.next-grub' data/org.kriscc.controlcenter.policy
+grep -q 'BootNext vale per un solo riavvio' qml/modules/SystemModule.qml
+if grep -q 'efibootmgr.*-[Oo]' src/PolkitHelper.cpp qml/modules/SystemModule.qml; then
+  echo "ERROR: permanent UEFI BootOrder mutation must not be exposed" >&2
+  exit 1
+fi
+
+# Minimal scope: no firmware updater or first-run/welcome workflow is shipped by the new system page.
+if grep -niE 'fwupdmgr|firmware|welcome|first.?run' qml/modules/SystemModule.qml qml/modules/DashboardModule.qml qml/modules/RecoveryModule.qml; then
+  echo "ERROR: firmware/welcome scope leaked into krisCC 0.5 UI" >&2
+  exit 1
+fi
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+grep -q 'Q_CLASSINFO("D-Bus Interface", "org.kriscc.ControlCenter")' src/InstanceController.h
+grep -q 'qml/modules/SystemModule.qml' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+grep -q '^Release:[[:space:]]*1%{?dist}
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.services-active"' qml/modules/ToolsModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are written under a temporary name and expose structured outcomes.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.services-active"' qml/modules/ToolsModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are written under a temporary name and expose structured outcomes.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+grep -q '^Release:[[:space:]]*1%{?dist} '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.health"' qml/modules/SystemModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are atomic and the UI supports explicit verification and restore.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool verifySnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool restoreSnapshot' src/SystemBackend.h
+grep -q 'validateBackupPath' src/SystemBackend.cpp
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+grep -q 'OperationLog::append' src/SystemBackend.cpp
+grep -q 'src/OperationLog.cpp src/OperationLog.h' CMakeLists.txt
+
+# Next-boot selection is one-shot only: BootNext or grub2-reboot, never a permanent BootOrder rewrite.
+grep -q 'QStringLiteral("/usr/sbin/efibootmgr")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("-n")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("/usr/sbin/grub2-reboot")' src/PolkitHelper.cpp
+grep -q 'org.kriscc.controlcenter.boot.next-uefi' data/org.kriscc.controlcenter.policy
+grep -q 'org.kriscc.controlcenter.boot.next-grub' data/org.kriscc.controlcenter.policy
+grep -q 'BootNext vale per un solo riavvio' qml/modules/SystemModule.qml
+if grep -q 'efibootmgr.*-[Oo]' src/PolkitHelper.cpp qml/modules/SystemModule.qml; then
+  echo "ERROR: permanent UEFI BootOrder mutation must not be exposed" >&2
+  exit 1
+fi
+
+# Minimal scope: no firmware updater or first-run/welcome workflow is shipped by the new system page.
+if grep -niE 'fwupdmgr|firmware|welcome|first.?run' qml/modules/SystemModule.qml qml/modules/DashboardModule.qml qml/modules/RecoveryModule.qml; then
+  echo "ERROR: firmware/welcome scope leaked into krisCC 0.5 UI" >&2
+  exit 1
+fi
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+grep -q 'Q_CLASSINFO("D-Bus Interface", "org.kriscc.ControlCenter")' src/InstanceController.h
+grep -q 'qml/modules/SystemModule.qml' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+grep -q '^Release:[[:space:]]*1%{?dist}
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.services-active"' qml/modules/ToolsModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are written under a temporary name and expose structured outcomes.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.services-active"' qml/modules/ToolsModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are written under a temporary name and expose structured outcomes.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.health"' qml/modules/SystemModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are atomic and the UI supports explicit verification and restore.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool verifySnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool restoreSnapshot' src/SystemBackend.h
+grep -q 'validateBackupPath' src/SystemBackend.cpp
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+grep -q 'OperationLog::append' src/SystemBackend.cpp
+grep -q 'src/OperationLog.cpp src/OperationLog.h' CMakeLists.txt
+
+# Next-boot selection is one-shot only: BootNext or grub2-reboot, never a permanent BootOrder rewrite.
+grep -q 'QStringLiteral("/usr/sbin/efibootmgr")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("-n")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("/usr/sbin/grub2-reboot")' src/PolkitHelper.cpp
+grep -q 'org.kriscc.controlcenter.boot.next-uefi' data/org.kriscc.controlcenter.policy
+grep -q 'org.kriscc.controlcenter.boot.next-grub' data/org.kriscc.controlcenter.policy
+grep -q 'BootNext vale per un solo riavvio' qml/modules/SystemModule.qml
+if grep -q 'efibootmgr.*-[Oo]' src/PolkitHelper.cpp qml/modules/SystemModule.qml; then
+  echo "ERROR: permanent UEFI BootOrder mutation must not be exposed" >&2
+  exit 1
+fi
+
+# Minimal scope: no firmware updater or first-run/welcome workflow is shipped by the new system page.
+if grep -niE 'fwupdmgr|firmware|welcome|first.?run' qml/modules/SystemModule.qml qml/modules/DashboardModule.qml qml/modules/RecoveryModule.qml; then
+  echo "ERROR: firmware/welcome scope leaked into krisCC 0.5 UI" >&2
+  exit 1
+fi
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+grep -q 'Q_CLASSINFO("D-Bus Interface", "org.kriscc.ControlCenter")' src/InstanceController.h
+grep -q 'qml/modules/SystemModule.qml' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+grep -q '^Release:[[:space:]]*1%{?dist}
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.services-active"' qml/modules/ToolsModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are written under a temporary name and expose structured outcomes.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.services-active"' qml/modules/ToolsModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are written under a temporary name and expose structured outcomes.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+grep -q '^Release:[[:space:]]*1%{?dist}
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.health"' qml/modules/SystemModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are atomic and the UI supports explicit verification and restore.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool verifySnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool restoreSnapshot' src/SystemBackend.h
+grep -q 'validateBackupPath' src/SystemBackend.cpp
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+grep -q 'OperationLog::append' src/SystemBackend.cpp
+grep -q 'src/OperationLog.cpp src/OperationLog.h' CMakeLists.txt
+
+# Next-boot selection is one-shot only: BootNext or grub2-reboot, never a permanent BootOrder rewrite.
+grep -q 'QStringLiteral("/usr/sbin/efibootmgr")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("-n")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("/usr/sbin/grub2-reboot")' src/PolkitHelper.cpp
+grep -q 'org.kriscc.controlcenter.boot.next-uefi' data/org.kriscc.controlcenter.policy
+grep -q 'org.kriscc.controlcenter.boot.next-grub' data/org.kriscc.controlcenter.policy
+grep -q 'BootNext vale per un solo riavvio' qml/modules/SystemModule.qml
+if grep -q 'efibootmgr.*-[Oo]' src/PolkitHelper.cpp qml/modules/SystemModule.qml; then
+  echo "ERROR: permanent UEFI BootOrder mutation must not be exposed" >&2
+  exit 1
+fi
+
+# Minimal scope: no firmware updater or first-run/welcome workflow is shipped by the new system page.
+if grep -niE 'fwupdmgr|firmware|welcome|first.?run' qml/modules/SystemModule.qml qml/modules/DashboardModule.qml qml/modules/RecoveryModule.qml; then
+  echo "ERROR: firmware/welcome scope leaked into krisCC 0.5 UI" >&2
+  exit 1
+fi
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+grep -q 'Q_CLASSINFO("D-Bus Interface", "org.kriscc.ControlCenter")' src/InstanceController.h
+grep -q 'qml/modules/SystemModule.qml' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+grep -q '^Release:[[:space:]]*1%{?dist}
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.services-active"' qml/modules/ToolsModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are written under a temporary name and expose structured outcomes.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.services-active"' qml/modules/ToolsModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are written under a temporary name and expose structured outcomes.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+grep -q '^Release:[[:space:]]*1%{?dist} '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.health"' qml/modules/SystemModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are atomic and the UI supports explicit verification and restore.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool verifySnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool restoreSnapshot' src/SystemBackend.h
+grep -q 'validateBackupPath' src/SystemBackend.cpp
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+grep -q 'OperationLog::append' src/SystemBackend.cpp
+grep -q 'src/OperationLog.cpp src/OperationLog.h' CMakeLists.txt
+
+# Next-boot selection is one-shot only: BootNext or grub2-reboot, never a permanent BootOrder rewrite.
+grep -q 'QStringLiteral("/usr/sbin/efibootmgr")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("-n")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("/usr/sbin/grub2-reboot")' src/PolkitHelper.cpp
+grep -q 'org.kriscc.controlcenter.boot.next-uefi' data/org.kriscc.controlcenter.policy
+grep -q 'org.kriscc.controlcenter.boot.next-grub' data/org.kriscc.controlcenter.policy
+grep -q 'BootNext vale per un solo riavvio' qml/modules/SystemModule.qml
+if grep -q 'efibootmgr.*-[Oo]' src/PolkitHelper.cpp qml/modules/SystemModule.qml; then
+  echo "ERROR: permanent UEFI BootOrder mutation must not be exposed" >&2
+  exit 1
+fi
+
+# Minimal scope: no firmware updater or first-run/welcome workflow is shipped by the new system page.
+if grep -niE 'fwupdmgr|firmware|welcome|first.?run' qml/modules/SystemModule.qml qml/modules/DashboardModule.qml qml/modules/RecoveryModule.qml; then
+  echo "ERROR: firmware/welcome scope leaked into krisCC 0.5 UI" >&2
+  exit 1
+fi
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+grep -q 'Q_CLASSINFO("D-Bus Interface", "org.kriscc.ControlCenter")' src/InstanceController.h
+grep -q 'qml/modules/SystemModule.qml' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+grep -q '^Release:[[:space:]]*1%{?dist}
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.services-active"' qml/modules/ToolsModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are written under a temporary name and expose structured outcomes.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.services-active"' qml/modules/ToolsModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are written under a temporary name and expose structured outcomes.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.health"' qml/modules/SystemModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are atomic and the UI supports explicit verification and restore.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool verifySnapshot' src/SystemBackend.h
+grep -q 'Q_INVOKABLE bool restoreSnapshot' src/SystemBackend.h
+grep -q 'validateBackupPath' src/SystemBackend.cpp
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+grep -q 'OperationLog::append' src/SystemBackend.cpp
+grep -q 'src/OperationLog.cpp src/OperationLog.h' CMakeLists.txt
+
+# Next-boot selection is one-shot only: BootNext or grub2-reboot, never a permanent BootOrder rewrite.
+grep -q 'QStringLiteral("/usr/sbin/efibootmgr")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("-n")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("/usr/sbin/grub2-reboot")' src/PolkitHelper.cpp
+grep -q 'org.kriscc.controlcenter.boot.next-uefi' data/org.kriscc.controlcenter.policy
+grep -q 'org.kriscc.controlcenter.boot.next-grub' data/org.kriscc.controlcenter.policy
+grep -q 'BootNext vale per un solo riavvio' qml/modules/SystemModule.qml
+if grep -q 'efibootmgr.*-[Oo]' src/PolkitHelper.cpp qml/modules/SystemModule.qml; then
+  echo "ERROR: permanent UEFI BootOrder mutation must not be exposed" >&2
+  exit 1
+fi
+
+# Minimal scope: no firmware updater or first-run/welcome workflow is shipped by the new system page.
+if grep -niE 'fwupdmgr|firmware|welcome|first.?run' qml/modules/SystemModule.qml qml/modules/DashboardModule.qml qml/modules/RecoveryModule.qml; then
+  echo "ERROR: firmware/welcome scope leaked into krisCC 0.5 UI" >&2
+  exit 1
+fi
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+grep -q 'Q_CLASSINFO("D-Bus Interface", "org.kriscc.ControlCenter")' src/InstanceController.h
+grep -q 'qml/modules/SystemModule.qml' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+grep -q '^Release:[[:space:]]*1%{?dist}
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.services-active"' qml/modules/ToolsModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are written under a temporary name and expose structured outcomes.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
+  echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
+  exit 1
+fi
+
+grep -q 'qt_add_executable(krisCC' CMakeLists.txt
+grep -q 'URI org.kriscc' CMakeLists.txt
+grep -q 'install(TARGETS krisCC' CMakeLists.txt
+grep -q 'data/krisCC.desktop' CMakeLists.txt
+grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
+grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
+grep -q '^Name=krisCC$' data/krisCC.desktop
+grep -q '^Exec=krisCC$' data/krisCC.desktop
+grep -q '^Icon=krisCC$' data/krisCC.desktop
+grep -q '<id>org.kriscc.KrisCC</id>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<name>krisCC</name>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<provides><binary>krisCC</binary></provides>' data/org.kriscc.KrisCC.metainfo.xml
+grep -q '<vendor>krisCC</vendor>' data/org.kriscc.controlcenter.policy
+
+grep -q 'qmlRegisterType<PackageSearch>("org.kriscc"' src/main.cpp
+grep -q 'loadFromModule(QStringLiteral("org.kriscc")' src/main.cpp
+grep -q 'import org.kriscc' qml/Main.qml
+grep -q 'import org.kriscc' qml/modules/SoftwareModule.qml
+if grep -R -n 'org\.kcontrolc' CMakeLists.txt src/main.cpp qml data packaging; then
+  echo "ERROR: old org.kcontrolc application identity remains" >&2
+  exit 1
+fi
+
+# No old product branding may leak into the UI. Historical backup directories
+# are allowed only as non-destructive exclusions in SystemBackend.
+if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
+  echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
+  exit 1
+fi
+grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+
+if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
+    CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
+    data/org.kriscc.controlcenter.policy data/org.kriscc.KrisCC.metainfo.xml; then
+  echo "ERROR: legacy Raku branding remains in application identity/metadata" >&2
+  exit 1
+fi
+
+if grep -R -nE 'github\.com/krism-eu/(K-ControlC|KCC)([^[:alnum:]]|$)' \
+    CMakeLists.txt src qml data packaging README.md INTEGRAZIONE.md .github; then
+  echo "ERROR: old repository URL remains" >&2
+  exit 1
+fi
+
+# Read-only external queries must have watchdogs so busy/searching cannot remain forever.
+grep -q 'krisccTimedOut' src/PackageSearch.cpp
+grep -q 'krisccTimedOut' src/SoftwareBackend.cpp
+grep -q 'krisccTimedOut' src/BootcBackend.cpp
+grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
+
+# Backend/UI state must not depend on translated presentation strings.
+grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
+grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
+grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'UtilityBackend.operationId === "bookmark.services-active"' qml/modules/ToolsModule.qml
+if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+  echo "ERROR: translated UI strings are still used as backend state" >&2
+  exit 1
+fi
+
+# Backups are written under a temporary name and expose structured outcomes.
+grep -q 'QStringLiteral(".partial")' src/SystemBackend.cpp
+grep -q 'exitCode == 0 || exitCode == 1' src/SystemBackend.cpp
+grep -q 'Q_INVOKABLE bool cancelSnapshot' src/SystemBackend.h
+grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
+
+# --background must be a single activatable session instance, not an unreachable duplicate.
+grep -q 'org.kriscc.ControlCenter' src/main.cpp
+grep -q 'registerService(serviceName)' src/main.cpp
+grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
+grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
+
+# The released RPM is validated in a fresh Fedora job before release publication.
+grep -q '^  rpm-smoke:' .github/workflows/build.yml
+grep -q 'needs: \[build-fedora, rpm-smoke\]' .github/workflows/build.yml
+grep -q 'dnf -y install "$rpm_file"' .github/workflows/build.yml
+grep -q '/usr/bin/krisCC' .github/workflows/build.yml
+
+echo "Checking mandatory local DNF5 behavior..."
+dnf5 list --installed --json >/dev/null
+
+echo "Checking repository-backed DNF5 queries when metadata is available..."
+if dnf5 repo list --all --json >/dev/null 2>&1; then
+  dnf5 repo list --all --json >/dev/null
+  if dnf5 --repo=fedora,updates repoquery --available \
+      --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
+      'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
+    grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
+    if grep -q '^bash' /tmp/kriscc-repoquery.txt; then
+      awk -F '\t' 'NR == 1 { exit (NF >= 7 ? 0 : 1) }' /tmp/kriscc-repoquery.txt \
+        || { echo "ERROR: repoquery metadata fields are not tab-separated" >&2; exit 1; }
+    fi
+  else
+    echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
+  fi
+  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+else
+  echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
+fi
+
+if command -v bootc >/dev/null 2>&1; then
+  echo "bootc detected; validating the exact JSON command used by krisCC"
+  bootc status --format json > /tmp/kriscc-bootc-status.json
+  grep -q '"status"' /tmp/kriscc-bootc-status.json
+else
+  echo "bootc not available in this CI container; static command/schema guards passed"
+fi
+ packaging/krisCC.spec
+if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]+(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
   echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
   exit 1
 fi
