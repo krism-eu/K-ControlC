@@ -32,13 +32,13 @@ Il nuovo percorso ha sempre precedenza. Il fallback legacy potrà essere rimosso
 
 La base del sistema resta image-based e si aggiorna esclusivamente tramite BootC. KrisOS supporta un solo deployment operativo; krisCC non espone rollback o gestione di deployment alternativi.
 
-krisCC usa DNF5 per catalogo, inventario, aggiornamenti disponibili, pacchetti recenti e stato dei repository abilitati. La gestione esplicita dei repository usa soltanto `dnf5 config-manager`: add da URL HTTP(S) validato e enable/disable di un ID validato. L'installazione/rimozione del layer persistente passa sempre da `rk`, che può rifiutare pacchetti o origini non compatibili con la policy KrisOS.
+krisCC usa DNF5 per catalogo, inventario, aggiornamenti disponibili, pacchetti recenti e stato dei repository abilitati. La gestione esplicita dei repository usa soltanto `dnf5 config-manager`: add da URL HTTPS validato e enable/disable di un ID validato. L'installazione/rimozione del layer persistente passa sempre da `rk`. rk usa i repository DNF che l'amministratore ha lasciato abilitati, forza `pkg_gpgcheck` e verifica le firme della transazione prima di applicarla; la base immutabile e le architetture vietate restano protette.
 
 L'anteprima deve usare `rk plan <pacchetto>` e non un comando DNF5 parallelo: il piano mostrato all'utente deve essere prodotto dallo stesso solver, dalle stesse esclusioni e dalla stessa policy che verranno applicati da `rk add`.
 
 ## Privilegi
 
-Non aggiungere wrapper shell generici. `PolkitHelper` valida programma e argomenti completi. La policy usa `auth_admin` senza retention e restringe le mutazioni a `rk sync/add/rm`, `dnf5 config-manager` con forme allowlistate, alle operazioni BootC di aggiornamento supportate e alla sola selezione one-shot del prossimo boot tramite `efibootmgr -n` o `grub2-reboot`. Il rollback BootC non è esposto.
+Non aggiungere wrapper shell generici. `PolkitHelper` valida programma e argomenti completi. La policy usa `auth_admin` senza retention e restringe le mutazioni a `rk sync/add/rm`, `dnf5 config-manager` con forme allowlistate e URL addrepo HTTPS-only, alle operazioni BootC di aggiornamento supportate e alla sola selezione one-shot del prossimo boot tramite `efibootmgr -n` o `grub2-reboot`. Il rollback BootC non è esposto.
 
 ## Pipeline immagine
 
@@ -80,3 +80,8 @@ rpm -V krisCC
 Poi verificare manualmente `rk plan/add/rm/sync`, ricerca RPM, Flatpak, Podman, update BootC, backup create/verify/restore, cronologia locale e selezione one-shot UEFI/GRUB quando disponibile.
 
 Repository: https://github.com/krism-eu/krisCC
+
+
+## Backup home K1.0
+
+Il profilo home esclude cache, cestino, backup precedenti, `~/.local/share/flatpak` e `~/.local/share/containers`. Questi ultimi sono runtime/app Flatpak e storage Podman ricostruibili; eventuali volumi Podman sono quindi fuori dal backup. I dati personali delle applicazioni Flatpak in `~/.var/app` restano inclusi.
