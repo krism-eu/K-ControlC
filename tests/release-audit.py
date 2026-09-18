@@ -73,11 +73,13 @@ require(not missing, f"QML bookmark(s) without backend implementation: {missing}
 expected_programs = {
     "/usr/bin/rk",
     "/usr/bin/bootc",
+    "/usr/bin/dnf5",
     "/usr/bin/efibootmgr",
     "/usr/bin/grub2-reboot",
 }
 qml_privileged_programs = set()
-for qml_path in ("qml/modules/SystemModule.qml", "qml/modules/RecoveryModule.qml"):
+for qml_path in ("qml/modules/SystemModule.qml", "qml/modules/RecoveryModule.qml",
+                 "qml/modules/SoftwareModule.qml"):
     qml = read(qml_path)
     qml_privileged_programs.update(re.findall(r'PolkitHelper\.execute\("([^"]+)"', qml))
 require(qml_privileged_programs == expected_programs,
@@ -89,6 +91,12 @@ require('args.size() == 2 && args.at(0) == QStringLiteral("-n")' in polkit_cpp,
         "UEFI BootNext invocation is not exact")
 require('args.size() == 1 && isSafeGrubEntry(args.at(0))' in polkit_cpp,
         "GRUB next-entry invocation is not exact")
+require('args.at(0) == QStringLiteral("config-manager")' in polkit_cpp,
+        "DNF repository mutations are not restricted to config-manager")
+require("isSafeRepositoryId" in polkit_cpp and "isSafeRepositoryUrl" in polkit_cpp,
+        "DNF repository validators are missing")
+require('url.scheme() == QStringLiteral("https") || url.scheme() == QStringLiteral("http")' in polkit_cpp,
+        "DNF repository URLs must be constrained to HTTP(S)")
 require("entry.startsWith(QLatin1Char('-'))" in polkit_cpp,
         "GRUB entry validator does not reject option-shaped values")
 for forbidden in ('QStringLiteral("-o")', 'QStringLiteral("-O")', "--bootorder"):
@@ -104,6 +112,7 @@ expected_actions = {
     "org.kriscc.controlcenter.rk.sync": ("/usr/bin/rk", "sync", "auth_admin"),
     "org.kriscc.controlcenter.rk.add": ("/usr/bin/rk", "add", "auth_admin"),
     "org.kriscc.controlcenter.rk.rm": ("/usr/bin/rk", "rm", "auth_admin"),
+    "org.kriscc.controlcenter.dnf.config-manager": ("/usr/bin/dnf5", "config-manager", "auth_admin"),
     "org.kriscc.controlcenter.bootc.upgrade": ("/usr/bin/bootc", "upgrade", "auth_admin"),
     "org.kriscc.controlcenter.boot.next-uefi": ("/usr/bin/efibootmgr", "-n", "auth_admin"),
     "org.kriscc.controlcenter.boot.next-grub": ("/usr/bin/grub2-reboot", None, "auth_admin"),
@@ -159,7 +168,7 @@ require(main_qml.count("pageStack.replace(") == 7,
 combined_ui = system_qml + recovery_qml + read("qml/modules/DashboardModule.qml")
 require(not re.search(r"fwupdmgr|firmware|welcome|first.?run", combined_ui, re.I),
         "firmware/welcome scope leaked into 0.5.1")
-require("bootc" in spec and "dnf5" in spec and "tar" in spec,
+require("bootc" in spec and "dnf5" in spec and "dnf5-plugins" in spec and "tar" in spec,
         "mandatory runtime requirements missing from RPM spec")
 require("sudo rk sync" not in recovery_qml, "UI incorrectly claims sudo is used")
 require("bootc" in readme.lower() and "rk" in integration_doc,
