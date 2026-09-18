@@ -61,7 +61,7 @@ void SoftwareBackend::refreshRepositories()
         for (const QJsonValue &value : document.array()) {
             const QJsonObject object = value.toObject();
             const QString id = object.value(QStringLiteral("id")).toString();
-            if (id != QStringLiteral("fedora") && id != QStringLiteral("updates"))
+            if (id.isEmpty())
                 continue;
             QVariantMap repo;
             repo.insert(QStringLiteral("id"), id);
