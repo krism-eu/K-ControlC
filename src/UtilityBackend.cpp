@@ -253,7 +253,7 @@ bool UtilityBackend::previewRpmInstall(const QString &packageName)
                  QStringLiteral("rpm.plan"), kRepositoryQueryTimeoutMs);
 }
 
-bool UtilityBackend::runFlatpak(const QString &mode, const QString &query)
+bool UtilityBackend::runFlatpak(const QString &mode, const QString &query, const QString &remote)
 {
     if (mode == QStringLiteral("installed"))
         return start(QStringLiteral("/usr/bin/flatpak"),
@@ -282,11 +282,18 @@ bool UtilityBackend::runFlatpak(const QString &mode, const QString &query)
                      {QStringLiteral("search"), QStringLiteral("--user"),
                       QStringLiteral("--columns=name,description,application,version,branch,remotes"), query.trimmed()},
                      tr("Ricerca Flatpak: %1").arg(query.trimmed()), QStringLiteral("flatpak.search"), kRepositoryQueryTimeoutMs);
-    if (mode == QStringLiteral("install") && validPackageName(query.trimmed()))
+    if (mode == QStringLiteral("install") && validPackageName(query.trimmed())) {
+        const QString selectedRemote = remote.trimmed().isEmpty() ? QStringLiteral("flathub") : remote.trimmed();
+        if (!validPackageName(selectedRemote)) {
+            setImmediateError(tr("Installazione Flatpak"), QStringLiteral("flatpak.install"),
+                              tr("Remote Flatpak non valido."));
+            return false;
+        }
         return start(QStringLiteral("/usr/bin/flatpak"),
                      {QStringLiteral("install"), QStringLiteral("--user"), QStringLiteral("--noninteractive"),
-                      QStringLiteral("--assumeyes"), QStringLiteral("flathub"), query.trimmed()},
+                      QStringLiteral("--assumeyes"), selectedRemote, query.trimmed()},
                      tr("Installazione Flatpak: %1").arg(query.trimmed()), QStringLiteral("flatpak.install"));
+    }
     if (mode == QStringLiteral("remove") && validPackageName(query.trimmed()))
         return start(QStringLiteral("/usr/bin/flatpak"),
                      {QStringLiteral("uninstall"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), query.trimmed()},
