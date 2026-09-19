@@ -2,10 +2,13 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import org.kde.kirigami as Kirigami
+import org.kriscc
 
 Kirigami.ScrollablePage {
     id: root
     title: qsTr("Sistema")
+
+    UtilityBackend { id: utilityBackend }
 
     property bool ownBootAction: false
     property string bootActionKind: ""
@@ -36,10 +39,10 @@ Kirigami.ScrollablePage {
     }
 
     function uefiEntries() {
-        if (UtilityBackend.operationId !== "bookmark.uefi" || UtilityBackend.resultState !== "success")
+        if (utilityBackend.operationId !== "bookmark.uefi" || utilityBackend.resultState !== "success")
             return []
         var result = []
-        var lines = UtilityBackend.output.split("\n")
+        var lines = utilityBackend.output.split("\n")
         for (var i = 0; i < lines.length; ++i) {
             var match = lines[i].match(/^Boot([0-9A-Fa-f]{4})\*?\s+(.+)$/)
             if (match)
@@ -49,11 +52,11 @@ Kirigami.ScrollablePage {
     }
 
     function grubEntries() {
-        if (UtilityBackend.operationId !== "bookmark.grub-entries" || UtilityBackend.resultState !== "success")
+        if (utilityBackend.operationId !== "bookmark.grub-entries" || utilityBackend.resultState !== "success")
             return []
         var result = []
         var current = {}
-        var lines = UtilityBackend.output.split("\n")
+        var lines = utilityBackend.output.split("\n")
         function commit() {
             if (current.id) {
                 var label = current.title ? current.title : current.id
@@ -87,9 +90,9 @@ Kirigami.ScrollablePage {
                 return
             root.ownBootAction = false
             if (root.bootActionKind === "uefi")
-                UtilityBackend.runBookmark("uefi")
+                utilityBackend.runBookmark("uefi")
             else if (root.bootActionKind === "grub")
-                UtilityBackend.runBookmark("grub-entries")
+                utilityBackend.runBookmark("grub-entries")
             root.historyEntries = SystemBackend.operationHistoryEntries()
         }
     }
@@ -222,7 +225,7 @@ Kirigami.ScrollablePage {
                             RowLayout {
                                 Layout.fillWidth: true
                                 Kirigami.Heading { Layout.fillWidth: true; level: 2; font.bold: true; text: qsTr("Flatpak") }
-                                Controls.BusyIndicator { visible: UtilityBackend.busy; running: visible }
+                                Controls.BusyIndicator { visible: utilityBackend.busy; running: visible }
                             }
                             Controls.Label {
                                 Layout.fillWidth: true
@@ -235,24 +238,24 @@ Kirigami.ScrollablePage {
                                 Controls.Button {
                                     text: qsTr("Controlla")
                                     icon.name: "view-refresh"
-                                    enabled: !UtilityBackend.busy && SystemBackend.programAvailable("flatpak")
-                                    onClicked: UtilityBackend.runFlatpak("updates", "")
+                                    enabled: !utilityBackend.busy && SystemBackend.programAvailable("flatpak")
+                                    onClicked: utilityBackend.runFlatpak("updates", "")
                                 }
                                 Controls.Button {
                                     text: qsTr("Aggiorna tutto")
                                     icon.name: "system-software-update"
-                                    enabled: !UtilityBackend.busy && SystemBackend.programAvailable("flatpak")
+                                    enabled: !utilityBackend.busy && SystemBackend.programAvailable("flatpak")
                                     onClicked: flatpakDialog.open()
                                 }
                             }
                             Controls.TextArea {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 120
-                                visible: UtilityBackend.operationId.indexOf("flatpak.") === 0 && UtilityBackend.output.length > 0
+                                visible: utilityBackend.operationId.indexOf("flatpak.") === 0 && utilityBackend.output.length > 0
                                 readOnly: true
                                 wrapMode: TextEdit.WrapAnywhere
                                 font.family: "monospace"
-                                text: UtilityBackend.output
+                                text: utilityBackend.output
                             }
                         }
                     }
@@ -322,10 +325,10 @@ Kirigami.ScrollablePage {
                         Flow {
                             Layout.fillWidth: true
                             spacing: Kirigami.Units.smallSpacing
-                            Controls.Button { text: qsTr("Controlla salute"); icon.name: "tools-report-bug"; enabled: !UtilityBackend.busy; onClicked: UtilityBackend.runBookmark("health") }
-                            Controls.Button { text: qsTr("Sicurezza"); icon.name: "security-high"; enabled: !UtilityBackend.busy; onClicked: UtilityBackend.runBookmark("security") }
-                            Controls.Button { text: qsTr("Unità fallite"); icon.name: "dialog-warning"; enabled: !UtilityBackend.busy; onClicked: UtilityBackend.runBookmark("failed-units") }
-                            Controls.Button { text: qsTr("Errori ultimo avvio"); icon.name: "view-list-text"; enabled: !UtilityBackend.busy; onClicked: UtilityBackend.runBookmark("journal-errors") }
+                            Controls.Button { text: qsTr("Controlla salute"); icon.name: "tools-report-bug"; enabled: !utilityBackend.busy; onClicked: utilityBackend.runBookmark("health") }
+                            Controls.Button { text: qsTr("Sicurezza"); icon.name: "security-high"; enabled: !utilityBackend.busy; onClicked: utilityBackend.runBookmark("security") }
+                            Controls.Button { text: qsTr("Unità fallite"); icon.name: "dialog-warning"; enabled: !utilityBackend.busy; onClicked: utilityBackend.runBookmark("failed-units") }
+                            Controls.Button { text: qsTr("Errori ultimo avvio"); icon.name: "view-list-text"; enabled: !utilityBackend.busy; onClicked: utilityBackend.runBookmark("journal-errors") }
                         }
                     }
                 }
@@ -360,7 +363,7 @@ Kirigami.ScrollablePage {
                         }
                         RowLayout {
                             Controls.Button { text: qsTr("Aggiorna stati"); icon.name: "view-refresh"; onClicked: root.servicesRefreshToken++ }
-                            Controls.Button { text: qsTr("Mostra tutti gli attivi"); icon.name: "view-list-details"; enabled: !UtilityBackend.busy; onClicked: UtilityBackend.runBookmark("services-active") }
+                            Controls.Button { text: qsTr("Mostra tutti gli attivi"); icon.name: "view-list-details"; enabled: !utilityBackend.busy; onClicked: utilityBackend.runBookmark("services-active") }
                         }
                     }
                 }
@@ -373,20 +376,20 @@ Kirigami.ScrollablePage {
 
                 Kirigami.AbstractCard {
                     Layout.fillWidth: true
-                    visible: UtilityBackend.operationId === "bookmark.health"
-                          || UtilityBackend.operationId === "bookmark.security"
-                          || UtilityBackend.operationId === "bookmark.failed-units"
-                          || UtilityBackend.operationId === "bookmark.journal-errors"
-                          || UtilityBackend.operationId === "bookmark.services-active"
+                    visible: utilityBackend.operationId === "bookmark.health"
+                          || utilityBackend.operationId === "bookmark.security"
+                          || utilityBackend.operationId === "bookmark.failed-units"
+                          || utilityBackend.operationId === "bookmark.journal-errors"
+                          || utilityBackend.operationId === "bookmark.services-active"
                     contentItem: ColumnLayout {
                         RowLayout {
                             Layout.fillWidth: true
-                            Kirigami.Heading { Layout.fillWidth: true; level: 3; font.bold: true; text: UtilityBackend.title }
+                            Kirigami.Heading { Layout.fillWidth: true; level: 3; font.bold: true; text: utilityBackend.title }
                             Controls.Button {
                                 text: qsTr("Copia")
                                 icon.name: "edit-copy"
-                                enabled: UtilityBackend.output.length > 0
-                                onClicked: SystemBackend.copyToClipboard(UtilityBackend.output)
+                                enabled: utilityBackend.output.length > 0
+                                onClicked: SystemBackend.copyToClipboard(utilityBackend.output)
                             }
                         }
                         Controls.TextArea {
@@ -395,7 +398,7 @@ Kirigami.ScrollablePage {
                             readOnly: true
                             wrapMode: TextEdit.WrapAnywhere
                             font.family: "monospace"
-                            text: UtilityBackend.output
+                            text: utilityBackend.output
                         }
                     }
                 }
@@ -419,8 +422,8 @@ Kirigami.ScrollablePage {
                             Controls.Button {
                                 text: qsTr("Leggi voci UEFI")
                                 icon.name: "view-refresh"
-                                enabled: !UtilityBackend.busy && SystemBackend.programAvailable("efibootmgr")
-                                onClicked: UtilityBackend.runBookmark("uefi")
+                                enabled: !utilityBackend.busy && SystemBackend.programAvailable("efibootmgr")
+                                onClicked: utilityBackend.runBookmark("uefi")
                             }
                             Controls.ComboBox {
                                 id: uefiCombo
@@ -458,8 +461,8 @@ Kirigami.ScrollablePage {
                             Controls.Button {
                                 text: qsTr("Leggi voci")
                                 icon.name: "view-refresh"
-                                enabled: !UtilityBackend.busy && SystemBackend.programAvailable("grubby")
-                                onClicked: UtilityBackend.runBookmark("grub-entries")
+                                enabled: !utilityBackend.busy && SystemBackend.programAvailable("grubby")
+                                onClicked: utilityBackend.runBookmark("grub-entries")
                             }
                             Controls.ComboBox {
                                 id: grubCombo
@@ -495,10 +498,10 @@ Kirigami.ScrollablePage {
                         Flow {
                             Layout.fillWidth: true
                             spacing: Kirigami.Units.smallSpacing
-                            Controls.Button { text: qsTr("Partizioni"); enabled: !UtilityBackend.busy; onClicked: UtilityBackend.runBookmark("partitions") }
-                            Controls.Button { text: qsTr("Ordine mount"); enabled: !UtilityBackend.busy; onClicked: UtilityBackend.runBookmark("fstab-order") }
-                            Controls.Button { text: qsTr("Mount attivi"); enabled: !UtilityBackend.busy; onClicked: UtilityBackend.runBookmark("mounts") }
-                            Controls.Button { text: qsTr("Spazio"); enabled: !UtilityBackend.busy; onClicked: UtilityBackend.runBookmark("disk-space") }
+                            Controls.Button { text: qsTr("Partizioni"); enabled: !utilityBackend.busy; onClicked: utilityBackend.runBookmark("partitions") }
+                            Controls.Button { text: qsTr("Ordine mount"); enabled: !utilityBackend.busy; onClicked: utilityBackend.runBookmark("fstab-order") }
+                            Controls.Button { text: qsTr("Mount attivi"); enabled: !utilityBackend.busy; onClicked: utilityBackend.runBookmark("mounts") }
+                            Controls.Button { text: qsTr("Spazio"); enabled: !utilityBackend.busy; onClicked: utilityBackend.runBookmark("disk-space") }
                             Controls.Button {
                                 text: qsTr("Partition Manager")
                                 icon.name: "partitionmanager"
@@ -511,21 +514,21 @@ Kirigami.ScrollablePage {
 
                 Kirigami.AbstractCard {
                     Layout.fillWidth: true
-                    visible: UtilityBackend.operationId === "bookmark.uefi"
-                          || UtilityBackend.operationId === "bookmark.grub-entries"
-                          || UtilityBackend.operationId === "bookmark.partitions"
-                          || UtilityBackend.operationId === "bookmark.fstab-order"
-                          || UtilityBackend.operationId === "bookmark.mounts"
-                          || UtilityBackend.operationId === "bookmark.disk-space"
+                    visible: utilityBackend.operationId === "bookmark.uefi"
+                          || utilityBackend.operationId === "bookmark.grub-entries"
+                          || utilityBackend.operationId === "bookmark.partitions"
+                          || utilityBackend.operationId === "bookmark.fstab-order"
+                          || utilityBackend.operationId === "bookmark.mounts"
+                          || utilityBackend.operationId === "bookmark.disk-space"
                     contentItem: ColumnLayout {
-                        Kirigami.Heading { level: 3; font.bold: true; text: UtilityBackend.title }
+                        Kirigami.Heading { level: 3; font.bold: true; text: utilityBackend.title }
                         Controls.TextArea {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 300
                             readOnly: true
                             wrapMode: TextEdit.WrapAnywhere
                             font.family: "monospace"
-                            text: UtilityBackend.output
+                            text: utilityBackend.output
                         }
                     }
                 }
@@ -564,13 +567,13 @@ Kirigami.ScrollablePage {
                             Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Pulizia") }
                             Controls.Button {
                                 text: qsTr("Flatpak inutilizzati")
-                                enabled: SystemBackend.programAvailable("flatpak") && !UtilityBackend.busy
+                                enabled: SystemBackend.programAvailable("flatpak") && !utilityBackend.busy
                                 onClicked: unusedFlatpakDialog.open()
                             }
                             Controls.Button {
                                 text: qsTr("RPM non necessari")
-                                enabled: SystemBackend.programAvailable("dnf5") && !UtilityBackend.busy
-                                onClicked: UtilityBackend.runBookmark("unneeded-rpms")
+                                enabled: SystemBackend.programAvailable("dnf5") && !utilityBackend.busy
+                                onClicked: utilityBackend.runBookmark("unneeded-rpms")
                             }
                         }
                     }
@@ -592,17 +595,17 @@ Kirigami.ScrollablePage {
 
                 Kirigami.AbstractCard {
                     Layout.fillWidth: true
-                    visible: UtilityBackend.operationId === "bookmark.unneeded-rpms"
-                          || UtilityBackend.operationId === "flatpak.remove-unused"
+                    visible: utilityBackend.operationId === "bookmark.unneeded-rpms"
+                          || utilityBackend.operationId === "flatpak.remove-unused"
                     contentItem: ColumnLayout {
-                        Kirigami.Heading { level: 3; font.bold: true; text: UtilityBackend.title }
+                        Kirigami.Heading { level: 3; font.bold: true; text: utilityBackend.title }
                         Controls.TextArea {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 260
                             readOnly: true
                             wrapMode: TextEdit.WrapAnywhere
                             font.family: "monospace"
-                            text: UtilityBackend.output
+                            text: utilityBackend.output
                         }
                     }
                 }
@@ -639,7 +642,7 @@ Kirigami.ScrollablePage {
         modal: true
         title: qsTr("Aggiornare tutti i Flatpak utente?")
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
-        onAccepted: UtilityBackend.runFlatpak("update-all", "")
+        onAccepted: utilityBackend.runFlatpak("update-all", "")
     }
 
     Controls.Dialog {
@@ -651,7 +654,7 @@ Kirigami.ScrollablePage {
             wrapMode: Text.WordWrap
             text: qsTr("Rimuove dal profilo utente i runtime e le dipendenze Flatpak non più necessari.")
         }
-        onAccepted: UtilityBackend.runFlatpak("remove-unused", "")
+        onAccepted: utilityBackend.runFlatpak("remove-unused", "")
     }
 
     Controls.Dialog {
