@@ -14,6 +14,7 @@ Kirigami.ScrollablePage {
     property bool refreshUpdatesAfterAction: false
     property bool refreshSearchAfterInstall: false
     property bool refreshRemotesAfterAdd: false
+    property bool refreshInstalledAfterAction: false
 
     function expectedOperationId() {
         return "flatpak." + root.mode
@@ -68,6 +69,11 @@ Kirigami.ScrollablePage {
         utilityBackend.runFlatpak("install", appId, root.preferredRemote(remote))
     }
 
+    function removeFlatpak(appId) {
+        root.refreshInstalledAfterAction = true
+        utilityBackend.runFlatpak("remove", appId)
+    }
+
     Connections {
         target: utilityBackend
         function onStateChanged() {
@@ -87,6 +93,12 @@ Kirigami.ScrollablePage {
                     && utilityBackend.operationId === "flatpak.flathub-add") {
                 root.refreshRemotesAfterAdd = false
                 root.run("remotes", "")
+                return
+            }
+            if (root.refreshInstalledAfterAction && !utilityBackend.busy
+                    && utilityBackend.operationId === "flatpak.remove") {
+                root.refreshInstalledAfterAction = false
+                root.run("installed", "")
             }
         }
     }
@@ -212,7 +224,8 @@ Kirigami.ScrollablePage {
 
         ListView {
             Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(contentHeight, 620)
+            Layout.preferredHeight: contentHeight
+            interactive: false
             clip: true
             spacing: Kirigami.Units.smallSpacing
             model: root.mode === "search" && root.lastQuery.length < 2 ? [] : root.rows()
@@ -328,6 +341,8 @@ Kirigami.ScrollablePage {
     Controls.Dialog {
         id: flathubDialog
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         title: qsTr("Aggiungere Flathub?")
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
@@ -352,13 +367,15 @@ Kirigami.ScrollablePage {
             open()
         }
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         title: qsTr("Rimuovere %1?").arg(appName)
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
             wrapMode: Text.WordWrap
             text: qsTr("Rimuove il Flatpak %1 dal tuo utente.").arg(removeDialog.appId)
         }
-        onAccepted: root.run("remove", appId)
+        onAccepted: root.removeFlatpak(appId)
     }
 
     Controls.Dialog {
@@ -371,6 +388,8 @@ Kirigami.ScrollablePage {
             open()
         }
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         title: qsTr("Aggiornare %1?").arg(appName)
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
@@ -383,6 +402,8 @@ Kirigami.ScrollablePage {
     Controls.Dialog {
         id: updateAllDialog
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         title: qsTr("Aggiornare tutte le applicazioni Flatpak?")
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
