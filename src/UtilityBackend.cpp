@@ -223,7 +223,7 @@ bool UtilityBackend::runBookmark(const QString &id)
             "printf '\\n=== Overlay /usr ===\\n'; findmnt -n -o SOURCE,FSTYPE,OPTIONS /usr 2>/dev/null || true; "
             "printf '\\n=== Spazio ===\\n'; df -h / /var /home 2>/dev/null || df -h /; "
             "printf '\\n=== rk ===\\n'; /usr/bin/rk status 2>&1 || true; "
-            "printf '\\n=== BootC ===\\n'; /usr/bin/bootc status 2>&1 || true");
+            "printf '\\n=== BootC ===\\n'; /usr/bin/pkexec /usr/libexec/kriscc/bootc-status humanreadable 2>&1 || true");
         return start(QStringLiteral("/usr/bin/bash"), {QStringLiteral("-c"), script},
                      tr("Salute KrisOS"), QStringLiteral("bookmark.health"), kRepositoryQueryTimeoutMs);
     }
