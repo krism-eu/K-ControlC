@@ -43,11 +43,19 @@ Kirigami.ScrollablePage {
         return ""
     }
 
-    function visibleForFilter(model) {
-        if (root.installFilter === "base") return model.owned
-        if (root.installFilter === "persistent") return model.persistent
-        if (root.installFilter === "local") return model.installed && !model.owned && !model.persistent
-        return true
+    function showPackageDetails(model) {
+        root.detailPackage = {
+            name: model.name,
+            summary: model.summary || "",
+            version: model.version || "",
+            arch: model.arch || "",
+            repository: model.repository || "",
+            downloadSize: model.downloadSize || 0,
+            installSize: model.installSize || 0,
+            state: root.packageState(model)
+        }
+        utilityBackend.previewRpmInstall(model.name)
+        packageDialog.open()
     }
 
     function requestPrivileged(program, args, title, message) {
@@ -204,20 +212,7 @@ Kirigami.ScrollablePage {
                                 Controls.Button {
                                     text: qsTr("Dettagli")
                                     icon.name: "documentinfo"
-                                    onClicked: {
-                                        root.detailPackage = {
-                                            name: model.name,
-                                            summary: model.summary,
-                                            version: model.version,
-                                            arch: model.arch,
-                                            repository: model.repository,
-                                            downloadSize: model.downloadSize,
-                                            installSize: model.installSize,
-                                            state: root.packageState(model)
-                                        }
-                                        utilityBackend.previewRpmInstall(model.name)
-                                        packageDialog.open()
-                                    }
+                                    onClicked: root.showPackageDetails(model)
                                 }
                                 Controls.Button {
                                     visible: model.persistent || (!model.owned && !model.persistent)
@@ -354,6 +349,11 @@ Kirigami.ScrollablePage {
                             Controls.Label { Layout.fillWidth: true; font.bold: true; text: model.name + (model.arch ? "." + model.arch : "") }
                             Controls.Label { text: model.version || ""; opacity: 0.72 }
                             Controls.Label { text: model.repository || ""; opacity: 0.72 }
+                            Controls.Button {
+                                text: qsTr("Dettagli")
+                                icon.name: "documentinfo"
+                                onClicked: root.showPackageDetails(model)
+                            }
                         }
                     }
                 }
@@ -384,6 +384,11 @@ Kirigami.ScrollablePage {
                             Controls.Label { Layout.fillWidth: true; font.bold: true; text: model.name + (model.arch ? "." + model.arch : "") }
                             Controls.Label { text: model.version || ""; opacity: 0.72 }
                             Controls.Label { text: model.repository || ""; opacity: 0.72 }
+                            Controls.Button {
+                                text: qsTr("Dettagli")
+                                icon.name: "documentinfo"
+                                onClicked: root.showPackageDetails(model)
+                            }
                         }
                     }
                 }
