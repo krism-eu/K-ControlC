@@ -192,7 +192,7 @@ Kirigami.ScrollablePage {
                             }
                             Controls.Label {
                                 Layout.fillWidth: true
-                                opacity: 0.62
+                                opacity: 0.72
                                 elide: Text.ElideRight
                                 text: [model.version, model.arch, model.repository].filter(function(x) { return !!x }).join(" · ")
                             }
@@ -302,7 +302,7 @@ Kirigami.ScrollablePage {
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 Controls.Label { Layout.fillWidth: true; font.bold: true; text: model.name + (model.arch ? "." + model.arch : "") }
-                                Controls.Label { Layout.fillWidth: true; opacity: 0.65; text: (model.version || "") + (model.repository ? " · " + model.repository : ""); elide: Text.ElideRight }
+                                Controls.Label { Layout.fillWidth: true; opacity: 0.72; text: (model.version || "") + (model.repository ? " · " + model.repository : ""); elide: Text.ElideRight }
                             }
                             Controls.Label { text: root.packageState(model); opacity: 0.7; font.bold: model.persistent || model.owned }
                             Controls.Button {
@@ -353,7 +353,7 @@ Kirigami.ScrollablePage {
                         contentItem: RowLayout {
                             Controls.Label { Layout.fillWidth: true; font.bold: true; text: model.name + (model.arch ? "." + model.arch : "") }
                             Controls.Label { text: model.version || ""; opacity: 0.72 }
-                            Controls.Label { text: model.repository || ""; opacity: 0.62 }
+                            Controls.Label { text: model.repository || ""; opacity: 0.72 }
                         }
                     }
                 }
@@ -383,7 +383,7 @@ Kirigami.ScrollablePage {
                         contentItem: RowLayout {
                             Controls.Label { Layout.fillWidth: true; font.bold: true; text: model.name + (model.arch ? "." + model.arch : "") }
                             Controls.Label { text: model.version || ""; opacity: 0.72 }
-                            Controls.Label { text: model.repository || ""; opacity: 0.62 }
+                            Controls.Label { text: model.repository || ""; opacity: 0.72 }
                         }
                     }
                 }
@@ -427,7 +427,7 @@ Kirigami.ScrollablePage {
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 Controls.Label { font.bold: true; text: modelData.name }
-                                Controls.Label { text: modelData.id; opacity: 0.62 }
+                                Controls.Label { text: modelData.id; opacity: 0.72 }
                             }
                             Controls.Label {
                                 Layout.preferredWidth: 110
@@ -471,8 +471,8 @@ Kirigami.ScrollablePage {
                     delegate: Controls.Label {
                         required property string modelData
                         Layout.fillWidth: true
-                        wrapMode: Text.WrapAnywhere
-                        font.family: "monospace"
+                        wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                        font.family: Kirigami.Theme.defaultFixedWidthFont.family
                         text: modelData
                     }
                 }
