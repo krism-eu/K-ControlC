@@ -7,6 +7,8 @@ import org.kriscc
 Kirigami.ScrollablePage {
     id: root
     title: qsTr("Software RPM")
+
+    UtilityBackend { id: utilityBackend }
     property bool ownOperation: false
     property var progressLines: []
     property string searchError: ""
@@ -45,9 +47,9 @@ Kirigami.ScrollablePage {
     }
 
     function transactionDependencies() {
-        if (UtilityBackend.operationId !== "rpm.plan" || UtilityBackend.resultState !== "success")
+        if (utilityBackend.operationId !== "rpm.plan" || utilityBackend.resultState !== "success")
             return []
-        var lines = UtilityBackend.output.split("\n")
+        var lines = utilityBackend.output.split("\n")
         var result = []
         var inDependencies = false
         for (var i = 0; i < lines.length; ++i) {
@@ -73,9 +75,9 @@ Kirigami.ScrollablePage {
     }
 
     function transactionTotals() {
-        if (UtilityBackend.operationId !== "rpm.plan" || UtilityBackend.resultState !== "success")
+        if (utilityBackend.operationId !== "rpm.plan" || utilityBackend.resultState !== "success")
             return []
-        var lines = UtilityBackend.output.split("\n")
+        var lines = utilityBackend.output.split("\n")
         var result = []
         for (var i = 0; i < lines.length; ++i) {
             var trimmed = lines[i].trim()
@@ -241,7 +243,7 @@ Kirigami.ScrollablePage {
                                             installSize: model.installSize,
                                             state: root.packageState(model)
                                         }
-                                        UtilityBackend.previewRpmInstall(model.name)
+                                        utilityBackend.previewRpmInstall(model.name)
                                         packageDialog.open()
                                     }
                                 }
@@ -515,7 +517,7 @@ Kirigami.ScrollablePage {
                 opacity: 0.72
                 text: qsTr("L'anteprima usa la stessa policy rk dell'installazione reale: repository DNF abilitati, firme RPM obbligatorie, base immutabile protetta e architetture consentite.")
             }
-            Controls.BusyIndicator { visible: UtilityBackend.busy; running: visible; Layout.alignment: Qt.AlignHCenter }
+            Controls.BusyIndicator { visible: utilityBackend.busy; running: visible; Layout.alignment: Qt.AlignHCenter }
 
             Repeater {
                 model: root.transactionTotals()
@@ -530,7 +532,7 @@ Kirigami.ScrollablePage {
 
             Kirigami.AbstractCard {
                 Layout.fillWidth: true
-                visible: !UtilityBackend.busy && root.transactionDependencies().length > 0
+                visible: !utilityBackend.busy && root.transactionDependencies().length > 0
                 contentItem: ColumnLayout {
                     Controls.Label { text: qsTr("Pacchetti aggiuntivi"); font.bold: true }
                     Repeater {
@@ -547,12 +549,12 @@ Kirigami.ScrollablePage {
 
             Kirigami.InlineMessage {
                 Layout.fillWidth: true
-                visible: !UtilityBackend.busy && UtilityBackend.operationId === "rpm.plan"
-                         && UtilityBackend.resultState !== "idle" && root.transactionDependencies().length === 0
-                type: UtilityBackend.resultState === "success" ? Kirigami.MessageType.Information : Kirigami.MessageType.Error
-                text: UtilityBackend.resultState === "success"
+                visible: !utilityBackend.busy && utilityBackend.operationId === "rpm.plan"
+                         && utilityBackend.resultState !== "idle" && root.transactionDependencies().length === 0
+                type: utilityBackend.resultState === "success" ? Kirigami.MessageType.Information : Kirigami.MessageType.Error
+                text: utilityBackend.resultState === "success"
                     ? qsTr("Il piano rk non segnala dipendenze aggiuntive, oppure il pacchetto è già presente.")
-                    : UtilityBackend.output
+                    : utilityBackend.output
             }
 
             Controls.CheckBox {
@@ -566,7 +568,7 @@ Kirigami.ScrollablePage {
                 readOnly: true
                 wrapMode: TextEdit.Wrap
                 font.family: "monospace"
-                text: UtilityBackend.output
+                text: utilityBackend.output
             }
         }
         onClosed: technicalOutputToggle.checked = false
