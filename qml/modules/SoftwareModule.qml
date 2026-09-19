@@ -158,7 +158,8 @@ Kirigami.ScrollablePage {
 
                 ListView {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.min(contentHeight, 520)
+                    Layout.preferredHeight: contentHeight
+                    interactive: false
                     model: searchModel
                     clip: true
                     spacing: Kirigami.Units.smallSpacing
@@ -253,7 +254,7 @@ Kirigami.ScrollablePage {
                 RowLayout {
                     Layout.fillWidth: true
                     Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Pacchetti presenti nel sistema, filtrabili per provenienza.") }
-                    Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: installedModel.loadInstalled() }
+                    Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: installedModel.loadInstalled(root.installFilter) }
                 }
                 Controls.ButtonGroup { id: installFilterGroup }
                 RowLayout {
@@ -290,7 +291,8 @@ Kirigami.ScrollablePage {
                 }
                 ListView {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.min(contentHeight, 500)
+                    Layout.preferredHeight: contentHeight
+                    interactive: false
                     model: installedModel
                     clip: true
                     spacing: Kirigami.Units.smallSpacing
@@ -326,12 +328,23 @@ Kirigami.ScrollablePage {
             ColumnLayout {
                 RowLayout {
                     Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: qsTr("Aggiornamenti RPM disponibili nei repository DNF abilitati. La base resta aggiornata tramite BootC.") }
+                    Controls.Button {
+                        text: qsTr("Risincronizza persistenti")
+                        icon.name: "view-refresh"
+                        enabled: !PolkitHelper.running && BootcBackend.persistentPackageCount > 0
+                        onClicked: root.requestPrivileged(
+                            "/usr/bin/rk", ["sync"],
+                            qsTr("Risincronizzare i pacchetti persistenti?"),
+                            qsTr("rk riallineerà il layer RPM alle richieste persistenti salvate.")
+                        )
+                    }
                     Controls.Button { text: qsTr("Aggiorna"); icon.name: "view-refresh"; onClicked: upgradesModel.loadUpgrades() }
                 }
                 Controls.BusyIndicator { visible: upgradesModel.searching; running: visible; Layout.alignment: Qt.AlignHCenter }
                 ListView {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.min(contentHeight, 500)
+                    Layout.preferredHeight: contentHeight
+                    interactive: false
                     model: upgradesModel
                     clip: true
                     spacing: Kirigami.Units.smallSpacing
@@ -344,6 +357,12 @@ Kirigami.ScrollablePage {
                         }
                     }
                 }
+                Kirigami.InlineMessage {
+                    Layout.fillWidth: true
+                    visible: !upgradesModel.searching && upgradesModel.count === 0
+                    type: Kirigami.MessageType.Positive
+                    text: qsTr("Nessun aggiornamento RPM disponibile nei repository abilitati.")
+                }
             }
 
             ColumnLayout {
@@ -354,7 +373,8 @@ Kirigami.ScrollablePage {
                 Controls.BusyIndicator { visible: recentModel.searching; running: visible; Layout.alignment: Qt.AlignHCenter }
                 ListView {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.min(contentHeight, 500)
+                    Layout.preferredHeight: contentHeight
+                    interactive: false
                     model: recentModel
                     clip: true
                     spacing: Kirigami.Units.smallSpacing
@@ -366,6 +386,12 @@ Kirigami.ScrollablePage {
                             Controls.Label { text: model.repository || ""; opacity: 0.62 }
                         }
                     }
+                }
+                Kirigami.InlineMessage {
+                    Layout.fillWidth: true
+                    visible: !recentModel.searching && recentModel.count === 0
+                    type: Kirigami.MessageType.Information
+                    text: qsTr("Nessuna novità repository disponibile.")
                 }
             }
 
