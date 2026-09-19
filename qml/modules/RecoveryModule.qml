@@ -74,7 +74,7 @@ Kirigami.ScrollablePage {
                 Controls.Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                    opacity: 0.68
+                    opacity: 0.72
                     text: backupProfile.currentIndex === 0
                           ? qsTr("Include le configurazioni utente supportate. Minimo 1 GiB libero.")
                           : qsTr("Include la home, escludendo cache, cestino e backup precedenti. Minimo 5 GiB liberi.")
@@ -86,7 +86,7 @@ Kirigami.ScrollablePage {
                         Kirigami.Heading { level: 3; font.bold: true; text: qsTr("Contenuto del backup") }
                         Controls.Label {
                             Layout.fillWidth: true
-                            opacity: 0.68
+                            opacity: 0.72
                             text: qsTr("Destinazione: ~/krisCC Backups")
                         }
                         Repeater {
@@ -109,7 +109,7 @@ Kirigami.ScrollablePage {
                                 }
                                 Controls.Label {
                                     visible: modelData.exists !== undefined
-                                    opacity: 0.62
+                                    opacity: 0.72
                                     text: modelData.exists ? qsTr("presente") : qsTr("assente")
                                 }
                             }
@@ -179,7 +179,7 @@ Kirigami.ScrollablePage {
                                 Controls.Label { Layout.fillWidth: true; font.bold: true; text: modelData.name }
                                 Controls.Label {
                                     Layout.fillWidth: true
-                                    opacity: 0.62
+                                    opacity: 0.72
                                     text: (modelData.kind === "home" ? qsTr("Home") : qsTr("Configurazione"))
                                           + " · " + root.humanSize(modelData.size)
                                           + " · " + modelData.modified
@@ -237,8 +237,8 @@ Kirigami.ScrollablePage {
                     Layout.preferredHeight: 150
                     visible: utilityBackend.operationId === "bookmark.rk-status"
                     readOnly: true
-                    wrapMode: TextEdit.WrapAnywhere
-                    font.family: "monospace"
+                    wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                    font.family: Kirigami.Theme.defaultFixedWidthFont.family
                     text: utilityBackend.output
                 }
             }
