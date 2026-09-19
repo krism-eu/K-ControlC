@@ -2,10 +2,13 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import org.kde.kirigami as Kirigami
+import org.kriscc
 
 Kirigami.ScrollablePage {
     id: root
     title: qsTr("Container")
+
+    UtilityBackend { id: utilityBackend }
 
     property string mode: "containers"
     property var containers: []
@@ -32,23 +35,23 @@ Kirigami.ScrollablePage {
 
     function refresh() {
         root.parseError = ""
-        UtilityBackend.runPodman(root.mode === "images" ? "images" : "list")
+        utilityBackend.runPodman(root.mode === "images" ? "images" : "list")
     }
 
     function parseResult() {
-        if (UtilityBackend.busy)
+        if (utilityBackend.busy)
             return
         var expected = root.mode === "images" ? "podman.images" : "podman.list"
-        if (UtilityBackend.operationId !== expected)
+        if (utilityBackend.operationId !== expected)
             return
-        if (UtilityBackend.resultState !== "success") {
+        if (utilityBackend.resultState !== "success") {
             if (root.mode === "images") root.images = []
             else root.containers = []
-            root.parseError = UtilityBackend.output.length > 0 ? UtilityBackend.output : qsTr("Impossibile leggere i dati Podman.")
+            root.parseError = utilityBackend.output.length > 0 ? utilityBackend.output : qsTr("Impossibile leggere i dati Podman.")
             return
         }
         try {
-            var data = JSON.parse(UtilityBackend.output || "[]")
+            var data = JSON.parse(utilityBackend.output || "[]")
             if (root.mode === "images")
                 root.images = Array.isArray(data) ? data : []
             else
@@ -57,7 +60,7 @@ Kirigami.ScrollablePage {
         } catch (e) {
             if (root.mode === "images") root.images = []
             else root.containers = []
-            root.parseError = UtilityBackend.output.length > 0 ? UtilityBackend.output : qsTr("Output Podman non leggibile.")
+            root.parseError = utilityBackend.output.length > 0 ? utilityBackend.output : qsTr("Output Podman non leggibile.")
         }
     }
 
@@ -114,7 +117,7 @@ Kirigami.ScrollablePage {
 
     function runAction(mode, name) {
         root.refreshAfterAction = true
-        UtilityBackend.runPodman(mode, name)
+        utilityBackend.runPodman(mode, name)
     }
 
     Component.onCompleted: if (SystemBackend.programAvailable("podman")) root.refresh()
@@ -122,7 +125,7 @@ Kirigami.ScrollablePage {
     Connections {
         target: UtilityBackend
         function onStateChanged() {
-            if (UtilityBackend.busy)
+            if (utilityBackend.busy)
                 return
             if (root.refreshAfterAction) {
                 root.refreshAfterAction = false
@@ -182,7 +185,7 @@ Kirigami.ScrollablePage {
             Controls.Button {
                 text: qsTr("Aggiorna")
                 icon.name: "view-refresh"
-                enabled: !UtilityBackend.busy && SystemBackend.programAvailable("podman")
+                enabled: !utilityBackend.busy && SystemBackend.programAvailable("podman")
                 onClicked: root.refresh()
             }
             Item { Layout.fillWidth: true }
@@ -209,7 +212,7 @@ Kirigami.ScrollablePage {
         }
 
         Controls.BusyIndicator {
-            visible: UtilityBackend.busy
+            visible: utilityBackend.busy
             running: visible
             Layout.alignment: Qt.AlignHCenter
         }
@@ -253,15 +256,15 @@ Kirigami.ScrollablePage {
                         }
                         RowLayout {
                             Layout.fillWidth: true
-                            Controls.Button { text: qsTr("Info"); icon.name: "documentinfo"; onClicked: UtilityBackend.runPodman("info", root.containerName(modelData)) }
-                            Controls.Button { text: qsTr("Log"); icon.name: "text-x-log"; onClicked: UtilityBackend.runPodman("logs", root.containerName(modelData)) }
+                            Controls.Button { text: qsTr("Info"); icon.name: "documentinfo"; onClicked: utilityBackend.runPodman("info", root.containerName(modelData)) }
+                            Controls.Button { text: qsTr("Log"); icon.name: "text-x-log"; onClicked: utilityBackend.runPodman("logs", root.containerName(modelData)) }
                             Item { Layout.fillWidth: true }
-                            Controls.Button { text: qsTr("Avvia"); enabled: !UtilityBackend.busy; onClicked: root.runAction("start", root.containerName(modelData)) }
-                            Controls.Button { text: qsTr("Ferma"); enabled: !UtilityBackend.busy; onClicked: root.runAction("stop", root.containerName(modelData)) }
-                            Controls.Button { text: qsTr("Riavvia"); enabled: !UtilityBackend.busy; onClicked: root.runAction("restart", root.containerName(modelData)) }
+                            Controls.Button { text: qsTr("Avvia"); enabled: !utilityBackend.busy; onClicked: root.runAction("start", root.containerName(modelData)) }
+                            Controls.Button { text: qsTr("Ferma"); enabled: !utilityBackend.busy; onClicked: root.runAction("stop", root.containerName(modelData)) }
+                            Controls.Button { text: qsTr("Riavvia"); enabled: !utilityBackend.busy; onClicked: root.runAction("restart", root.containerName(modelData)) }
                             Controls.Button {
                                 text: qsTr("Rinomina")
-                                enabled: !UtilityBackend.busy
+                                enabled: !utilityBackend.busy
                                 onClicked: {
                                     root.selectedName = root.containerName(modelData)
                                     renameField.text = root.selectedName
@@ -275,7 +278,7 @@ Kirigami.ScrollablePage {
 
             Kirigami.InlineMessage {
                 Layout.fillWidth: true
-                visible: SystemBackend.programAvailable("podman") && !UtilityBackend.busy && root.containers.length === 0 && root.parseError.length === 0
+                visible: SystemBackend.programAvailable("podman") && !utilityBackend.busy && root.containers.length === 0 && root.parseError.length === 0
                 type: Kirigami.MessageType.Information
                 text: qsTr("Nessun container Podman presente per l'utente.")
             }
@@ -316,7 +319,7 @@ Kirigami.ScrollablePage {
                         Controls.Button {
                             text: qsTr("Elimina")
                             icon.name: "edit-delete"
-                            enabled: !UtilityBackend.busy && root.imageId(modelData).length > 0
+                            enabled: !utilityBackend.busy && root.imageId(modelData).length > 0
                             onClicked: {
                                 root.selectedImageId = root.imageId(modelData)
                                 root.selectedImageName = root.imageName(modelData)
@@ -329,7 +332,7 @@ Kirigami.ScrollablePage {
 
             Kirigami.InlineMessage {
                 Layout.fillWidth: true
-                visible: SystemBackend.programAvailable("podman") && !UtilityBackend.busy && root.images.length === 0 && root.parseError.length === 0
+                visible: SystemBackend.programAvailable("podman") && !utilityBackend.busy && root.images.length === 0 && root.parseError.length === 0
                 type: Kirigami.MessageType.Information
                 text: qsTr("Nessuna immagine Podman presente per l'utente.")
             }
@@ -337,19 +340,19 @@ Kirigami.ScrollablePage {
 
         Kirigami.AbstractCard {
             Layout.fillWidth: true
-            visible: UtilityBackend.operationId.indexOf("podman.") === 0
-                  && UtilityBackend.operationId !== "podman.list"
-                  && UtilityBackend.operationId !== "podman.images"
-                  && UtilityBackend.output.length > 0
+            visible: utilityBackend.operationId.indexOf("podman.") === 0
+                  && utilityBackend.operationId !== "podman.list"
+                  && utilityBackend.operationId !== "podman.images"
+                  && utilityBackend.output.length > 0
             contentItem: ColumnLayout {
-                Controls.Label { font.bold: true; text: UtilityBackend.title }
+                Controls.Label { font.bold: true; text: utilityBackend.title }
                 Controls.TextArea {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 220
                     readOnly: true
                     wrapMode: TextEdit.WrapAnywhere
                     font.family: "monospace"
-                    text: UtilityBackend.output
+                    text: utilityBackend.output
                 }
             }
         }
@@ -368,7 +371,7 @@ Kirigami.ScrollablePage {
             var next = renameField.text.trim()
             if (next.length > 0 && next !== root.selectedName) {
                 root.refreshAfterAction = true
-                UtilityBackend.runPodman("rename", root.selectedName, next)
+                utilityBackend.runPodman("rename", root.selectedName, next)
             }
         }
     }
@@ -384,7 +387,7 @@ Kirigami.ScrollablePage {
         }
         onAccepted: {
             root.refreshAfterAction = true
-            UtilityBackend.runPodman("image-remove", root.selectedImageId)
+            utilityBackend.runPodman("image-remove", root.selectedImageId)
         }
     }
 }
