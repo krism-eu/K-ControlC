@@ -43,7 +43,6 @@ foreach(qml_file IN LISTS KRISCC_QML_FILES)
     set_source_files_properties("${qml_file}" PROPERTIES QT_RESOURCE_ALIAS "${qml_name}")
 endforeach()
 
-set_source_files_properties(qml/modules/SoftwareModule.qml PROPERTIES QT_QML_SKIP_CACHEGEN ON)
 
 qt_add_qml_module(krisCC
     URI org.kriscc
