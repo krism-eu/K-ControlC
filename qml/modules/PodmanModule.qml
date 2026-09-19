@@ -22,8 +22,12 @@ Kirigami.ScrollablePage {
     function humanSize(bytes) {
         if (bytes === undefined || bytes === null || bytes === "")
             return qsTr("n/d")
-        if (typeof bytes === "string")
-            return bytes
+        if (typeof bytes === "string") {
+            var numeric = Number(bytes)
+            if (isNaN(numeric))
+                return bytes
+            bytes = numeric
+        }
         if (bytes >= 1024 * 1024 * 1024)
             return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GiB"
         if (bytes >= 1024 * 1024)
@@ -80,7 +84,7 @@ Kirigami.ScrollablePage {
 
     function containerSize(item) {
         if (!item) return qsTr("n/d")
-        if (item.Size) return item.Size
+        if (item.Size) return root.humanSize(item.Size)
         if (item.SizeRw !== undefined || item.SizeRootFs !== undefined) {
             var rw = item.SizeRw !== undefined ? item.SizeRw : 0
             var rootfs = item.SizeRootFs !== undefined ? item.SizeRootFs : 0
@@ -107,7 +111,13 @@ Kirigami.ScrollablePage {
 
     function imageCreated(item) {
         if (!item) return ""
-        return item.CreatedAt || item.CreatedSince || item.Created || ""
+        var value = item.CreatedAt || item.CreatedSince || item.Created || ""
+        if (value === "") return ""
+        var numeric = Number(value)
+        var date = isNaN(numeric) ? new Date(value) : new Date(numeric * 1000)
+        if (!isNaN(date.getTime()))
+            return Qt.formatDateTime(date, "dd/MM/yyyy HH:mm")
+        return value
     }
 
     function imageSize(item) {
@@ -123,7 +133,7 @@ Kirigami.ScrollablePage {
     Component.onCompleted: if (SystemBackend.programAvailable("podman")) root.refresh()
 
     Connections {
-        target: UtilityBackend
+        target: utilityBackend
         function onStateChanged() {
             if (utilityBackend.busy)
                 return
@@ -160,8 +170,9 @@ Kirigami.ScrollablePage {
         }
 
         Controls.TabBar {
+            id: podmanTabs
             Layout.fillWidth: true
-            currentIndex: root.mode === "images" ? 1 : 0
+            currentIndex: 0
             Controls.TabButton {
                 text: qsTr("Container")
                 font.bold: checked
