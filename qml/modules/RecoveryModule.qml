@@ -248,6 +248,8 @@ Kirigami.ScrollablePage {
     Controls.Dialog {
         id: homeDialog
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         title: qsTr("Creare il backup della home?")
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
@@ -260,6 +262,8 @@ Kirigami.ScrollablePage {
     Controls.Dialog {
         id: restoreDialog
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         title: qsTr("Ripristinare %1?").arg(root.restoreName)
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
@@ -274,6 +278,8 @@ Kirigami.ScrollablePage {
     Controls.Dialog {
         id: syncDialog
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         title: qsTr("Risincronizzare il layer RPM?")
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
