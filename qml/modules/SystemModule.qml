@@ -189,7 +189,7 @@ Kirigami.ScrollablePage {
                             }
                             Controls.Label {
                                 Layout.fillWidth: true
-                                opacity: 0.68
+                                opacity: 0.72
                                 text: {
                                     var d = root.bootedDeployment()
                                     return [d.version || "", root.shortDigest(d.digest || "")].filter(function(x) { return !!x }).join(" · ")
@@ -280,8 +280,8 @@ Kirigami.ScrollablePage {
                                 Layout.preferredHeight: 150
                                 visible: bootTechnicalDetails.checked
                                 readOnly: true
-                                wrapMode: TextEdit.WrapAnywhere
-                                font.family: "monospace"
+                                wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                                font.family: Kirigami.Theme.defaultFixedWidthFont.family
                                 text: BootcBackend.statusText
                             }
                         }
@@ -323,8 +323,8 @@ Kirigami.ScrollablePage {
                                 Layout.preferredHeight: 120
                                 visible: utilityBackend.operationId.indexOf("flatpak.") === 0 && utilityBackend.output.length > 0
                                 readOnly: true
-                                wrapMode: TextEdit.WrapAnywhere
-                                font.family: "monospace"
+                                wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                                font.family: Kirigami.Theme.defaultFixedWidthFont.family
                                 text: utilityBackend.output
                             }
                         }
@@ -488,8 +488,8 @@ Kirigami.ScrollablePage {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 330
                             readOnly: true
-                            wrapMode: TextEdit.WrapAnywhere
-                            font.family: "monospace"
+                            wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                            font.family: Kirigami.Theme.defaultFixedWidthFont.family
                             text: utilityBackend.output
                         }
                     }
@@ -618,8 +618,8 @@ Kirigami.ScrollablePage {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 300
                             readOnly: true
-                            wrapMode: TextEdit.WrapAnywhere
-                            font.family: "monospace"
+                            wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                            font.family: Kirigami.Theme.defaultFixedWidthFont.family
                             text: utilityBackend.output
                         }
                     }
@@ -695,8 +695,8 @@ Kirigami.ScrollablePage {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 260
                             readOnly: true
-                            wrapMode: TextEdit.WrapAnywhere
-                            font.family: "monospace"
+                            wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                            font.family: Kirigami.Theme.defaultFixedWidthFont.family
                             text: utilityBackend.output
                         }
                     }
