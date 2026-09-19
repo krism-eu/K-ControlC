@@ -174,6 +174,7 @@ Kirigami.ScrollablePage {
             Layout.fillWidth: true
             currentIndex: 0
             Controls.TabButton {
+                implicitHeight: Kirigami.Units.gridUnit * 2.1
                 text: qsTr("Container")
                 font.bold: checked
                 onClicked: {
@@ -182,6 +183,7 @@ Kirigami.ScrollablePage {
                 }
             }
             Controls.TabButton {
+                implicitHeight: Kirigami.Units.gridUnit * 2.1
                 text: qsTr("Immagini")
                 font.bold: checked
                 onClicked: {
@@ -372,6 +374,8 @@ Kirigami.ScrollablePage {
     Controls.Dialog {
         id: renameDialog
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         title: qsTr("Rinomina container")
         standardButtons: Controls.Dialog.Ok | Controls.Dialog.Cancel
         contentItem: ColumnLayout {
@@ -390,6 +394,8 @@ Kirigami.ScrollablePage {
     Controls.Dialog {
         id: imageRemoveDialog
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         title: qsTr("Eliminare l'immagine?")
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
