@@ -81,6 +81,16 @@ if grep -q 'id != QStringLiteral("fedora") && id != QStringLiteral("updates")' s
 fi
 grep -q 'QStringLiteral("repoquery"), QStringLiteral("--available")' src/PackageSearch.cpp
 grep -q 'args << QStringLiteral("list") << filter << QStringLiteral("--json")' src/PackageSearch.cpp
+grep -q "name + QLatin1Char('\\x1f') + arch" src/PackageSearch.cpp
+grep -q 'm_installedFilter' src/PackageSearch.cpp
+if grep -q 'visibleForFilter' qml/modules/SoftwareModule.qml; then
+  echo "ERROR: installed RPM filtering still happens in QML delegates" >&2
+  exit 1
+fi
+if grep -q 'Installing dependencies:\|Transaction Summary:\|Total size of inbound packages' qml/modules/SoftwareModule.qml; then
+  echo "ERROR: locale-sensitive rk plan parser remains" >&2
+  exit 1
+fi
 
 # Flatpak management is deliberately per-user. Inventory, remotes and mutations
 # must all use the same installation scope so the UI never shows system refs it
@@ -95,10 +105,20 @@ grep -q 'mode == QStringLiteral("update")' src/UtilityBackend.cpp
 grep -q 'QStringLiteral("update"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), QStringLiteral("--assumeyes")' src/UtilityBackend.cpp
 grep -q 'text: qsTr("Aggiorna tutto")' qml/modules/FlatpakModule.qml
 grep -q 'text: qsTr("Aggiorna")' qml/modules/FlatpakModule.qml
+grep -q 'selectedRemote' src/UtilityBackend.cpp
+grep -Fq 'modelData[5]' qml/modules/FlatpakModule.qml
+if grep -q 'currentIndex: root.mode' qml/modules/FlatpakModule.qml qml/modules/PodmanModule.qml; then
+  echo "ERROR: tab currentIndex is still bound back to mode" >&2
+  exit 1
+fi
 
 # The BootC check is an explicit registry check and must remain non-applying.
 grep -Fq 'root.runBootc(["upgrade", "--check"])' qml/modules/SystemModule.qml
 grep -q 'text: qsTr("Controlla immagine")' qml/modules/SystemModule.qml
+grep -q 'root.hasStagedDeployment()' qml/modules/SystemModule.qml
+grep -q 'bootProgressLines' qml/modules/SystemModule.qml
+grep -q 'BootcBackend.refreshStatus()' qml/modules/SystemModule.qml
+grep -q '/usr/libexec/kriscc/bootc-status humanreadable' src/UtilityBackend.cpp
 
 if grep -Eq 'QStringLiteral\("--json"\)|QStringLiteral\("--format-version' src/BootcBackend.cpp; then
   echo "ERROR: BootcBackend must use bootc status --format json without legacy JSON flags" >&2
@@ -142,7 +162,7 @@ test ! -e data/org.kcontrolc.KControlC.metainfo.xml
 
 grep -q '^Name:[[:space:]]*krisCC$' packaging/krisCC.spec
 grep -Fxq 'Version:        0.5.1' packaging/krisCC.spec
-grep -Fxq 'Release:        9%{?dist}' packaging/krisCC.spec
+grep -Fxq 'Release:        10%{?dist}' packaging/krisCC.spec
 if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
   echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
   exit 1
@@ -180,7 +200,7 @@ if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
   echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
   exit 1
 fi
-grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'Informazioni rapide di sistema' src/SystemBackend.cpp
 grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
 grep -q 'QStringLiteral("KCC Backups")' src/SystemBackend.cpp
 grep -q 'QStringLiteral("K-ControlC Backups")' src/SystemBackend.cpp
@@ -211,10 +231,10 @@ grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
 # Backend/UI state must not depend on translated presentation strings.
 grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
 grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
-grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
-grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
-grep -q 'UtilityBackend.operationId === "bookmark.health"' qml/modules/SystemModule.qml
-if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+grep -q 'utilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'utilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'utilityBackend.operationId === "bookmark.health"' qml/modules/SystemModule.qml
+if grep -R -nE 'utilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|utilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
   echo "ERROR: translated UI strings are still used as backend state" >&2
   exit 1
 fi
@@ -229,13 +249,23 @@ grep -q 'validateBackupPath' src/SystemBackend.cpp
 grep -q 'QProcess::nullDevice()' src/SystemBackend.cpp
 grep -q 'Impossibile avviare la verifica' src/SystemBackend.cpp
 grep -q 'Impossibile avviare il ripristino' src/SystemBackend.cpp
-grep -A5 'flatpak-unused' src/SystemBackend.cpp | grep -q 'QStringLiteral("--user")'
+grep -q 'mode == QStringLiteral("remove-unused")' src/UtilityBackend.cpp
+grep -A4 'mode == QStringLiteral("remove-unused")' src/UtilityBackend.cpp | grep -q 'QStringLiteral("--user")'
+grep -A4 'mode == QStringLiteral("remove-unused")' src/UtilityBackend.cpp | grep -q 'QStringLiteral("--unused")'
 grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
 grep -q 'OperationLog::append' src/SystemBackend.cpp
 grep -q 'src/OperationLog.cpp src/OperationLog.h' CMakeLists.txt
 grep -q 'Q_INVOKABLE QVariantList backupPreview' src/SystemBackend.h
 grep -q 'Q_INVOKABLE QVariantList operationHistoryEntries' src/SystemBackend.h
 grep -q 'Q_INVOKABLE QString flatpakIconPath' src/SystemBackend.h
+if grep -q 'launchQuickAction\|sessionAction\|launchFlatpakManager' src/SystemBackend.h src/SystemBackend.cpp; then
+  echo "ERROR: dead SystemBackend APIs remain" >&2
+  exit 1
+fi
+if grep -q 'launchUnprivileged\|isUnprivilegedInvocationAllowed' src/PolkitHelper.h src/PolkitHelper.cpp; then
+  echo "ERROR: dead Polkit unprivileged path remains" >&2
+  exit 1
+fi
 
 # Next-boot selection is one-shot only: BootNext or grub2-reboot, never a permanent BootOrder rewrite.
 grep -q 'QStringLiteral("/usr/bin/efibootmgr")' src/PolkitHelper.cpp
@@ -263,8 +293,30 @@ grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
 grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
 grep -q 'Q_CLASSINFO("D-Bus Interface", "org.kriscc.ControlCenter")' src/InstanceController.h
 grep -q 'qml/modules/SystemModule.qml' CMakeLists.txt
-grep -q 'function replaceForIndex(index)' qml/Main.qml
-test "$(grep -c 'pageStack.replace(' qml/Main.qml)" -eq 7
+test ! -e qml/modules/BootcModule.qml
+test ! -e qml/modules/ToolsModule.qml
+grep -q 'pageStack.globalToolBar.style: Kirigami.ApplicationHeaderStyle.None' qml/Main.qml
+grep -q 'StackLayout' qml/Main.qml
+if grep -q 'pageStack.replace(' qml/Main.qml; then
+  echo "ERROR: top-level navigation still recreates pages" >&2
+  exit 1
+fi
+grep -q 'qmlRegisterType<UtilityBackend>("org.kriscc"' src/main.cpp
+if grep -q 'setContextProperty(QStringLiteral("UtilityBackend")' src/main.cpp; then
+  echo "ERROR: global UtilityBackend singleton restored" >&2
+  exit 1
+fi
+for qml in SoftwareModule FlatpakModule PodmanModule SystemModule CommandsModule RecoveryModule; do
+  grep -q 'UtilityBackend { id: utilityBackend }' "qml/modules/$qml.qml"
+done
+if grep -q 'QT_QML_SKIP_CACHEGEN' CMakeLists.txt; then
+  echo "ERROR: SoftwareModule still bypasses qmlcachegen" >&2
+  exit 1
+fi
+if grep -q '#c62828' qml/Main.qml; then
+  echo "ERROR: hard-coded application accent returned" >&2
+  exit 1
+fi
 
 # The released RPM is validated in a fresh Fedora job before release publication.
 grep -q '^  rpm-smoke:' .github/workflows/build.yml
