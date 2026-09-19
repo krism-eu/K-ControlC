@@ -238,16 +238,18 @@ void PackageSearch::startRepoQuery(const QString &term)
         for (const QString &line : lines) {
             const QStringList parts = line.split(QLatin1Char('\t'));
             const QString name = parts.value(0).trimmed();
-            if (name.isEmpty() || parts.size() < 7 || seen.contains(name))
+            const QString arch = parts.value(4).trimmed();
+            const QString key = name + QLatin1Char('\x1f') + arch;
+            if (name.isEmpty() || parts.size() < 7 || seen.contains(key))
                 continue;
 
-            seen.insert(name);
+            seen.insert(key);
             Entry entry;
             entry.name = name;
             entry.summary = parts.value(1).simplified().left(512);
             entry.version = parts.value(2).trimmed();
             entry.repository = parts.value(3).trimmed();
-            entry.arch = parts.value(4).trimmed();
+            entry.arch = arch;
             entry.downloadSize = parts.value(5).toULongLong();
             entry.installSize = parts.value(6).toULongLong();
             entry.installed = m_installed.contains(name);
