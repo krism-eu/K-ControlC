@@ -12,24 +12,13 @@ Kirigami.ApplicationWindow {
     minimumHeight: 600
     visible: !KrisccStartHidden
     title: qsTr("krisCC")
-    Kirigami.Theme.highlightColor: "#c62828"
-    palette.highlight: "#c62828"
+    property int currentSection: 0
 
-    function replaceForIndex(index) {
-        if (index === 1) pageStack.replace(softwarePage)
-        else if (index === 2) pageStack.replace(flatpakPage)
-        else if (index === 3) pageStack.replace(podmanPage)
-        else if (index === 4) pageStack.replace(systemPage)
-        else if (index === 5) pageStack.replace(commandsPage)
-        else if (index === 6) pageStack.replace(recoveryPage)
-        else pageStack.replace(dashboardPage)
-    }
+    pageStack.globalToolBar.style: Kirigami.ApplicationHeaderStyle.None
 
     function showIndex(index) {
-        if (topTabs.currentIndex === index)
-            replaceForIndex(index)
-        else
-            topTabs.currentIndex = index
+        if (index >= 0 && index <= 6)
+            root.currentSection = index
     }
 
     function openById(pageId) {
@@ -43,51 +32,105 @@ Kirigami.ApplicationWindow {
     }
 
     header: Controls.ToolBar {
-        contentItem: ColumnLayout {
+        implicitHeight: Kirigami.Units.gridUnit * 2.6
+        contentItem: RowLayout {
             spacing: Kirigami.Units.smallSpacing
 
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.leftMargin: Kirigami.Units.smallSpacing
-                Layout.rightMargin: Kirigami.Units.smallSpacing
+            Controls.Label {
+                font.bold: true
+                font.pointSize: Kirigami.Theme.defaultFont.pointSize + 2
+                text: qsTr("krisCC")
+            }
 
-                Controls.Label {
-                    Layout.fillWidth: true
-                    font.bold: true
-                    font.pointSize: Kirigami.Theme.defaultFont.pointSize + 2
-                    text: qsTr("krisCC")
-                }
-                Controls.Label {
-                    opacity: 0.58
-                    text: qsTr("KrisOS · %1").arg(Qt.application.version)
+            Flickable {
+                id: navigationFlick
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                contentWidth: navigationRow.implicitWidth
+                contentHeight: height
+                boundsBehavior: Flickable.StopAtBounds
+                flickableDirection: Flickable.HorizontalFlick
+
+                RowLayout {
+                    id: navigationRow
+                    height: parent.height
+                    spacing: Kirigami.Units.smallSpacing
+
+                    Repeater {
+                        model: [
+                            qsTr("Panoramica"),
+                            qsTr("RPM"),
+                            qsTr("Flatpak"),
+                            qsTr("Container"),
+                            qsTr("Sistema"),
+                            qsTr("Comandi"),
+                            qsTr("Backup")
+                        ]
+                        delegate: Controls.ToolButton {
+                            required property int index
+                            required property string modelData
+                            checkable: true
+                            checked: root.currentSection === index
+                            text: modelData
+                            font.bold: checked
+                            onClicked: root.showIndex(index)
+
+                            contentItem: Controls.Label {
+                                text: parent.text
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                font: parent.font
+                                color: parent.checked ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.textColor
+                            }
+                            background: Item {
+                                Rectangle {
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.bottom: parent.bottom
+                                    height: 2
+                                    visible: parent.parent.checked
+                                    color: Kirigami.Theme.negativeTextColor
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
-            Controls.TabBar {
-                id: topTabs
-                Layout.fillWidth: true
-                onCurrentIndexChanged: {
-                    if (pageStack.depth > 0)
-                        root.replaceForIndex(currentIndex)
-                }
-
-                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Panoramica") }
-                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("RPM") }
-                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Flatpak") }
-                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Container") }
-                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Sistema") }
-                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Comandi") }
-                Controls.TabButton { implicitHeight: Kirigami.Units.gridUnit * 2.15; font.bold: checked; text: qsTr("Backup") }
+            Controls.Label {
+                opacity: 0.72
+                text: qsTr("KrisOS · %1").arg(Qt.application.version)
             }
         }
     }
 
-    pageStack.initialPage: dashboardPage
+    pageStack.initialPage: Kirigami.Page {
+        title: ""
+        padding: 0
+
+        StackLayout {
+            anchors.fill: parent
+            currentIndex: root.currentSection
+
+            DashboardModule {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                onOpenRequested: function(pageId) { root.openById(pageId) }
+            }
+            SoftwareModule { Layout.fillWidth: true; Layout.fillHeight: true }
+            FlatpakModule { Layout.fillWidth: true; Layout.fillHeight: true }
+            PodmanModule { Layout.fillWidth: true; Layout.fillHeight: true }
+            SystemModule { Layout.fillWidth: true; Layout.fillHeight: true }
+            CommandsModule { Layout.fillWidth: true; Layout.fillHeight: true }
+            RecoveryModule { Layout.fillWidth: true; Layout.fillHeight: true }
+        }
+    }
 
     Timer {
         id: smokePager
         property int nextIndex: 0
-        interval: 180
+        interval: 220
         repeat: true
         running: KrisccSmokeTest
         onTriggered: {
@@ -97,17 +140,4 @@ Kirigami.ApplicationWindow {
                 stop()
         }
     }
-
-    Component {
-        id: dashboardPage
-        DashboardModule {
-            onOpenRequested: function(pageId) { root.openById(pageId) }
-        }
-    }
-    Component { id: softwarePage; SoftwareModule {} }
-    Component { id: flatpakPage; FlatpakModule {} }
-    Component { id: podmanPage; PodmanModule {} }
-    Component { id: systemPage; SystemModule {} }
-    Component { id: commandsPage; CommandsModule {} }
-    Component { id: recoveryPage; RecoveryModule {} }
 }
