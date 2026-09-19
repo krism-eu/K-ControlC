@@ -34,7 +34,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     Q_INVOKABLE void search(const QString &term);
-    Q_INVOKABLE void loadInstalled(const QString &filter = QStringLiteral("all"));
+    Q_INVOKABLE void loadInstalled(const QString &filter = QString());
     Q_INVOKABLE void loadUpgrades();
     Q_INVOKABLE void loadRecent();
     bool searching() const { return m_searching; }
