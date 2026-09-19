@@ -106,8 +106,13 @@ void PackageSearch::search(const QString &term)
         startInstalledQuery(sanitized);
 }
 
-void PackageSearch::loadInstalled()
+void PackageSearch::loadInstalled(const QString &filter)
 {
+    static const QSet<QString> allowed = {
+        QStringLiteral("all"), QStringLiteral("base"),
+        QStringLiteral("persistent"), QStringLiteral("local")
+    };
+    m_installedFilter = allowed.contains(filter) ? filter : QStringLiteral("all");
     refreshPersistentSet();
     ++m_generation;
     stopActiveProcess();
@@ -366,6 +371,17 @@ void PackageSearch::startListQuery(const QString &filter, bool installedEntries)
                 entry.installed = installedEntries || m_installed.contains(name);
                 entry.owned = m_owned.contains(name);
                 entry.persistent = m_persistent.contains(name);
+
+                if (installedEntries) {
+                    const bool local = entry.installed && !entry.owned && !entry.persistent;
+                    if (m_installedFilter == QStringLiteral("base") && !entry.owned)
+                        continue;
+                    if (m_installedFilter == QStringLiteral("persistent") && !entry.persistent)
+                        continue;
+                    if (m_installedFilter == QStringLiteral("local") && !local)
+                        continue;
+                }
+
                 entries.append(entry);
                 if (entries.size() >= 500)
                     break;
