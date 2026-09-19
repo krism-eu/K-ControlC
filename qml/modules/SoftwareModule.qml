@@ -457,9 +457,12 @@ Kirigami.ScrollablePage {
     Controls.Dialog {
         id: addRepoDialog
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         title: qsTr("Aggiungi repository DNF")
-        standardButtons: Controls.Dialog.Ok | Controls.Dialog.Cancel
+        standardButtons: Controls.Dialog.Cancel
         contentItem: ColumnLayout {
+            spacing: Kirigami.Units.smallSpacing
             Controls.Label {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
@@ -470,124 +473,148 @@ Kirigami.ScrollablePage {
                 Layout.fillWidth: true
                 placeholderText: qsTr("https://esempio.invalid/repository.repo")
                 selectByMouse: true
+                onTextChanged: root.repoValidationError = ""
+            }
+            Kirigami.InlineMessage {
+                Layout.fillWidth: true
+                visible: root.repoValidationError.length > 0
+                type: Kirigami.MessageType.Error
+                text: root.repoValidationError
+            }
+            Controls.Button {
+                Layout.alignment: Qt.AlignRight
+                text: qsTr("Aggiungi")
+                icon.name: "list-add"
+                enabled: !PolkitHelper.running
+                onClicked: {
+                    var url = repoUrlField.text.trim()
+                    root.repoValidationError = ""
+                    if (!/^https:\/\/[^\s]+$/i.test(url)) {
+                        root.repoValidationError = qsTr("Repository non aggiunto: usa un URL HTTPS valido.")
+                        return
+                    }
+                    root.runPrivileged("/usr/bin/dnf5",
+                        ["config-manager", "addrepo", "--from-repofile=" + url])
+                    repoUrlField.clear()
+                    addRepoDialog.close()
+                }
             }
         }
-        onAccepted: {
-            var url = repoUrlField.text.trim()
+        onRejected: {
             root.repoValidationError = ""
-            if (!/^https:\/\/[^\s]+$/i.test(url)) {
-                root.repoValidationError = qsTr("Repository non aggiunto: usa un URL HTTPS valido.")
-            } else {
-                root.runPrivileged("/usr/bin/dnf5",
-                    ["config-manager", "addrepo", "--from-repofile=" + url])
-            }
             repoUrlField.clear()
         }
-        onRejected: repoUrlField.clear()
     }
 
     Controls.Dialog {
         id: packageDialog
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         width: Math.min(root.width - 48, 800)
+        height: Math.min(root.height - 48, 650)
         title: root.detailPackage ? root.detailPackage.name : qsTr("Dettagli pacchetto")
         standardButtons: Controls.Dialog.Close
-        contentItem: ColumnLayout {
-            spacing: Kirigami.Units.smallSpacing
 
-            Controls.Label {
-                Layout.fillWidth: true
-                wrapMode: Text.WordWrap
-                font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
-                text: root.detailPackage ? root.detailPackage.summary : ""
-            }
-            Controls.Label {
-                Layout.fillWidth: true
-                opacity: 0.7
-                wrapMode: Text.WordWrap
-                text: root.detailPackage ? [root.detailPackage.version, root.detailPackage.arch, root.detailPackage.repository, root.detailPackage.state].filter(function(x) { return !!x }).join(" · ") : ""
-            }
+        contentItem: Controls.ScrollView {
+            clip: true
 
-            RowLayout {
-                Layout.fillWidth: true
-                Kirigami.AbstractCard {
+            ColumnLayout {
+                width: Math.max(320, packageDialog.width - Kirigami.Units.gridUnit * 4)
+                spacing: Kirigami.Units.smallSpacing
+
+                Controls.Label {
                     Layout.fillWidth: true
-                    contentItem: ColumnLayout {
-                        Controls.Label { text: qsTr("Download"); opacity: 0.65 }
-                        Controls.Label { font.bold: true; text: root.detailPackage ? root.humanSize(root.detailPackage.downloadSize) : "" }
-                    }
-                }
-                Kirigami.AbstractCard {
-                    Layout.fillWidth: true
-                    contentItem: ColumnLayout {
-                        Controls.Label { text: qsTr("Spazio installato"); opacity: 0.65 }
-                        Controls.Label { font.bold: true; text: root.detailPackage ? root.humanSize(root.detailPackage.installSize) : "" }
-                    }
-                }
-            }
-
-            Kirigami.Separator { Layout.fillWidth: true }
-            Kirigami.Heading { level: 3; font.bold: true; text: qsTr("Piano rk") }
-            Controls.Label {
-                Layout.fillWidth: true
-                wrapMode: Text.WordWrap
-                opacity: 0.72
-                text: qsTr("L'anteprima usa la stessa policy rk dell'installazione reale: repository DNF abilitati, firme RPM obbligatorie, base immutabile protetta e architetture consentite.")
-            }
-            Controls.BusyIndicator { visible: utilityBackend.busy; running: visible; Layout.alignment: Qt.AlignHCenter }
-
-            Repeater {
-                model: root.transactionTotals()
-                delegate: Controls.Label {
-                    required property string modelData
-                    Layout.fillWidth: true
-                    font.bold: true
                     wrapMode: Text.WordWrap
-                    text: modelData
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
+                    text: root.detailPackage ? root.detailPackage.summary : ""
                 }
-            }
+                Controls.Label {
+                    Layout.fillWidth: true
+                    opacity: 0.72
+                    wrapMode: Text.WordWrap
+                    text: root.detailPackage
+                        ? [root.detailPackage.version, root.detailPackage.arch,
+                           root.detailPackage.repository, root.detailPackage.state]
+                          .filter(function(x) { return !!x }).join(" · ")
+                        : ""
+                }
 
-            Kirigami.AbstractCard {
-                Layout.fillWidth: true
-                visible: !utilityBackend.busy && root.transactionDependencies().length > 0
-                contentItem: ColumnLayout {
-                    Controls.Label { text: qsTr("Pacchetti aggiuntivi"); font.bold: true }
-                    Repeater {
-                        model: root.transactionDependencies()
-                        delegate: Controls.Label {
-                            required property string modelData
-                            Layout.fillWidth: true
-                            wrapMode: Text.WrapAnywhere
-                            text: modelData
+                RowLayout {
+                    Layout.fillWidth: true
+                    Kirigami.AbstractCard {
+                        Layout.fillWidth: true
+                        contentItem: ColumnLayout {
+                            Controls.Label { text: qsTr("Download"); opacity: 0.72 }
+                            Controls.Label {
+                                font.bold: true
+                                text: root.detailPackage ? root.humanSize(root.detailPackage.downloadSize) : ""
+                            }
+                        }
+                    }
+                    Kirigami.AbstractCard {
+                        Layout.fillWidth: true
+                        contentItem: ColumnLayout {
+                            Controls.Label { text: qsTr("Spazio installato"); opacity: 0.72 }
+                            Controls.Label {
+                                font.bold: true
+                                text: root.detailPackage ? root.humanSize(root.detailPackage.installSize) : ""
+                            }
                         }
                     }
                 }
-            }
 
-            Kirigami.InlineMessage {
-                Layout.fillWidth: true
-                visible: !utilityBackend.busy && utilityBackend.operationId === "rpm.plan"
-                         && utilityBackend.resultState !== "idle" && root.transactionDependencies().length === 0
-                type: utilityBackend.resultState === "success" ? Kirigami.MessageType.Information : Kirigami.MessageType.Error
-                text: utilityBackend.resultState === "success"
-                    ? qsTr("Il piano rk non segnala dipendenze aggiuntive, oppure il pacchetto è già presente.")
-                    : utilityBackend.output
-            }
-
-            Controls.CheckBox {
-                id: technicalOutputToggle
-                text: qsTr("Mostra output tecnico rk")
-            }
-            Controls.TextArea {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 180
-                visible: technicalOutputToggle.checked
-                readOnly: true
-                wrapMode: TextEdit.Wrap
-                font.family: "monospace"
-                text: utilityBackend.output
+                Kirigami.Separator { Layout.fillWidth: true }
+                Kirigami.Heading { level: 3; font.bold: true; text: qsTr("Piano rk") }
+                Controls.Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.72
+                    text: qsTr("Il piano mostrato qui sotto è l'output reale di rk plan. Non viene reinterpretato dalla UI.")
+                }
+                Controls.BusyIndicator {
+                    visible: utilityBackend.busy && utilityBackend.operationId === "rpm.plan"
+                    running: visible
+                    Layout.alignment: Qt.AlignHCenter
+                }
+                Kirigami.InlineMessage {
+                    Layout.fillWidth: true
+                    visible: !utilityBackend.busy
+                             && utilityBackend.operationId === "rpm.plan"
+                             && utilityBackend.resultState === "error"
+                    type: Kirigami.MessageType.Error
+                    text: utilityBackend.output
+                }
+                Kirigami.AbstractCard {
+                    Layout.fillWidth: true
+                    visible: utilityBackend.operationId === "rpm.plan"
+                             && utilityBackend.output.length > 0
+                             && utilityBackend.resultState !== "error"
+                    contentItem: Controls.Label {
+                        width: parent.width
+                        wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                        font.family: Kirigami.Theme.defaultFixedWidthFont.family
+                        text: utilityBackend.output
+                    }
+                }
             }
         }
-        onClosed: technicalOutputToggle.checked = false
+    }
+
+    Controls.Dialog {
+        id: privilegedConfirmDialog
+        modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
+        title: root.pendingTitle
+        standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
+        contentItem: Controls.Label {
+            wrapMode: Text.WordWrap
+            text: root.pendingMessage
+        }
+        onAccepted: {
+            if (root.pendingProgram.length > 0)
+                root.runPrivileged(root.pendingProgram, root.pendingArgs)
+        }
     }
 }
