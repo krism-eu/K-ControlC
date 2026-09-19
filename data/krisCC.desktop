@@ -1,11 +1,15 @@
 [Desktop Entry]
 Type=Application
 Name=krisCC
+Name[it]=krisCC
 GenericName=System Control Center
+GenericName[it]=Centro di controllo di sistema
 Comment=Personal control center for KrisOS and Fedora bootc systems
+Comment[it]=Centro di controllo personale per KrisOS e sistemi Fedora bootc
 Exec=krisCC
 Icon=krisCC
 Terminal=false
 Categories=Settings;System;
 Keywords=bootc;system;settings;software;recovery;fedora;krisos;control center;containers;podman;
 StartupNotify=true
+StartupWMClass=krisCC
