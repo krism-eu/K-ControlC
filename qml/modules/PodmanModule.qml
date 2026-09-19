@@ -203,7 +203,7 @@ Kirigami.ScrollablePage {
             }
             Item { Layout.fillWidth: true }
             Controls.Label {
-                opacity: 0.65
+                opacity: 0.72
                 text: root.mode === "images"
                       ? qsTr("%1 immagini").arg(root.images.length)
                       : qsTr("%1 container").arg(root.containers.length)
@@ -363,8 +363,8 @@ Kirigami.ScrollablePage {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 220
                     readOnly: true
-                    wrapMode: TextEdit.WrapAnywhere
-                    font.family: "monospace"
+                    wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                    font.family: Kirigami.Theme.defaultFixedWidthFont.family
                     text: utilityBackend.output
                 }
             }
