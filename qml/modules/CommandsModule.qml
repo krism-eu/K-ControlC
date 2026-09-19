@@ -87,15 +87,15 @@ Kirigami.ScrollablePage {
                         }
                         Controls.Label {
                             Layout.fillWidth: true
-                            font.family: "monospace"
-                            wrapMode: Text.WrapAnywhere
+                            font.family: Kirigami.Theme.defaultFixedWidthFont.family
+                            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                             opacity: 0.82
                             text: modelData.command
                         }
                         Controls.Label {
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
-                            opacity: 0.62
+                            opacity: 0.72
                             text: modelData.note
                         }
                     }
@@ -133,8 +133,8 @@ Kirigami.ScrollablePage {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 340
                     readOnly: true
-                    wrapMode: TextEdit.WrapAnywhere
-                    font.family: "monospace"
+                    wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                    font.family: Kirigami.Theme.defaultFixedWidthFont.family
                     text: utilityBackend.output
                 }
             }
