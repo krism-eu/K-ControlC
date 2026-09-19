@@ -34,7 +34,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     Q_INVOKABLE void search(const QString &term);
-    Q_INVOKABLE void loadInstalled();
+    Q_INVOKABLE void loadInstalled(const QString &filter = QStringLiteral("all"));
     Q_INVOKABLE void loadUpgrades();
     Q_INVOKABLE void loadRecent();
     bool searching() const { return m_searching; }
@@ -79,6 +79,7 @@ private:
     QDateTime m_installedCacheMtime;
     QString m_installedCacheDbPath;
     bool m_installedCacheValid = false;
+    QString m_installedFilter = QStringLiteral("all");
     bool m_searching = false;
     quint64 m_generation = 0;
 };
