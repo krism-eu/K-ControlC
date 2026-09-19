@@ -136,8 +136,8 @@ Kirigami.ScrollablePage {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 190
                     readOnly: true
-                    wrapMode: TextEdit.WrapAnywhere
-                    font.family: "monospace"
+                    wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                    font.family: Kirigami.Theme.defaultFixedWidthFont.family
                     text: SystemBackend.quickSystemInfo()
                 }
                 RowLayout {
