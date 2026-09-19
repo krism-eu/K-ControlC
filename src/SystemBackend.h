@@ -43,12 +43,9 @@ public:
     Q_INVOKABLE QString flatpakIconPath(const QString &appId) const;
     Q_INVOKABLE bool toolAvailable(const QString &toolId) const;
     Q_INVOKABLE bool launchTool(const QString &toolId) const;
-    Q_INVOKABLE bool launchFlatpakManager() const;
-    Q_INVOKABLE bool launchQuickAction(const QString &actionId) const;
     Q_INVOKABLE bool programAvailable(const QString &program) const;
     Q_INVOKABLE QString serviceState(const QString &service) const;
     Q_INVOKABLE bool restartService(const QString &service);
-    Q_INVOKABLE bool sessionAction(const QString &action);
     Q_INVOKABLE void notify(const QString &summary, const QString &body = QString()) const;
 
     Q_INVOKABLE bool createSnapshot(const QString &kind);
