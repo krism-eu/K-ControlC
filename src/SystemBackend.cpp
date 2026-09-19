@@ -286,48 +286,6 @@ bool SystemBackend::launchTool(const QString &toolId) const
     return info.exists() && info.isExecutable() && QProcess::startDetached(program, {});
 }
 
-bool SystemBackend::launchFlatpakManager() const
-{
-    const QString discover = resolveExecutable(QStringLiteral("plasma-discover"));
-    return !discover.isEmpty() && QProcess::startDetached(discover, {});
-}
-
-bool SystemBackend::launchQuickAction(const QString &actionId) const
-{
-    const QString konsole = resolveExecutable(QStringLiteral("konsole"));
-    if (konsole.isEmpty())
-        return false;
-
-    if (actionId == QStringLiteral("flatpak-unused")) {
-        const QString flatpak = resolveExecutable(QStringLiteral("flatpak"));
-        return !flatpak.isEmpty()
-            && QProcess::startDetached(konsole, {QStringLiteral("-e"), flatpak,
-                                                 QStringLiteral("uninstall"), QStringLiteral("--user"),
-                                                 QStringLiteral("--unused")});
-    }
-    if (actionId == QStringLiteral("journal-errors")) {
-        const QString journalctl = resolveExecutable(QStringLiteral("journalctl"));
-        return !journalctl.isEmpty()
-            && QProcess::startDetached(konsole, {QStringLiteral("-e"), journalctl,
-                                                 QStringLiteral("-b"), QStringLiteral("-p"), QStringLiteral("warning")});
-    }
-    if (actionId == QStringLiteral("unneeded")) {
-        const QString dnf5 = resolveExecutable(QStringLiteral("dnf5"));
-        return !dnf5.isEmpty()
-            && QProcess::startDetached(konsole, {QStringLiteral("-e"), dnf5,
-                                                 QStringLiteral("repoquery"), QStringLiteral("--installed"),
-                                                 QStringLiteral("--unneeded")});
-    }
-    if (actionId == QStringLiteral("disks")) {
-        const QString lsblk = resolveExecutable(QStringLiteral("lsblk"));
-        return !lsblk.isEmpty()
-            && QProcess::startDetached(konsole, {QStringLiteral("-e"), lsblk,
-                                                 QStringLiteral("-o"),
-                                                 QStringLiteral("NAME,SIZE,FSTYPE,FSUSE%,MOUNTPOINTS,MODEL")});
-    }
-    return false;
-}
-
 bool SystemBackend::programAvailable(const QString &program) const
 {
     return !resolveExecutable(program).isEmpty();
@@ -373,34 +331,6 @@ bool SystemBackend::restartService(const QString &service)
         const QDBusPendingReply<QDBusObjectPath> reply(*call);
         notify(reply.isError() ? tr("Riavvio servizio non riuscito") : tr("Servizio riavviato"),
                reply.isError() ? reply.error().message() : service);
-        call->deleteLater();
-    });
-    return true;
-}
-
-bool SystemBackend::sessionAction(const QString &action)
-{
-    static const QHash<QString, QString> methods = {
-        {QStringLiteral("poweroff"), QStringLiteral("PowerOff")},
-        {QStringLiteral("reboot"), QStringLiteral("Reboot")},
-        {QStringLiteral("suspend"), QStringLiteral("Suspend")}
-    };
-    if (!methods.contains(action))
-        return false;
-
-    QDBusInterface login(QStringLiteral("org.freedesktop.login1"),
-                         QStringLiteral("/org/freedesktop/login1"),
-                         QStringLiteral("org.freedesktop.login1.Manager"),
-                         QDBusConnection::systemBus());
-    if (!login.isValid())
-        return false;
-
-    auto *watcher = new QDBusPendingCallWatcher(login.asyncCall(methods.value(action), true), this);
-    connect(watcher, &QDBusPendingCallWatcher::finished, this,
-            [this](QDBusPendingCallWatcher *call) {
-        const QDBusPendingReply<> reply(*call);
-        if (reply.isError())
-            notify(tr("Azione di sessione non riuscita"), reply.error().message());
         call->deleteLater();
     });
     return true;
