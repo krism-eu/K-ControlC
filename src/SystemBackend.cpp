@@ -18,6 +18,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
+#include <QLocale>
 #include <QHash>
 #include <QProcess>
 #include <QRegularExpression>
@@ -641,7 +642,11 @@ QVariantList SystemBackend::operationHistoryEntries() const
             continue;
         const QJsonObject object = document.object();
         QVariantMap entry;
-        entry.insert(QStringLiteral("time"), object.value(QStringLiteral("time")).toString());
+        const QString rawTime = object.value(QStringLiteral("time")).toString();
+        const QDateTime parsedTime = QDateTime::fromString(rawTime, Qt::ISODate);
+        entry.insert(QStringLiteral("time"),
+                     parsedTime.isValid() ? QLocale().toString(parsedTime, QLocale::ShortFormat)
+                                          : rawTime);
         entry.insert(QStringLiteral("category"), object.value(QStringLiteral("category")).toString());
         entry.insert(QStringLiteral("action"), object.value(QStringLiteral("action")).toString());
         entry.insert(QStringLiteral("state"), object.value(QStringLiteral("state")).toString());
