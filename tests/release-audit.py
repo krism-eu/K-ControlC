@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = "0.5.1"
-RELEASE = "9"
+RELEASE = "10"
 RPM_EVR = f"{VERSION}-{RELEASE}.fc44"
 RPM_FILE = f"krisCC-{RPM_EVR}.x86_64.rpm"
 TAG = f"v{VERSION}-{RELEASE}"
@@ -29,7 +29,13 @@ workflow = read(".github/workflows/build.yml")
 system_cpp = read("src/SystemBackend.cpp")
 polkit_cpp = read("src/PolkitHelper.cpp")
 utility_cpp = read("src/UtilityBackend.cpp")
+main_cpp = read("src/main.cpp")
+package_cpp = read("src/PackageSearch.cpp")
 main_qml = read("qml/Main.qml")
+dashboard_qml = read("qml/modules/DashboardModule.qml")
+software_qml = read("qml/modules/SoftwareModule.qml")
+flatpak_qml = read("qml/modules/FlatpakModule.qml")
+podman_qml = read("qml/modules/PodmanModule.qml")
 system_qml = read("qml/modules/SystemModule.qml")
 recovery_qml = read("qml/modules/RecoveryModule.qml")
 commands_qml = read("qml/modules/CommandsModule.qml")
@@ -53,18 +59,19 @@ require(f"krisCC-{VERSION}-*.rpm" in readme, "README RPM version mismatch")
 require(f"grep -Fxq 'Release:        {RELEASE}%{{?dist}}' packaging/krisCC.spec" in e2e,
         "e2e RPM release assertion mismatch")
 
-# Only the consolidated System page is shipped; legacy pages can remain in git history
-# but must not be part of the QML module.
+# Only the consolidated pages are shipped. Legacy merged pages must be gone,
+# not merely hidden from CMake.
 require("qml/modules/SystemModule.qml" in cmake, "SystemModule is not shipped")
-require("qml/modules/BootcModule.qml" not in cmake, "legacy BootcModule is still shipped")
-require("qml/modules/ToolsModule.qml" not in cmake, "legacy ToolsModule is still shipped")
+require(not (ROOT / "qml/modules/BootcModule.qml").exists(), "legacy BootcModule still exists")
+require(not (ROOT / "qml/modules/ToolsModule.qml").exists(), "legacy ToolsModule still exists")
 require("src/OperationLog.cpp src/OperationLog.h" in cmake, "OperationLog is not linked")
+require("QT_QML_SKIP_CACHEGEN" not in cmake, "QML cache generation must not be bypassed")
 
 # Every bookmark exposed by QML must have a backend implementation.
 backend_bookmarks = set(re.findall(r'id == QStringLiteral\("([^"]+)"\)', utility_cpp))
 qml_bookmarks = set()
 for qml in (system_qml, recovery_qml, commands_qml):
-    qml_bookmarks.update(re.findall(r'UtilityBackend\.runBookmark\("([^"]+)"\)', qml))
+    qml_bookmarks.update(re.findall(r'utilityBackend\.runBookmark\("([^"]+)"\)', qml))
 command_card_ids = set(re.findall(r'\{\s*id:\s*"([^"]+)"', commands_qml))
 missing = sorted((qml_bookmarks | command_card_ids) - backend_bookmarks)
 require(not missing, f"QML bookmark(s) without backend implementation: {missing}")
@@ -167,27 +174,70 @@ require('QStringLiteral(".local/share/flatpak")' in system_cpp,
 require('QStringLiteral(".local/share/containers")' in system_cpp,
         "home backup must exclude Podman container store")
 
-# The Flatpak contract is per-user everywhere, including the external cleanup shortcut.
-flatpak_cleanup = re.search(
-    r'if \(actionId == QStringLiteral\("flatpak-unused"\)\) \{(.*?)\n    \}',
-    system_cpp, re.S)
-require(flatpak_cleanup is not None, "flatpak-unused action missing")
-require('QStringLiteral("--user")' in flatpak_cleanup.group(1)
-        and 'QStringLiteral("--unused")' in flatpak_cleanup.group(1),
+# Flatpak stays entirely in user scope and installs from the remote returned
+# by search instead of forcing Flathub for every result.
+require('mode == QStringLiteral("remove-unused")' in utility_cpp
+        and 'QStringLiteral("--user")' in utility_cpp
+        and 'QStringLiteral("--unused")' in utility_cpp,
         "Flatpak unused cleanup must stay in user scope")
 require('QStringLiteral("search"), QStringLiteral("--user")' in utility_cpp,
         "Flatpak search must stay in user scope")
 require('QStringLiteral("install"), QStringLiteral("--user"), QStringLiteral("--noninteractive")' in utility_cpp
         and 'QStringLiteral("--assumeyes")' in utility_cpp,
         "Flatpak install must be noninteractive in user scope")
+require("selectedRemote" in utility_cpp and "modelData[5]" in flatpak_qml,
+        "Flatpak install must preserve the search result remote")
+require('currentIndex: root.mode' not in flatpak_qml
+        and 'currentIndex: root.mode' not in podman_qml,
+        "tab state must not bind currentIndex back to mode")
 
-# Navigation should replace a page once, not once from showIndex and again from TabBar.
-require("function replaceForIndex(index)" in main_qml, "central page replacement function missing")
-require(main_qml.count("pageStack.replace(") == 7,
-        "page replacement logic is duplicated outside the central dispatcher")
+# Navigation must keep all seven pages alive and disable the Kirigami global
+# page header to avoid duplicate chrome/title bars.
+require("pageStack.globalToolBar.style: Kirigami.ApplicationHeaderStyle.None" in main_qml,
+        "global Kirigami page toolbar is not disabled")
+require("StackLayout" in main_qml and "pageStack.replace(" not in main_qml,
+        "top-level pages must stay alive in a StackLayout")
+require("qmlRegisterType<UtilityBackend>" in main_cpp,
+        "UtilityBackend must be instantiable per page")
+require('setContextProperty(QStringLiteral("UtilityBackend")' not in main_cpp,
+        "global UtilityBackend context singleton must not be restored")
+for qml in (software_qml, flatpak_qml, podman_qml, system_qml, commands_qml, recovery_qml):
+    require("UtilityBackend { id: utilityBackend }" in qml,
+            "each active page must own an isolated UtilityBackend")
+require("#c62828" not in main_qml, "hard-coded red accent must not override the desktop theme")
+
+# Dialogs that live inside ScrollablePage must be reparented to the window overlay.
+for name, qml in {
+    "software": software_qml,
+    "flatpak": flatpak_qml,
+    "podman": podman_qml,
+    "system": system_qml,
+    "recovery": recovery_qml,
+}.items():
+    require(qml.count("parent: Controls.Overlay.overlay") >= qml.count("Controls.Dialog {"),
+            f"{name}: dialog remains parented to scroll content")
+
+# RPM plan is rendered as the real rk output; no locale-sensitive English parser.
+for token in ("Installing dependencies:", "Installing weak dependencies:",
+              "Transaction Summary:", "Total size of inbound packages"):
+    require(token not in software_qml, f"locale-sensitive rk parser remains: {token}")
+require("seen.contains(key)" in package_cpp and "name + QLatin1Char('\\x1f') + arch" in package_cpp,
+        "RPM search must deduplicate by name+arch")
+require("m_installedFilter" in package_cpp and "visibleForFilter" not in software_qml,
+        "installed RPM filtering must happen in the model")
+require("/usr/libexec/kriscc/bootc-status humanreadable" in utility_cpp,
+        "health check must use the safe bootc status wrapper")
+require("root.hasStagedDeployment()" in system_qml
+        and "BootcBackend.refreshStatus()" in system_qml
+        and "bootProgressLines" in system_qml,
+        "System BootC workflow lost staged/progress/refresh state")
+require("launchQuickAction" not in system_cpp and "sessionAction" not in system_cpp,
+        "dead SystemBackend APIs remain")
+require("launchUnprivileged" not in polkit_cpp,
+        "dead Polkit unprivileged launcher remains")
 
 # Keep the intended minimal scope and immutable KrisOS update contract.
-combined_ui = system_qml + recovery_qml + read("qml/modules/DashboardModule.qml")
+combined_ui = system_qml + recovery_qml + dashboard_qml
 require(not re.search(r"fwupdmgr|firmware|welcome|first.?run", combined_ui, re.I),
         "firmware/welcome scope leaked into 0.5.1")
 require("bootc" in spec and "dnf5" in spec and "dnf5-plugins" in spec and "tar" in spec,
