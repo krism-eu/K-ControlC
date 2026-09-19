@@ -18,7 +18,7 @@ Kirigami.ScrollablePage {
                 Layout.fillWidth: true
                 level: 1
                 font.bold: true
-                text: qsTr("krisCC")
+                text: qsTr("Panoramica")
             }
             Controls.Button {
                 text: qsTr("Sistema")
@@ -43,7 +43,6 @@ Kirigami.ScrollablePage {
             Kirigami.AbstractCard {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.preferredHeight: 155
                 contentItem: ColumnLayout {
                     Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Sistema") }
                     Controls.Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: SystemBackend.osName }
@@ -60,7 +59,6 @@ Kirigami.ScrollablePage {
             Kirigami.AbstractCard {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.preferredHeight: 155
                 contentItem: ColumnLayout {
                     Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Aggiornamenti") }
                     Controls.Label {
@@ -85,7 +83,6 @@ Kirigami.ScrollablePage {
             Kirigami.AbstractCard {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.preferredHeight: 135
                 contentItem: ColumnLayout {
                     Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Software") }
                     Controls.Label {
@@ -104,7 +101,6 @@ Kirigami.ScrollablePage {
             Kirigami.AbstractCard {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.preferredHeight: 135
                 contentItem: ColumnLayout {
                     Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Container") }
                     Controls.Label {
@@ -128,7 +124,7 @@ Kirigami.ScrollablePage {
             contentItem: ColumnLayout {
                 RowLayout {
                     Layout.fillWidth: true
-                    Kirigami.Heading { Layout.fillWidth: true; level: 2; font.bold: true; text: qsTr("Quick System Info") }
+                    Kirigami.Heading { Layout.fillWidth: true; level: 2; font.bold: true; text: qsTr("Informazioni rapide") }
                     Controls.Button {
                         text: qsTr("Copia")
                         icon.name: "edit-copy"
