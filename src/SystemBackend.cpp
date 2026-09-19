@@ -168,16 +168,16 @@ QString SystemBackend::quickSystemInfo() const
 {
     QString text;
     QTextStream out(&text);
-    out << "krisCC Quick System Info\n";
-    out << "OS: " << osName() << '\n';
-    out << "Host: " << hostName() << '\n';
-    out << "Kernel: " << kernelVersion() << '\n';
-    out << "Arch: " << architecture() << '\n';
-    out << "RAM: " << memorySummary() << '\n';
-    out << "Storage dati: " << storageSummary() << '\n';
-    out << "Desktop: " << desktopSession() << '\n';
-    out << "Timezone: " << systemTimeZoneName() << '\n';
-    out << "Boot mode: " << (QFileInfo::exists(QStringLiteral("/sys/firmware/efi")) ? "UEFI" : "BIOS") << '\n';
+    out << tr("Informazioni rapide di sistema") << '\n';
+    out << tr("Sistema operativo: ") << osName() << '\n';
+    out << tr("Host: ") << hostName() << '\n';
+    out << tr("Kernel: ") << kernelVersion() << '\n';
+    out << tr("Architettura: ") << architecture() << '\n';
+    out << tr("RAM: ") << memorySummary() << '\n';
+    out << tr("Storage dati: ") << storageSummary() << '\n';
+    out << tr("Desktop: ") << desktopSession() << '\n';
+    out << tr("Fuso orario: ") << systemTimeZoneName() << '\n';
+    out << tr("Modalità di avvio: ") << (QFileInfo::exists(QStringLiteral("/sys/firmware/efi")) ? "UEFI" : "BIOS") << '\n';
     out << "Qt: " << qVersion() << '\n';
     return text.trimmed();
 }
