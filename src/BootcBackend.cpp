@@ -71,15 +71,18 @@ QVariantMap deploymentMap(const QString &role, const QJsonObject &deployment)
     map.insert(QStringLiteral("digest"), digest);
     map.insert(QStringLiteral("checksum"), checksum);
     map.insert(QStringLiteral("pinned"), deployment.value(QStringLiteral("pinned")).toBool(false));
+    map.insert(QStringLiteral("downloadOnly"), deployment.value(QStringLiteral("downloadOnly")).toBool(false));
     map.insert(QStringLiteral("timestamp"), timestamp);
     return map;
 }
 
 void startBootcStatus(QProcess *process, const QString &format)
 {
-    const QStringList bootcArgs = {
+    QStringList bootcArgs = {
         QStringLiteral("status"), QStringLiteral("--format"), format
     };
+    if (format == QStringLiteral("json"))
+        bootcArgs.append(QStringLiteral("--format-version=1"));
 
     if (::geteuid() == 0) {
         process->start(QStringLiteral("/usr/bin/bootc"), bootcArgs);

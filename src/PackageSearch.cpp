@@ -287,6 +287,7 @@ void PackageSearch::startRepoQuery(const QString &term)
     const QString packageSpec = QStringLiteral("*") + term + QStringLiteral("*");
     rawProcess->start(QStringLiteral("/usr/bin/dnf5"),
                       {QStringLiteral("repoquery"), QStringLiteral("--available"),
+                       QStringLiteral("--latest-limit=1"),
                        QStringLiteral("--queryformat"),
                        QStringLiteral("%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n"),
                        packageSpec});

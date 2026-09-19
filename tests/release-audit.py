@@ -7,8 +7,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.5.1"
-RELEASE = "10"
+VERSION = "0.6.0"
+RELEASE = "1"
 RPM_EVR = f"{VERSION}-{RELEASE}.fc44"
 RPM_FILE = f"krisCC-{RPM_EVR}.x86_64.rpm"
 TAG = f"v{VERSION}-{RELEASE}"
@@ -105,8 +105,9 @@ require('args.at(0) == QStringLiteral("config-manager")' in polkit_cpp,
 require("isSafeRepositoryId" in polkit_cpp and "isSafeRepositoryUrl" in polkit_cpp,
         "DNF repository validators are missing")
 require('url.scheme() == QStringLiteral("https")' in polkit_cpp
+        and 'url.userInfo().isEmpty()' in polkit_cpp
         and 'QStringLiteral("http")' not in polkit_cpp,
-        "DNF repository URLs must be HTTPS-only")
+        "DNF repository URLs must be HTTPS-only and reject embedded credentials")
 require("entry.startsWith(QLatin1Char('-'))" in polkit_cpp,
         "GRUB entry validator does not reject option-shaped values")
 for forbidden in ('QStringLiteral("-o")', 'QStringLiteral("-O")', "--bootorder"):
@@ -146,8 +147,8 @@ require("auth_admin_keep" not in read("data/org.kriscc.controlcenter.policy"),
 
 bootc_wrapper = read("src/bootc-status.sh")
 require('case "$1" in' in bootc_wrapper
-        and 'exec /usr/bin/bootc status --format "$1"' in bootc_wrapper
-        and 'json|humanreadable' in bootc_wrapper
+        and 'exec /usr/bin/bootc status --format json --format-version=1' in bootc_wrapper
+        and 'exec /usr/bin/bootc status --format humanreadable' in bootc_wrapper
         and '"$@"' not in bootc_wrapper,
         "bootc status wrapper must expose only fixed status formats")
 require("bootc-status.sh" in cmake,
@@ -224,6 +225,8 @@ for token in ("Installing dependencies:", "Installing weak dependencies:",
     require(token not in software_qml, f"locale-sensitive rk parser remains: {token}")
 require("seen.contains(key)" in package_cpp and "name + QLatin1Char('\\x1f') + arch" in package_cpp,
         "RPM search must deduplicate by name+arch")
+require('QStringLiteral("--latest-limit=1")' in package_cpp,
+        "RPM search must request the latest candidate for each name.arch")
 require("m_installedFilter" in package_cpp and "visibleForFilter" not in software_qml,
         "installed RPM filtering must happen in the model")
 require("/usr/libexec/kriscc/bootc-status humanreadable" in utility_cpp,
@@ -232,6 +235,23 @@ require("root.hasStagedDeployment()" in system_qml
         and "BootcBackend.refreshStatus()" in system_qml
         and "bootProgressLines" in system_qml,
         "System BootC workflow lost staged/progress/refresh state")
+require('QStringLiteral("downloadOnly")' in read("src/BootcBackend.cpp")
+        and '["upgrade", "--from-downloaded", "--apply"]' in system_qml
+        and '["upgrade", "--apply"]' not in system_qml
+        and "SystemBackend.requestReboot()" in system_qml,
+        "System BootC staged actions do not match the JSON deployment state")
+require('QStringLiteral("--format-version=1")' in read("src/BootcBackend.cpp"),
+        "root BootC JSON status path does not pin schema version 1")
+require('QStringLiteral("--from-downloaded")' in polkit_cpp,
+        "BootC allowlist is missing the fixed from-downloaded forms")
+require('{QStringLiteral("upgrade"), QStringLiteral("--apply")}' not in polkit_cpp,
+        "BootC allowlist still exposes the obsolete direct apply form")
+require("constexpr int kInteractiveTimeoutMs = 30 * 60 * 1000;" in utility_cpp
+        and utility_cpp.count("kInteractiveTimeoutMs") >= 7,
+        "Flatpak mutations are not consistently bounded by the interactive timeout")
+require("constexpr int kPodmanActionTimeoutMs = 5 * 60 * 1000;" in utility_cpp
+        and utility_cpp.count("kPodmanActionTimeoutMs") >= 5,
+        "Podman actions are not consistently bounded by the action timeout")
 require("launchQuickAction" not in system_cpp and "sessionAction" not in system_cpp,
         "dead SystemBackend APIs remain")
 require("launchUnprivileged" not in polkit_cpp,
@@ -240,7 +260,7 @@ require("launchUnprivileged" not in polkit_cpp,
 # Keep the intended minimal scope and immutable KrisOS update contract.
 combined_ui = system_qml + recovery_qml + dashboard_qml
 require(not re.search(r"fwupdmgr|firmware|welcome|first.?run", combined_ui, re.I),
-        "firmware/welcome scope leaked into 0.5.1")
+        "firmware/welcome scope leaked into 0.6.0")
 require("bootc" in spec and "dnf5" in spec and "dnf5-plugins" in spec and "tar" in spec,
         "mandatory runtime requirements missing from RPM spec")
 require("sudo rk sync" not in recovery_qml, "UI incorrectly claims sudo is used")

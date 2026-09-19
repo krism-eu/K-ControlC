@@ -130,6 +130,14 @@ Kirigami.ScrollablePage {
         }
     }
 
+    Connections {
+        target: SystemBackend
+        function onRebootFinished(success, message) {
+            if (!success && message.length > 0)
+                root.bootProgressLines = root.bootProgressLines.concat([message]).slice(-14)
+        }
+    }
+
     ColumnLayout {
         width: parent.width
         spacing: Kirigami.Units.largeSpacing
@@ -208,7 +216,11 @@ Kirigami.ScrollablePage {
                                 type: Kirigami.MessageType.Positive
                                 text: {
                                     var d = root.stagedDeployment()
-                                    return qsTr("Aggiornamento preparato: %1 · %2")
+                                    var state = d.downloadOnly === true
+                                        ? qsTr("Aggiornamento scaricato, in attesa di applicazione")
+                                        : qsTr("Aggiornamento predisposto per il prossimo avvio")
+                                    return qsTr("%1: %2 · %3")
+                                        .arg(state)
                                         .arg(d.version || qsTr("versione non indicata"))
                                         .arg(root.shortDigest(d.digest || d.checksum || ""))
                                 }
@@ -242,10 +254,14 @@ Kirigami.ScrollablePage {
                                     onClicked: root.runBootc(["upgrade"])
                                 }
                                 Controls.Button {
-                                    text: qsTr("Applica")
+                                    text: root.stagedDeployment().downloadOnly === true
+                                          ? qsTr("Applica e riavvia") : qsTr("Riavvia ora")
                                     icon.name: "system-reboot"
                                     enabled: BootcBackend.bootcAvailable && root.hasStagedDeployment() && !PolkitHelper.running
-                                    onClicked: applyDialog.open()
+                                    onClicked: {
+                                        applyDialog.downloadOnly = root.stagedDeployment().downloadOnly === true
+                                        applyDialog.open()
+                                    }
                                 }
                                 Controls.Button {
                                     text: qsTr("Risincronizza RPM")
@@ -725,16 +741,27 @@ Kirigami.ScrollablePage {
 
     Controls.Dialog {
         id: applyDialog
+        property bool downloadOnly: false
         modal: true
         parent: Controls.Overlay.overlay
         anchors.centerIn: parent
-        title: qsTr("Applicare l'aggiornamento KrisOS?")
+        title: downloadOnly ? qsTr("Applicare l'aggiornamento KrisOS?")
+                            : qsTr("Riavviare nel nuovo aggiornamento?")
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
             wrapMode: Text.WordWrap
-            text: qsTr("BootC applicherà l'immagine preparata. Potrebbe essere necessario riavviare.")
+            text: applyDialog.downloadOnly
+                  ? qsTr("L'immagine scaricata verrà preparata e il sistema verrà riavviato.")
+                  : qsTr("L'aggiornamento è già predisposto per il prossimo avvio; il sistema verrà riavviato ora. Il riavvio è autorizzato secondo la policy della sessione.")
         }
-        onAccepted: root.runBootc(["upgrade", "--apply"])
+        onAccepted: {
+            if (downloadOnly) {
+                root.runBootc(["upgrade", "--from-downloaded", "--apply"])
+            } else {
+                root.bootProgressLines = []
+                SystemBackend.requestReboot()
+            }
+        }
     }
 
     Controls.Dialog {

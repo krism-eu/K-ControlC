@@ -1,6 +1,6 @@
 Name:           krisCC
-Version:        0.5.1
-Release:        10%{?dist}
+Version:        0.6.0
+Release:        1%{?dist}
 Summary:        krisCC personal control center for KrisOS and Fedora bootc
 License:        MIT
 URL:            https://github.com/krism-eu/krisCC
@@ -51,6 +51,11 @@ Settings.
 %{_datadir}/icons/hicolor/scalable/apps/krisCC.svg
 
 %changelog
+* Sat Sep 19 2026 krism-eu - 0.6.0-1
+- Make BootC staged-update actions match download-only and ready-to-boot states
+- Pin the BootC JSON v1 contract and validate supported flags in CI
+- Bound user mutations, reject credential-bearing repository URLs and stabilize RPM search results
+
 * Sat Sep 19 2026 krism-eu - 0.5.1-10
 - Keep all seven pages alive and isolate utility operations per page
 - Complete BootC staged/progress/refresh UX and harden dialogs and confirmations

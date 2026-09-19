@@ -27,8 +27,8 @@ grep -A6 'org.kriscc.controlcenter.bootc.status' data/org.kriscc.controlcenter.p
   | grep -q '<allow_active>yes</allow_active>'
 grep -A8 'org.kriscc.controlcenter.bootc.status' data/org.kriscc.controlcenter.policy \
   | grep -q '/usr/libexec/kriscc/bootc-status'
-grep -q 'json|humanreadable' src/bootc-status.sh
-grep -Fq "exec /usr/bin/bootc status --format \"\$1\"" src/bootc-status.sh
+grep -Fq 'json) exec /usr/bin/bootc status --format json --format-version=1 ;;' src/bootc-status.sh
+grep -Fq 'humanreadable) exec /usr/bin/bootc status --format humanreadable ;;' src/bootc-status.sh
 if grep -Fq '"$@"' src/bootc-status.sh; then
   echo "ERROR: bootc status wrapper must not pass arbitrary arguments" >&2
   exit 1
@@ -50,6 +50,7 @@ grep -q 'isSafeRepositoryUrl' src/PolkitHelper.cpp
 grep -q 'org.kriscc.controlcenter.dnf.config-manager' data/org.kriscc.controlcenter.policy
 grep -q 'Aggiungi repository' qml/modules/SoftwareModule.qml
 grep -q 'url.scheme() == QStringLiteral("https")' src/PolkitHelper.cpp
+grep -q 'url.userInfo().isEmpty()' src/PolkitHelper.cpp
 if grep -q 'url.scheme() == QStringLiteral("http")' src/PolkitHelper.cpp; then
   echo "ERROR: repository URLs must be HTTPS-only" >&2
   exit 1
@@ -80,6 +81,7 @@ if grep -q 'id != QStringLiteral("fedora") && id != QStringLiteral("updates")' s
   exit 1
 fi
 grep -q 'QStringLiteral("repoquery"), QStringLiteral("--available")' src/PackageSearch.cpp
+grep -q 'QStringLiteral("--latest-limit=1")' src/PackageSearch.cpp
 grep -q 'args << QStringLiteral("list") << filter << QStringLiteral("--json")' src/PackageSearch.cpp
 grep -Fq "const QString key = name + QLatin1Char('\\x1f') + arch;" src/PackageSearch.cpp
 grep -q 'm_installedFilter' src/PackageSearch.cpp
@@ -119,13 +121,24 @@ grep -q 'root.hasStagedDeployment()' qml/modules/SystemModule.qml
 grep -q 'bootProgressLines' qml/modules/SystemModule.qml
 grep -q 'BootcBackend.refreshStatus()' qml/modules/SystemModule.qml
 grep -q '/usr/libexec/kriscc/bootc-status humanreadable' src/UtilityBackend.cpp
+grep -q 'QStringLiteral("downloadOnly")' src/BootcBackend.cpp
+grep -Fq 'root.runBootc(["upgrade", "--from-downloaded", "--apply"])' qml/modules/SystemModule.qml
+grep -q 'SystemBackend.requestReboot()' qml/modules/SystemModule.qml
+grep -q 'org.freedesktop.login1.Manager' src/SystemBackend.cpp
+grep -q 'constexpr int kInteractiveTimeoutMs = 30 \* 60 \* 1000;' src/UtilityBackend.cpp
+grep -q 'constexpr int kPodmanActionTimeoutMs = 5 \* 60 \* 1000;' src/UtilityBackend.cpp
+if grep -Fq 'root.runBootc(["upgrade", "--apply"])' qml/modules/SystemModule.qml; then
+  echo "ERROR: BootC apply bypasses the staged download-only state" >&2
+  exit 1
+fi
 
-if grep -Eq 'QStringLiteral\("--json"\)|QStringLiteral\("--format-version' src/BootcBackend.cpp; then
-  echo "ERROR: BootcBackend must use bootc status --format json without legacy JSON flags" >&2
+if grep -q 'QStringLiteral("--json")' src/BootcBackend.cpp; then
+  echo "ERROR: BootcBackend must use bootc status --format json" >&2
   exit 1
 fi
 
 grep -q 'QStringLiteral("--format")' src/BootcBackend.cpp
+grep -q 'QStringLiteral("--format-version=1")' src/BootcBackend.cpp
 grep -q 'QStringLiteral("json")' src/BootcBackend.cpp
 grep -q 'QStringLiteral("/usr/bin/pkexec")' src/BootcBackend.cpp
 grep -q 'imageStatus.value(QStringLiteral("image")).toObject()' src/BootcBackend.cpp
@@ -161,8 +174,8 @@ test -f data/org.kriscc.KrisCC.metainfo.xml
 test ! -e data/org.kcontrolc.KControlC.metainfo.xml
 
 grep -q '^Name:[[:space:]]*krisCC$' packaging/krisCC.spec
-grep -Fxq 'Version:        0.5.1' packaging/krisCC.spec
-grep -Fxq 'Release:        10%{?dist}' packaging/krisCC.spec
+grep -Fxq 'Version:        0.6.0' packaging/krisCC.spec
+grep -Fxq 'Release:        1%{?dist}' packaging/krisCC.spec
 if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
   echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
   exit 1
@@ -282,7 +295,7 @@ fi
 
 # Minimal scope: no firmware updater or first-run/welcome workflow is shipped by the new system page.
 if grep -niE 'fwupdmgr|firmware|welcome|first.?run' qml/modules/SystemModule.qml qml/modules/DashboardModule.qml qml/modules/RecoveryModule.qml; then
-  echo "ERROR: firmware/welcome scope leaked into krisCC 0.5 UI" >&2
+  echo "ERROR: firmware/welcome scope leaked into krisCC 0.6 UI" >&2
   exit 1
 fi
 
@@ -330,7 +343,7 @@ dnf5 list --installed --json >/dev/null
 echo "Checking repository-backed DNF5 queries when metadata is available..."
 if dnf5 repo list --all --json >/dev/null 2>&1; then
   dnf5 repo list --all --json >/dev/null
-  if dnf5 repoquery --available \
+  if dnf5 repoquery --available --latest-limit=1 \
       --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
       'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
     grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
@@ -348,10 +361,12 @@ else
   echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
 fi
 
-if command -v bootc >/dev/null 2>&1; then
-  echo "bootc detected; validating the exact JSON command used by krisCC"
-  bootc status --format json > /tmp/kriscc-bootc-status.json
-  grep -q '"status"' /tmp/kriscc-bootc-status.json
-else
-  echo "bootc not available in this CI container; static command/schema guards passed"
-fi
+echo "Checking the BootC CLI contract used by the allowlist..."
+bootc upgrade --help > /tmp/kriscc-bootc-upgrade-help.txt
+for flag in --check --download-only --from-downloaded --apply; do
+  grep -Fq -- "$flag" /tmp/kriscc-bootc-upgrade-help.txt \
+    || { echo "ERROR: installed bootc does not support $flag" >&2; exit 1; }
+done
+bootc status --help > /tmp/kriscc-bootc-status-help.txt
+grep -Fq -- '--format-version' /tmp/kriscc-bootc-status-help.txt \
+  || { echo "ERROR: installed bootc does not support --format-version" >&2; exit 1; }

@@ -13,6 +13,9 @@
   <provides><binary>krisCC</binary></provides>
   <categories><category>Settings</category><category>System</category></categories>
   <releases>
+    <release version="0.6.0" date="2026-09-19">
+      <description><p>Finalized BootC staged-update handling, bounded long-running mutations, deterministic RPM search results, and hardened repository URL validation.</p></description>
+    </release>
     <release version="0.5.1" date="2026-09-18">
       <description><p>Final K1.0 control-center integration with persistent navigation, isolated page operations, completed BootC workflow, repository management, Flatpak and Podman refinements, and safer backup and recovery UX.</p></description>
     </release>

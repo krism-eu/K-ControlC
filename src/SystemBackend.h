@@ -46,6 +46,7 @@ public:
     Q_INVOKABLE bool programAvailable(const QString &program) const;
     Q_INVOKABLE QString serviceState(const QString &service) const;
     Q_INVOKABLE bool restartService(const QString &service);
+    Q_INVOKABLE void requestReboot();
     Q_INVOKABLE void notify(const QString &summary, const QString &body = QString()) const;
 
     Q_INVOKABLE bool createSnapshot(const QString &kind);
@@ -63,6 +64,7 @@ public:
 signals:
     void backupBusyChanged();
     void backupStatusChanged();
+    void rebootFinished(bool success, const QString &message);
 
 private:
     QString readOsName() const;

@@ -1,6 +1,6 @@
 # Integrazione krisCC in KrisOS / Fedora bootc
 
-krisCC 0.5 è un'applicazione standalone Qt 6/Kirigami pensata per uso personale su Fedora bootc. Non duplica Plasma System Settings: integra solo le funzioni specifiche del sistema e gli strumenti di manutenzione che è utile avere in un unico posto.
+krisCC 0.6 è un'applicazione standalone Qt 6/Kirigami pensata per uso personale su Fedora bootc. Non duplica Plasma System Settings: integra solo le funzioni specifiche del sistema e gli strumenti di manutenzione che è utile avere in un unico posto.
 
 ## Runtime
 
@@ -71,7 +71,7 @@ Il NEVRA e l'eseguibile sono `krisCC`. Il modulo QML, gli action ID Polkit, il d
 Provare sulla macchina reale:
 
 ```bash
-sudo bootc status --format json | head -c 500
+sudo bootc status --format json --format-version=1 | head -c 500
 dnf5 repo list --all --json
 rpm -q krisCC
 rpm -V krisCC

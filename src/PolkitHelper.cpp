@@ -126,7 +126,8 @@ bool PolkitHelper::isSafeRepositoryUrl(const QString &value) const
     const QUrl url(value);
     return url.isValid()
         && url.scheme() == QStringLiteral("https")
-        && !url.host().isEmpty();
+        && !url.host().isEmpty()
+        && url.userInfo().isEmpty();
 }
 
 bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const QStringList &args) const
@@ -145,7 +146,8 @@ bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const Q
             {QStringLiteral("upgrade")},
             {QStringLiteral("upgrade"), QStringLiteral("--check")},
             {QStringLiteral("upgrade"), QStringLiteral("--download-only")},
-            {QStringLiteral("upgrade"), QStringLiteral("--apply")}
+            {QStringLiteral("upgrade"), QStringLiteral("--from-downloaded")},
+            {QStringLiteral("upgrade"), QStringLiteral("--from-downloaded"), QStringLiteral("--apply")}
         };
         return allowed.contains(args);
     }

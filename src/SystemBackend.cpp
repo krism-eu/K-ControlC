@@ -336,6 +336,31 @@ bool SystemBackend::restartService(const QString &service)
     return true;
 }
 
+void SystemBackend::requestReboot()
+{
+    QDBusInterface manager(QStringLiteral("org.freedesktop.login1"),
+                           QStringLiteral("/org/freedesktop/login1"),
+                           QStringLiteral("org.freedesktop.login1.Manager"),
+                           QDBusConnection::systemBus());
+    if (!manager.isValid()) {
+        emit rebootFinished(false, tr("Il servizio di riavvio logind non è disponibile."));
+        return;
+    }
+
+    auto *watcher = new QDBusPendingCallWatcher(
+        manager.asyncCall(QStringLiteral("Reboot"), true), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [this](QDBusPendingCallWatcher *call) {
+        const QDBusPendingReply<> reply(*call);
+        if (reply.isError())
+            emit rebootFinished(false, tr("Riavvio non autorizzato o non riuscito: %1")
+                                           .arg(reply.error().message()));
+        else
+            emit rebootFinished(true, QString());
+        call->deleteLater();
+    });
+}
+
 void SystemBackend::notify(const QString &summary, const QString &body) const
 {
     QDBusInterface notifications(QStringLiteral("org.freedesktop.Notifications"),
