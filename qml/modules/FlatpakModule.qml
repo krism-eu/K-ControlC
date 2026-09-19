@@ -298,7 +298,7 @@ Kirigami.ScrollablePage {
 
                     Controls.Label {
                         Layout.fillWidth: true
-                        opacity: 0.62
+                        opacity: 0.72
                         elide: Text.ElideRight
                         text: {
                             if (root.mode === "search")
