@@ -12,6 +12,10 @@ Kirigami.ScrollablePage {
 
     property bool ownBootAction: false
     property string bootActionKind: ""
+    property bool ownBootcOperation: false
+    property var bootProgressLines: []
+    property string pendingService: ""
+    property string pendingServiceTitle: ""
     property var historyEntries: []
     property int servicesRefreshToken: 0
     property var services: [
@@ -21,6 +25,8 @@ Kirigami.ScrollablePage {
     ]
 
     function runBootc(args) {
+        root.ownBootcOperation = true
+        root.bootProgressLines = []
         PolkitHelper.execute("/usr/bin/bootc", args)
     }
 
@@ -31,6 +37,19 @@ Kirigami.ScrollablePage {
                 return entries[i]
         }
         return entries.length > 0 ? entries[0] : {}
+    }
+
+    function stagedDeployment() {
+        var entries = BootcBackend.deployments
+        for (var i = 0; i < entries.length; ++i) {
+            if (entries[i].role === "Staged")
+                return entries[i]
+        }
+        return {}
+    }
+
+    function hasStagedDeployment() {
+        return !!root.stagedDeployment().image
     }
 
     function shortDigest(value) {
@@ -85,7 +104,21 @@ Kirigami.ScrollablePage {
 
     Connections {
         target: PolkitHelper
+        function onLine(text) {
+            if (root.ownBootcOperation)
+                root.bootProgressLines = root.bootProgressLines.concat([text]).slice(-14)
+        }
         function onFinished(success, output) {
+            if (root.ownBootcOperation) {
+                root.ownBootcOperation = false
+                root.bootProgressLines = root.bootProgressLines.concat([
+                    success ? qsTr("--- completato ---") : qsTr("--- fallito ---")
+                ]).slice(-14)
+                BootcBackend.refreshStatus()
+                BootcBackend.refreshPackages()
+                root.historyEntries = SystemBackend.operationHistoryEntries()
+                return
+            }
             if (!root.ownBootAction)
                 return
             root.ownBootAction = false
