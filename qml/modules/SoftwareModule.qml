@@ -16,6 +16,10 @@ Kirigami.ScrollablePage {
     property string installFilter: "all"
     property var detailPackage: null
     property string repoValidationError: ""
+    property string pendingProgram: ""
+    property var pendingArgs: []
+    property string pendingTitle: ""
+    property string pendingMessage: ""
 
     function humanSize(bytes) {
         if (!bytes || bytes <= 0)
@@ -46,45 +50,12 @@ Kirigami.ScrollablePage {
         return true
     }
 
-    function transactionDependencies() {
-        if (utilityBackend.operationId !== "rpm.plan" || utilityBackend.resultState !== "success")
-            return []
-        var lines = utilityBackend.output.split("\n")
-        var result = []
-        var inDependencies = false
-        for (var i = 0; i < lines.length; ++i) {
-            var line = lines[i]
-            var trimmed = line.trim()
-            if (trimmed === "Installing dependencies:" || trimmed === "Installing weak dependencies:") {
-                inDependencies = true
-                continue
-            }
-            if (inDependencies && (trimmed === "Transaction Summary:" || trimmed.indexOf("Total size of inbound packages") === 0 || trimmed.indexOf("After this operation") === 0))
-                inDependencies = false
-            if (!inDependencies || !trimmed)
-                continue
-            if (trimmed.endsWith(":")) {
-                inDependencies = false
-                continue
-            }
-            if (trimmed.indexOf("replacing ") === 0)
-                continue
-            result.push(trimmed)
-        }
-        return result
-    }
-
-    function transactionTotals() {
-        if (utilityBackend.operationId !== "rpm.plan" || utilityBackend.resultState !== "success")
-            return []
-        var lines = utilityBackend.output.split("\n")
-        var result = []
-        for (var i = 0; i < lines.length; ++i) {
-            var trimmed = lines[i].trim()
-            if (trimmed.indexOf("Total size of inbound packages") === 0 || trimmed.indexOf("After this operation") === 0)
-                result.push(trimmed)
-        }
-        return result
+    function requestPrivileged(program, args, title, message) {
+        root.pendingProgram = program
+        root.pendingArgs = args
+        root.pendingTitle = title
+        root.pendingMessage = message
+        privilegedConfirmDialog.open()
     }
 
     function runPrivileged(program, args) {
@@ -95,7 +66,7 @@ Kirigami.ScrollablePage {
 
     function refreshCurrent() {
         root.listError = ""
-        if (tabs.currentIndex === 1) installedModel.loadInstalled()
+        if (tabs.currentIndex === 1) installedModel.loadInstalled(root.installFilter)
         else if (tabs.currentIndex === 2) upgradesModel.loadUpgrades()
         else if (tabs.currentIndex === 3) recentModel.loadRecent()
         else if (tabs.currentIndex === 4) SoftwareBackend.refreshRepositories()
@@ -248,11 +219,23 @@ Kirigami.ScrollablePage {
                                     }
                                 }
                                 Controls.Button {
-                                    visible: model.persistent || (!model.installed && !model.owned)
+                                    visible: model.persistent || (!model.owned && !model.persistent)
                                     enabled: !PolkitHelper.running
-                                    text: model.persistent ? qsTr("Rimuovi") : qsTr("Installa")
+                                    text: model.persistent ? qsTr("Rimuovi")
+                                          : model.installed ? qsTr("Rendi persistente")
+                                                            : qsTr("Installa")
                                     icon.name: model.persistent ? "edit-delete" : "list-add"
-                                    onClicked: root.runPrivileged("/usr/bin/rk", model.persistent ? ["rm", model.name] : ["add", model.name])
+                                    onClicked: root.requestPrivileged(
+                                        "/usr/bin/rk",
+                                        model.persistent ? ["rm", model.name] : ["add", model.name],
+                                        model.persistent ? qsTr("Rimuovere %1?").arg(model.name)
+                                                         : model.installed
+                                                           ? qsTr("Rendere persistente %1?").arg(model.name)
+                                                           : qsTr("Installare %1?").arg(model.name),
+                                        model.persistent
+                                            ? qsTr("Il pacchetto verrà rimosso dal layer RPM persistente.")
+                                            : qsTr("L'operazione passa da rk e richiede autorizzazione amministrativa.")
+                                    )
                                 }
                             }
                         }
@@ -274,10 +257,27 @@ Kirigami.ScrollablePage {
                 }
                 Controls.ButtonGroup { id: installFilterGroup }
                 RowLayout {
-                    Controls.RadioButton { text: qsTr("Tutti"); checked: true; Controls.ButtonGroup.group: installFilterGroup; onClicked: root.installFilter = "all" }
-                    Controls.RadioButton { text: qsTr("Base"); Controls.ButtonGroup.group: installFilterGroup; onClicked: root.installFilter = "base" }
-                    Controls.RadioButton { text: qsTr("Persistenti"); Controls.ButtonGroup.group: installFilterGroup; onClicked: root.installFilter = "persistent" }
-                    Controls.RadioButton { text: qsTr("Locali"); Controls.ButtonGroup.group: installFilterGroup; onClicked: root.installFilter = "local" }
+                    Controls.RadioButton {
+                        text: qsTr("Tutti")
+                        checked: true
+                        Controls.ButtonGroup.group: installFilterGroup
+                        onClicked: { root.installFilter = "all"; installedModel.loadInstalled(root.installFilter) }
+                    }
+                    Controls.RadioButton {
+                        text: qsTr("Base")
+                        Controls.ButtonGroup.group: installFilterGroup
+                        onClicked: { root.installFilter = "base"; installedModel.loadInstalled(root.installFilter) }
+                    }
+                    Controls.RadioButton {
+                        text: qsTr("Persistenti")
+                        Controls.ButtonGroup.group: installFilterGroup
+                        onClicked: { root.installFilter = "persistent"; installedModel.loadInstalled(root.installFilter) }
+                    }
+                    Controls.RadioButton {
+                        text: qsTr("Locali")
+                        Controls.ButtonGroup.group: installFilterGroup
+                        onClicked: { root.installFilter = "local"; installedModel.loadInstalled(root.installFilter) }
+                    }
                     Item { Layout.fillWidth: true }
                 }
                 Controls.BusyIndicator { visible: installedModel.searching; running: visible; Layout.alignment: Qt.AlignHCenter }
@@ -296,8 +296,6 @@ Kirigami.ScrollablePage {
                     spacing: Kirigami.Units.smallSpacing
                     delegate: Kirigami.AbstractCard {
                         width: ListView.view.width
-                        visible: root.visibleForFilter(model)
-                        height: visible ? implicitHeight : 0
                         contentItem: RowLayout {
                             ColumnLayout {
                                 Layout.fillWidth: true
@@ -306,11 +304,19 @@ Kirigami.ScrollablePage {
                             }
                             Controls.Label { text: root.packageState(model); opacity: 0.7; font.bold: model.persistent || model.owned }
                             Controls.Button {
-                                visible: model.persistent
+                                visible: model.persistent || (!model.owned && model.installed)
                                 enabled: !PolkitHelper.running
-                                text: qsTr("Rimuovi")
-                                icon.name: "edit-delete"
-                                onClicked: root.runPrivileged("/usr/bin/rk", ["rm", model.name])
+                                text: model.persistent ? qsTr("Rimuovi") : qsTr("Rendi persistente")
+                                icon.name: model.persistent ? "edit-delete" : "list-add"
+                                onClicked: root.requestPrivileged(
+                                    "/usr/bin/rk",
+                                    model.persistent ? ["rm", model.name] : ["add", model.name],
+                                    model.persistent ? qsTr("Rimuovere %1?").arg(model.name)
+                                                     : qsTr("Rendere persistente %1?").arg(model.name),
+                                    model.persistent
+                                        ? qsTr("Il pacchetto verrà rimosso dal layer RPM persistente.")
+                                        : qsTr("Il pacchetto locale verrà aggiunto alle richieste persistenti gestite da rk.")
+                                )
                             }
                         }
                     }
@@ -409,8 +415,19 @@ Kirigami.ScrollablePage {
                                 enabled: !PolkitHelper.running
                                 text: modelData.enabled ? qsTr("Disattiva") : qsTr("Attiva")
                                 icon.name: modelData.enabled ? "media-playback-stop" : "media-playback-start"
-                                onClicked: root.runPrivileged("/usr/bin/dnf5",
-                                    ["config-manager", modelData.enabled ? "disable" : "enable", modelData.id])
+                                onClicked: {
+                                    if (modelData.enabled) {
+                                        root.requestPrivileged(
+                                            "/usr/bin/dnf5",
+                                            ["config-manager", "disable", modelData.id],
+                                            qsTr("Disattivare %1?").arg(modelData.id),
+                                            qsTr("I pacchetti di questo repository non saranno più disponibili per ricerca e transazioni rk finché non verrà riattivato.")
+                                        )
+                                    } else {
+                                        root.runPrivileged("/usr/bin/dnf5",
+                                            ["config-manager", "enable", modelData.id])
+                                    }
+                                }
                             }
                         }
                     }
