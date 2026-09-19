@@ -81,7 +81,7 @@ if grep -q 'id != QStringLiteral("fedora") && id != QStringLiteral("updates")' s
 fi
 grep -q 'QStringLiteral("repoquery"), QStringLiteral("--available")' src/PackageSearch.cpp
 grep -q 'args << QStringLiteral("list") << filter << QStringLiteral("--json")' src/PackageSearch.cpp
-grep -q "name + QLatin1Char('\\x1f') + arch" src/PackageSearch.cpp
+grep -Fq "const QString key = name + QLatin1Char('\\x1f') + arch;" src/PackageSearch.cpp
 grep -q 'm_installedFilter' src/PackageSearch.cpp
 if grep -q 'visibleForFilter' qml/modules/SoftwareModule.qml; then
   echo "ERROR: installed RPM filtering still happens in QML delegates" >&2
