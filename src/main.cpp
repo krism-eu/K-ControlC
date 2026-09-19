@@ -65,12 +65,12 @@ int main(int argc, char *argv[])
     const bool startHidden = parser.isSet(backgroundOption) && singleInstanceReady;
 
     qmlRegisterType<PackageSearch>("org.kriscc", 1, 0, "PackageSearch");
+    qmlRegisterType<UtilityBackend>("org.kriscc", 1, 0, "UtilityBackend");
 
     PolkitHelper polkitHelper;
     BootcBackend bootcBackend;
     SoftwareBackend softwareBackend;
     SystemBackend systemBackend;
-    UtilityBackend utilityBackend;
 
     QObject::connect(&polkitHelper, &PolkitHelper::finished, &systemBackend,
                      [&systemBackend](bool success, const QString &output) {
@@ -85,7 +85,6 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty(QStringLiteral("BootcBackend"), &bootcBackend);
     engine.rootContext()->setContextProperty(QStringLiteral("SoftwareBackend"), &softwareBackend);
     engine.rootContext()->setContextProperty(QStringLiteral("SystemBackend"), &systemBackend);
-    engine.rootContext()->setContextProperty(QStringLiteral("UtilityBackend"), &utilityBackend);
     engine.rootContext()->setContextProperty(QStringLiteral("KrisccStartHidden"), startHidden);
     const bool smokeTest = qEnvironmentVariableIsSet("KRISCC_SMOKE_TEST");
     engine.rootContext()->setContextProperty(QStringLiteral("KrisccSmokeTest"), smokeTest);
