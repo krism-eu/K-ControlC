@@ -172,6 +172,7 @@ Kirigami.ScrollablePage {
         Controls.TabBar {
             id: podmanTabs
             Layout.fillWidth: true
+            palette.highlight: Kirigami.Theme.negativeTextColor
             currentIndex: 0
             Controls.TabButton {
                 implicitHeight: Kirigami.Units.gridUnit * 2.1
