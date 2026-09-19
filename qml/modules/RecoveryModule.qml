@@ -2,10 +2,13 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import org.kde.kirigami as Kirigami
+import org.kriscc
 
 Kirigami.ScrollablePage {
     id: root
     title: qsTr("Backup e recovery")
+
+    UtilityBackend { id: utilityBackend }
 
     property int backupProfileIndex: 0
     property var backupFiles: []
@@ -219,8 +222,8 @@ Kirigami.ScrollablePage {
                     Controls.Button {
                         text: qsTr("Mostra stato rk")
                         icon.name: "documentinfo"
-                        enabled: !UtilityBackend.busy
-                        onClicked: UtilityBackend.runBookmark("rk-status")
+                        enabled: !utilityBackend.busy
+                        onClicked: utilityBackend.runBookmark("rk-status")
                     }
                     Controls.Button {
                         text: qsTr("Risincronizza pacchetti")
@@ -232,11 +235,11 @@ Kirigami.ScrollablePage {
                 Controls.TextArea {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 150
-                    visible: UtilityBackend.operationId === "bookmark.rk-status"
+                    visible: utilityBackend.operationId === "bookmark.rk-status"
                     readOnly: true
                     wrapMode: TextEdit.WrapAnywhere
                     font.family: "monospace"
-                    text: UtilityBackend.output
+                    text: utilityBackend.output
                 }
             }
         }
