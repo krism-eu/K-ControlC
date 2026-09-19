@@ -106,8 +106,13 @@ void PackageSearch::search(const QString &term)
         startInstalledQuery(sanitized);
 }
 
-void PackageSearch::loadInstalled()
+void PackageSearch::loadInstalled(const QString &filter)
 {
+    static const QSet<QString> allowed = {
+        QStringLiteral("all"), QStringLiteral("base"),
+        QStringLiteral("persistent"), QStringLiteral("local")
+    };
+    m_installedFilter = allowed.contains(filter) ? filter : QStringLiteral("all");
     refreshPersistentSet();
     ++m_generation;
     stopActiveProcess();
@@ -238,16 +243,18 @@ void PackageSearch::startRepoQuery(const QString &term)
         for (const QString &line : lines) {
             const QStringList parts = line.split(QLatin1Char('\t'));
             const QString name = parts.value(0).trimmed();
-            if (name.isEmpty() || parts.size() < 7 || seen.contains(name))
+            const QString arch = parts.value(4).trimmed();
+            const QString key = name + QLatin1Char('\x1f') + arch;
+            if (name.isEmpty() || parts.size() < 7 || seen.contains(key))
                 continue;
 
-            seen.insert(name);
+            seen.insert(key);
             Entry entry;
             entry.name = name;
             entry.summary = parts.value(1).simplified().left(512);
             entry.version = parts.value(2).trimmed();
             entry.repository = parts.value(3).trimmed();
-            entry.arch = parts.value(4).trimmed();
+            entry.arch = arch;
             entry.downloadSize = parts.value(5).toULongLong();
             entry.installSize = parts.value(6).toULongLong();
             entry.installed = m_installed.contains(name);
@@ -279,8 +286,7 @@ void PackageSearch::startRepoQuery(const QString &term)
 
     const QString packageSpec = QStringLiteral("*") + term + QStringLiteral("*");
     rawProcess->start(QStringLiteral("/usr/bin/dnf5"),
-                      {QStringLiteral("--repo=fedora,updates"),
-                       QStringLiteral("repoquery"), QStringLiteral("--available"),
+                      {QStringLiteral("repoquery"), QStringLiteral("--available"),
                        QStringLiteral("--queryformat"),
                        QStringLiteral("%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n"),
                        packageSpec});
@@ -365,6 +371,17 @@ void PackageSearch::startListQuery(const QString &filter, bool installedEntries)
                 entry.installed = installedEntries || m_installed.contains(name);
                 entry.owned = m_owned.contains(name);
                 entry.persistent = m_persistent.contains(name);
+
+                if (installedEntries) {
+                    const bool local = entry.installed && !entry.owned && !entry.persistent;
+                    if (m_installedFilter == QStringLiteral("base") && !entry.owned)
+                        continue;
+                    if (m_installedFilter == QStringLiteral("persistent") && !entry.persistent)
+                        continue;
+                    if (m_installedFilter == QStringLiteral("local") && !local)
+                        continue;
+                }
+
                 entries.append(entry);
                 if (entries.size() >= 500)
                     break;
@@ -394,8 +411,6 @@ void PackageSearch::startListQuery(const QString &filter, bool installedEntries)
     });
 
     QStringList args;
-    if (filter != QStringLiteral("--installed"))
-        args << QStringLiteral("--repo=fedora,updates");
     args << QStringLiteral("list") << filter << QStringLiteral("--json");
     rawProcess->start(QStringLiteral("/usr/bin/dnf5"), args);
     QTimer::singleShot(2 * 60 * 1000, rawProcess, [this, process, generation] {

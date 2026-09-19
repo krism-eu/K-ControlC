@@ -2,10 +2,13 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import org.kde.kirigami as Kirigami
+import org.kriscc
 
 Kirigami.ScrollablePage {
     id: root
     title: qsTr("Comandi utili")
+
+    UtilityBackend { id: utilityBackend }
 
     property var commands: [
         { id: "failed-units", title: qsTr("Unità fallite"), command: "systemctl --failed --no-pager --plain", note: qsTr("Unità systemd in errore.") },
@@ -41,7 +44,7 @@ Kirigami.ScrollablePage {
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 2
-            Kirigami.Heading { level: 2; text: qsTr("Comandi comuni") }
+            Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Comandi comuni") }
             Controls.Label {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
@@ -61,6 +64,9 @@ Kirigami.ScrollablePage {
                 delegate: Kirigami.AbstractCard {
                     required property var modelData
                     Layout.fillWidth: true
+                    Layout.preferredWidth: root.width > 820
+                                           ? (root.width - Kirigami.Units.largeSpacing) / 2
+                                           : root.width
                     contentItem: ColumnLayout {
                         spacing: Kirigami.Units.smallSpacing
                         RowLayout {
@@ -75,21 +81,21 @@ Kirigami.ScrollablePage {
                             Controls.Button {
                                 text: qsTr("Esegui")
                                 icon.name: "utilities-terminal"
-                                enabled: !UtilityBackend.busy
-                                onClicked: UtilityBackend.runBookmark(modelData.id)
+                                enabled: !utilityBackend.busy
+                                onClicked: utilityBackend.runBookmark(modelData.id)
                             }
                         }
                         Controls.Label {
                             Layout.fillWidth: true
-                            font.family: "monospace"
-                            wrapMode: Text.WrapAnywhere
+                            font.family: Kirigami.Theme.defaultFixedWidthFont.family
+                            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                             opacity: 0.82
                             text: modelData.command
                         }
                         Controls.Label {
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
-                            opacity: 0.62
+                            opacity: 0.72
                             text: modelData.note
                         }
                     }
@@ -98,38 +104,38 @@ Kirigami.ScrollablePage {
         }
 
         Controls.BusyIndicator {
-            visible: UtilityBackend.busy
+            visible: utilityBackend.busy
             running: visible
             Layout.alignment: Qt.AlignHCenter
         }
 
         Kirigami.AbstractCard {
             Layout.fillWidth: true
-            visible: UtilityBackend.title.length > 0 || UtilityBackend.output.length > 0
+            visible: utilityBackend.title.length > 0 || utilityBackend.output.length > 0
             contentItem: ColumnLayout {
                 RowLayout {
                     Layout.fillWidth: true
-                    Kirigami.Heading { Layout.fillWidth: true; level: 3; text: UtilityBackend.title || qsTr("Output") }
+                    Kirigami.Heading { Layout.fillWidth: true; level: 3; font.bold: true; text: utilityBackend.title || qsTr("Output") }
                     Controls.Button {
-                        visible: UtilityBackend.busy
+                        visible: utilityBackend.busy
                         text: qsTr("Annulla")
                         icon.name: "process-stop"
-                        onClicked: UtilityBackend.cancel()
+                        onClicked: utilityBackend.cancel()
                     }
                     Controls.Button {
                         text: qsTr("Copia output")
                         icon.name: "edit-copy"
-                        enabled: UtilityBackend.output.length > 0
-                        onClicked: SystemBackend.copyToClipboard(UtilityBackend.output)
+                        enabled: utilityBackend.output.length > 0
+                        onClicked: SystemBackend.copyToClipboard(utilityBackend.output)
                     }
                 }
                 Controls.TextArea {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 340
                     readOnly: true
-                    wrapMode: TextEdit.WrapAnywhere
-                    font.family: "monospace"
-                    text: UtilityBackend.output
+                    wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                    font.family: Kirigami.Theme.defaultFixedWidthFont.family
+                    text: utilityBackend.output
                 }
             }
         }

@@ -86,9 +86,8 @@ void startBootcStatus(QProcess *process, const QString &format)
         return;
     }
 
-    QStringList pkexecArgs = {QStringLiteral("/usr/bin/bootc")};
-    pkexecArgs.append(bootcArgs);
-    process->start(QStringLiteral("/usr/bin/pkexec"), pkexecArgs);
+    process->start(QStringLiteral("/usr/bin/pkexec"),
+                   {QStringLiteral("/usr/libexec/kriscc/bootc-status"), format});
 }
 }
 

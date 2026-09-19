@@ -25,49 +25,100 @@ fi
 grep -q 'org.kriscc.controlcenter.bootc.status' data/org.kriscc.controlcenter.policy
 grep -A6 'org.kriscc.controlcenter.bootc.status' data/org.kriscc.controlcenter.policy \
   | grep -q '<allow_active>yes</allow_active>'
+grep -A8 'org.kriscc.controlcenter.bootc.status' data/org.kriscc.controlcenter.policy \
+  | grep -q '/usr/libexec/kriscc/bootc-status'
+grep -q 'json|humanreadable' src/bootc-status.sh
+grep -Fq "exec /usr/bin/bootc status --format \"\$1\"" src/bootc-status.sh
+if grep -Fq '"$@"' src/bootc-status.sh; then
+  echo "ERROR: bootc status wrapper must not pass arbitrary arguments" >&2
+  exit 1
+fi
 
 # KrisOS supports a single deployment: rollback must not be offered or
-# privileged, and repository mutations must not bypass rk policy.
+# privileged. Repository management is allowed only through the constrained
+# DNF5 config-manager path; rk remains the final policy gate for persistent RPMs.
 if grep -RniE 'bootc[^\n]*rollback|"rollback"|Rollback \+ apply|Prepara rollback' \
     qml/modules/SystemModule.qml qml/modules/RecoveryModule.qml \
     src/PolkitHelper.cpp data/org.kriscc.controlcenter.policy; then
   echo "ERROR: unsupported BootC rollback remains exposed" >&2
   exit 1
 fi
-if grep -RniE 'config-manager|addrepo|Aggiungi repository' \
-    qml/modules/SoftwareModule.qml src/PolkitHelper.cpp data/org.kriscc.controlcenter.policy; then
-  echo "ERROR: arbitrary DNF repository mutation remains exposed" >&2
+grep -q 'QStringLiteral("/usr/bin/dnf5")' src/PolkitHelper.cpp
+grep -q 'QStringLiteral("config-manager")' src/PolkitHelper.cpp
+grep -q 'isSafeRepositoryId' src/PolkitHelper.cpp
+grep -q 'isSafeRepositoryUrl' src/PolkitHelper.cpp
+grep -q 'org.kriscc.controlcenter.dnf.config-manager' data/org.kriscc.controlcenter.policy
+grep -q 'Aggiungi repository' qml/modules/SoftwareModule.qml
+grep -q 'url.scheme() == QStringLiteral("https")' src/PolkitHelper.cpp
+if grep -q 'url.scheme() == QStringLiteral("http")' src/PolkitHelper.cpp; then
+  echo "ERROR: repository URLs must be HTTPS-only" >&2
+  exit 1
+fi
+grep -q 'Repository non aggiunto: usa un URL HTTPS valido' qml/modules/SoftwareModule.qml
+if grep -q 'auth_admin_keep' data/org.kriscc.controlcenter.policy; then
+  echo "ERROR: repository authorization must not be retained" >&2
   exit 1
 fi
 
 # RPM preview must be the same policy path as the actual rk transaction.
 grep -q 'QStringLiteral("/usr/bin/rk")' src/UtilityBackend.cpp
 grep -q 'QStringLiteral("plan")' src/UtilityBackend.cpp
-if grep -nE 'dnf5.*install|install.*--assumeno|--assumeno' src/UtilityBackend.cpp; then
+if grep -nE 'QStringLiteral\("/usr/bin/dnf5"\).*QStringLiteral\("install"\)|--assumeno' src/UtilityBackend.cpp; then
   echo "ERROR: RPM preview bypasses rk policy" >&2
   exit 1
 fi
 
-# Package discovery must match the repositories enabled by rk, while the
-# installed inventory remains local and must not be filtered by repository.
-grep -q 'QStringLiteral("--repo=fedora,updates")' src/PackageSearch.cpp
-grep -q 'filter != QStringLiteral("--installed")' src/PackageSearch.cpp
-grep -q 'id != QStringLiteral("fedora") && id != QStringLiteral("updates")' src/SoftwareBackend.cpp
+# Package discovery follows the repositories currently enabled in DNF.
+# Persistent installation still goes through rk, which may reject a package or
+# repository that is outside the KrisOS policy. Installed inventory stays local.
+if grep -q 'QStringLiteral("--repo=fedora,updates")' src/PackageSearch.cpp; then
+  echo "ERROR: package discovery is still hard-coded to fedora,updates" >&2
+  exit 1
+fi
+if grep -q 'id != QStringLiteral("fedora") && id != QStringLiteral("updates")' src/SoftwareBackend.cpp; then
+  echo "ERROR: repository UI still hides configured repositories" >&2
+  exit 1
+fi
+grep -q 'QStringLiteral("repoquery"), QStringLiteral("--available")' src/PackageSearch.cpp
+grep -q 'args << QStringLiteral("list") << filter << QStringLiteral("--json")' src/PackageSearch.cpp
+grep -Fq "const QString key = name + QLatin1Char('\\x1f') + arch;" src/PackageSearch.cpp
+grep -q 'm_installedFilter' src/PackageSearch.cpp
+if grep -q 'visibleForFilter' qml/modules/SoftwareModule.qml; then
+  echo "ERROR: installed RPM filtering still happens in QML delegates" >&2
+  exit 1
+fi
+if grep -q 'Installing dependencies:\|Transaction Summary:\|Total size of inbound packages' qml/modules/SoftwareModule.qml; then
+  echo "ERROR: locale-sensitive rk plan parser remains" >&2
+  exit 1
+fi
 
 # Flatpak management is deliberately per-user. Inventory, remotes and mutations
 # must all use the same installation scope so the UI never shows system refs it
 # cannot modify.
 grep -q 'QStringLiteral("list"), QStringLiteral("--user"), QStringLiteral("--app")' src/UtilityBackend.cpp
 grep -q 'QStringLiteral("remotes"), QStringLiteral("--user")' src/UtilityBackend.cpp
+grep -q 'QStringLiteral("search"), QStringLiteral("--user")' src/UtilityBackend.cpp
+grep -q 'QStringLiteral("install"), QStringLiteral("--user"), QStringLiteral("--noninteractive")' src/UtilityBackend.cpp
+grep -q 'QStringLiteral("--assumeyes")' src/UtilityBackend.cpp
 grep -q 'mode == QStringLiteral("update-all")' src/UtilityBackend.cpp
 grep -q 'mode == QStringLiteral("update")' src/UtilityBackend.cpp
 grep -q 'QStringLiteral("update"), QStringLiteral("--user"), QStringLiteral("--noninteractive"), QStringLiteral("--assumeyes")' src/UtilityBackend.cpp
 grep -q 'text: qsTr("Aggiorna tutto")' qml/modules/FlatpakModule.qml
 grep -q 'text: qsTr("Aggiorna")' qml/modules/FlatpakModule.qml
+grep -q 'selectedRemote' src/UtilityBackend.cpp
+grep -Fq 'modelData[5]' qml/modules/FlatpakModule.qml
+if grep -q 'currentIndex: root.mode' qml/modules/FlatpakModule.qml qml/modules/PodmanModule.qml; then
+  echo "ERROR: tab currentIndex is still bound back to mode" >&2
+  exit 1
+fi
 
 # The BootC check is an explicit registry check and must remain non-applying.
 grep -Fq 'root.runBootc(["upgrade", "--check"])' qml/modules/SystemModule.qml
 grep -q 'text: qsTr("Controlla immagine")' qml/modules/SystemModule.qml
+grep -q 'root.hasStagedDeployment()' qml/modules/SystemModule.qml
+grep -q 'bootProgressLines' qml/modules/SystemModule.qml
+grep -q 'BootcBackend.refreshStatus()' qml/modules/SystemModule.qml
+grep -q '/usr/libexec/kriscc/bootc-status humanreadable' src/UtilityBackend.cpp
 
 if grep -Eq 'QStringLiteral\("--json"\)|QStringLiteral\("--format-version' src/BootcBackend.cpp; then
   echo "ERROR: BootcBackend must use bootc status --format json without legacy JSON flags" >&2
@@ -111,7 +162,7 @@ test ! -e data/org.kcontrolc.KControlC.metainfo.xml
 
 grep -q '^Name:[[:space:]]*krisCC$' packaging/krisCC.spec
 grep -Fxq 'Version:        0.5.1' packaging/krisCC.spec
-grep -Fxq 'Release:        7%{?dist}' packaging/krisCC.spec
+grep -Fxq 'Release:        10%{?dist}' packaging/krisCC.spec
 if grep -Eq '^Provides:[[:space:]]*(kcc|k-controlc)([[:space:]=]|$)|^Obsoletes:[[:space:]]*(kcc|k-controlc)([[:space:]<=>]|$)' packaging/krisCC.spec; then
   echo "ERROR: krisCC must not provide or obsolete experimental legacy identities" >&2
   exit 1
@@ -123,6 +174,8 @@ grep -q 'install(TARGETS krisCC' CMakeLists.txt
 grep -q 'data/krisCC.desktop' CMakeLists.txt
 grep -q 'data/icons/hicolor/scalable/apps/krisCC.svg' CMakeLists.txt
 grep -q 'data/org.kriscc.controlcenter.policy' CMakeLists.txt
+grep -q 'src/bootc-status.sh' CMakeLists.txt
+grep -Fq '%{_libexecdir}/kriscc/bootc-status' packaging/krisCC.spec
 grep -q 'data/org.kriscc.KrisCC.metainfo.xml' CMakeLists.txt
 grep -q '^Name=krisCC$' data/krisCC.desktop
 grep -q '^Exec=krisCC$' data/krisCC.desktop
@@ -147,10 +200,14 @@ if grep -R -nE 'K-ControlC|(^|[^[:alnum:]])KCC([^[:alnum:]]|$)' qml; then
   echo "ERROR: visible legacy K-ControlC/KCC branding remains in QML" >&2
   exit 1
 fi
-grep -q 'krisCC Quick System Info' src/SystemBackend.cpp
+grep -q 'Informazioni rapide di sistema' src/SystemBackend.cpp
 grep -q 'QStringLiteral("/krisCC Backups")' src/SystemBackend.cpp
-grep -q 'QStringLiteral("--exclude=./KCC Backups")' src/SystemBackend.cpp
-grep -q 'QStringLiteral("--exclude=./K-ControlC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("KCC Backups")' src/SystemBackend.cpp
+grep -q 'QStringLiteral("K-ControlC Backups")' src/SystemBackend.cpp
+grep -q 'args << QStringLiteral("--exclude=./") + excluded' src/SystemBackend.cpp
+grep -q 'QStringLiteral(".local/share/flatpak")' src/SystemBackend.cpp
+grep -q 'QStringLiteral(".local/share/containers")' src/SystemBackend.cpp
+grep -Fq '.var/app' qml/modules/RecoveryModule.qml
 
 if grep -R -nE 'org\.raku|import raku\.cc|raku Control Center|raku Fedora' \
     CMakeLists.txt src/main.cpp qml data/krisCC.desktop packaging/krisCC.spec \
@@ -174,10 +231,10 @@ grep -q 'Tempo massimo superato' src/UtilityBackend.cpp
 # Backend/UI state must not depend on translated presentation strings.
 grep -q 'Q_PROPERTY(QString operationId' src/UtilityBackend.h
 grep -q 'Q_PROPERTY(QString resultState' src/UtilityBackend.h
-grep -q 'UtilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
-grep -q 'UtilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
-grep -q 'UtilityBackend.operationId === "bookmark.health"' qml/modules/SystemModule.qml
-if grep -R -nE 'UtilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|UtilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
+grep -q 'utilityBackend.operationId === "rpm.plan"' qml/modules/SoftwareModule.qml
+grep -q 'utilityBackend.operationId !== "podman.list"' qml/modules/PodmanModule.qml
+grep -q 'utilityBackend.operationId === "bookmark.health"' qml/modules/SystemModule.qml
+if grep -R -nE 'utilityBackend\.title[[:space:]]*(===|!==)[[:space:]]*qsTr|utilityBackend\.output[[:space:]]*===[[:space:]]*qsTr|backupStatus\.indexOf\(qsTr' qml; then
   echo "ERROR: translated UI strings are still used as backend state" >&2
   exit 1
 fi
@@ -192,10 +249,23 @@ grep -q 'validateBackupPath' src/SystemBackend.cpp
 grep -q 'QProcess::nullDevice()' src/SystemBackend.cpp
 grep -q 'Impossibile avviare la verifica' src/SystemBackend.cpp
 grep -q 'Impossibile avviare il ripristino' src/SystemBackend.cpp
-grep -A5 'flatpak-unused' src/SystemBackend.cpp | grep -q 'QStringLiteral("--user")'
+grep -q 'mode == QStringLiteral("remove-unused")' src/UtilityBackend.cpp
+grep -A4 'mode == QStringLiteral("remove-unused")' src/UtilityBackend.cpp | grep -q 'QStringLiteral("--user")'
+grep -A4 'mode == QStringLiteral("remove-unused")' src/UtilityBackend.cpp | grep -q 'QStringLiteral("--unused")'
 grep -q 'Q_PROPERTY(QString backupState' src/SystemBackend.h
 grep -q 'OperationLog::append' src/SystemBackend.cpp
 grep -q 'src/OperationLog.cpp src/OperationLog.h' CMakeLists.txt
+grep -q 'Q_INVOKABLE QVariantList backupPreview' src/SystemBackend.h
+grep -q 'Q_INVOKABLE QVariantList operationHistoryEntries' src/SystemBackend.h
+grep -q 'Q_INVOKABLE QString flatpakIconPath' src/SystemBackend.h
+if grep -q 'launchQuickAction\|sessionAction\|launchFlatpakManager' src/SystemBackend.h src/SystemBackend.cpp; then
+  echo "ERROR: dead SystemBackend APIs remain" >&2
+  exit 1
+fi
+if grep -q 'launchUnprivileged\|isUnprivilegedInvocationAllowed' src/PolkitHelper.h src/PolkitHelper.cpp; then
+  echo "ERROR: dead Polkit unprivileged path remains" >&2
+  exit 1
+fi
 
 # Next-boot selection is one-shot only: BootNext or grub2-reboot, never a permanent BootOrder rewrite.
 grep -q 'QStringLiteral("/usr/bin/efibootmgr")' src/PolkitHelper.cpp
@@ -223,8 +293,30 @@ grep -q 'existing.call(QDBus::NoBlock, QStringLiteral("show"))' src/main.cpp
 grep -q 'src/InstanceController.cpp src/InstanceController.h' CMakeLists.txt
 grep -q 'Q_CLASSINFO("D-Bus Interface", "org.kriscc.ControlCenter")' src/InstanceController.h
 grep -q 'qml/modules/SystemModule.qml' CMakeLists.txt
-grep -q 'function replaceForIndex(index)' qml/Main.qml
-test "$(grep -c 'pageStack.replace(' qml/Main.qml)" -eq 7
+test ! -e qml/modules/BootcModule.qml
+test ! -e qml/modules/ToolsModule.qml
+grep -q 'pageStack.globalToolBar.style: Kirigami.ApplicationHeaderStyle.None' qml/Main.qml
+grep -q 'StackLayout' qml/Main.qml
+if grep -q 'pageStack.replace(' qml/Main.qml; then
+  echo "ERROR: top-level navigation still recreates pages" >&2
+  exit 1
+fi
+grep -q 'qmlRegisterType<UtilityBackend>("org.kriscc"' src/main.cpp
+if grep -q 'setContextProperty(QStringLiteral("UtilityBackend")' src/main.cpp; then
+  echo "ERROR: global UtilityBackend singleton restored" >&2
+  exit 1
+fi
+for qml in SoftwareModule FlatpakModule PodmanModule SystemModule CommandsModule RecoveryModule; do
+  grep -q 'UtilityBackend { id: utilityBackend }' "qml/modules/$qml.qml"
+done
+if grep -q 'QT_QML_SKIP_CACHEGEN' CMakeLists.txt; then
+  echo "ERROR: SoftwareModule still bypasses qmlcachegen" >&2
+  exit 1
+fi
+if grep -q '#c62828' qml/Main.qml; then
+  echo "ERROR: hard-coded application accent returned" >&2
+  exit 1
+fi
 
 # The released RPM is validated in a fresh Fedora job before release publication.
 grep -q '^  rpm-smoke:' .github/workflows/build.yml
@@ -238,7 +330,7 @@ dnf5 list --installed --json >/dev/null
 echo "Checking repository-backed DNF5 queries when metadata is available..."
 if dnf5 repo list --all --json >/dev/null 2>&1; then
   dnf5 repo list --all --json >/dev/null
-  if dnf5 --repo=fedora,updates repoquery --available \
+  if dnf5 repoquery --available \
       --queryformat $'%{name}\t%{summary}\t%{evr}\t%{repoid}\t%{arch}\t%{downloadsize}\t%{installsize}\n' \
       'bash*' > /tmp/kriscc-repoquery.txt 2>/tmp/kriscc-repoquery.err; then
     grep -q '^bash' /tmp/kriscc-repoquery.txt || echo "WARNING: bash not returned by optional repoquery probe"
@@ -249,8 +341,9 @@ if dnf5 repo list --all --json >/dev/null 2>&1; then
   else
     echo "WARNING: optional repoquery probe skipped (repository metadata/network unavailable)"
   fi
-  dnf5 --repo=fedora,updates list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
-  dnf5 --repo=fedora,updates list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+  dnf5 list --upgrades --json >/dev/null 2>&1 || echo "WARNING: optional upgrades probe unavailable"
+  dnf5 list --recent --json >/dev/null 2>&1 || echo "WARNING: optional recent-packages probe unavailable"
+  dnf5 config-manager --help >/dev/null 2>&1 || { echo "ERROR: dnf5 config-manager runtime is unavailable" >&2; exit 1; }
 else
   echo "WARNING: repository metadata unavailable; optional DNF5 probes skipped"
 fi

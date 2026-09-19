@@ -40,14 +40,12 @@ public:
 
     Q_INVOKABLE QString quickSystemInfo() const;
     Q_INVOKABLE void copyToClipboard(const QString &text) const;
+    Q_INVOKABLE QString flatpakIconPath(const QString &appId) const;
     Q_INVOKABLE bool toolAvailable(const QString &toolId) const;
     Q_INVOKABLE bool launchTool(const QString &toolId) const;
-    Q_INVOKABLE bool launchFlatpakManager() const;
-    Q_INVOKABLE bool launchQuickAction(const QString &actionId) const;
     Q_INVOKABLE bool programAvailable(const QString &program) const;
     Q_INVOKABLE QString serviceState(const QString &service) const;
     Q_INVOKABLE bool restartService(const QString &service);
-    Q_INVOKABLE bool sessionAction(const QString &action);
     Q_INVOKABLE void notify(const QString &summary, const QString &body = QString()) const;
 
     Q_INVOKABLE bool createSnapshot(const QString &kind);
@@ -56,8 +54,10 @@ public:
     Q_INVOKABLE bool verifySnapshot(const QString &path);
     Q_INVOKABLE bool restoreSnapshot(const QString &path);
     Q_INVOKABLE bool openBackupFolder() const;
+    Q_INVOKABLE QVariantList backupPreview(const QString &kind) const;
 
     Q_INVOKABLE QString operationHistory() const;
+    Q_INVOKABLE QVariantList operationHistoryEntries() const;
     Q_INVOKABLE bool clearOperationHistory();
 
 signals:

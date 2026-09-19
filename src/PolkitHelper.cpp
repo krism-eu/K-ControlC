@@ -5,6 +5,7 @@
 #include <QDebug>
 #include <QFileInfo>
 #include <QRegularExpression>
+#include <QUrl>
 
 PolkitHelper::PolkitHelper(QObject *parent)
     : QObject(parent)
@@ -40,15 +41,6 @@ void PolkitHelper::execute(const QString &program, const QStringList &args)
     QStringList fullArgs;
     fullArgs << program << args;
     m_process->start(QStringLiteral("/usr/bin/pkexec"), fullArgs);
-}
-
-bool PolkitHelper::launchUnprivileged(const QString &program, const QStringList &args)
-{
-    if (!isUnprivilegedInvocationAllowed(program, args)) {
-        qWarning() << "PolkitHelper: avvio non consentito:" << program << args;
-        return false;
-    }
-    return QProcess::startDetached(program, args);
 }
 
 void PolkitHelper::onReadyRead()
@@ -121,6 +113,22 @@ bool PolkitHelper::isSafeGrubEntry(const QString &entry) const
     return true;
 }
 
+bool PolkitHelper::isSafeRepositoryId(const QString &repoId) const
+{
+    static const QRegularExpression pattern(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"));
+    return pattern.match(repoId).hasMatch();
+}
+
+bool PolkitHelper::isSafeRepositoryUrl(const QString &value) const
+{
+    if (value.isEmpty() || value.size() > 2048 || value.contains(QRegularExpression(QStringLiteral("[\\s\\x00-\\x1f]"))))
+        return false;
+    const QUrl url(value);
+    return url.isValid()
+        && url.scheme() == QStringLiteral("https")
+        && !url.host().isEmpty();
+}
+
 bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const QStringList &args) const
 {
     if (program == QStringLiteral("/usr/bin/rk")) {
@@ -142,6 +150,21 @@ bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const Q
         return allowed.contains(args);
     }
 
+    if (program == QStringLiteral("/usr/bin/dnf5")) {
+        if (args.size() == 3
+            && args.at(0) == QStringLiteral("config-manager")
+            && (args.at(1) == QStringLiteral("enable") || args.at(1) == QStringLiteral("disable")))
+            return isSafeRepositoryId(args.at(2));
+
+        const QString prefix = QStringLiteral("--from-repofile=");
+        if (args.size() == 3
+            && args.at(0) == QStringLiteral("config-manager")
+            && args.at(1) == QStringLiteral("addrepo")
+            && args.at(2).startsWith(prefix))
+            return isSafeRepositoryUrl(args.at(2).mid(prefix.size()));
+        return false;
+    }
+
     if (program == QStringLiteral("/usr/bin/efibootmgr"))
         return args.size() == 2 && args.at(0) == QStringLiteral("-n")
             && isSafeBootToken(args.at(1));
@@ -149,13 +172,6 @@ bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const Q
     if (program == QStringLiteral("/usr/bin/grub2-reboot"))
         return args.size() == 1 && isSafeGrubEntry(args.at(0));
 
-    return false;
-}
-
-bool PolkitHelper::isUnprivilegedInvocationAllowed(const QString &program, const QStringList &args) const
-{
-    if (program == QStringLiteral("/usr/bin/plasma-discover"))
-        return args.isEmpty();
     return false;
 }
 

@@ -15,6 +15,10 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
+#include <QLocale>
 #include <QHash>
 #include <QProcess>
 #include <QRegularExpression>
@@ -51,6 +55,33 @@ const QSet<QString> &allowedServices()
         QStringLiteral("bluetooth.service")
     };
     return services;
+}
+
+const QStringList &backupConfigEntries()
+{
+    static const QStringList entries = {
+        QStringLiteral(".config"),
+        QStringLiteral(".local/share/applications"),
+        QStringLiteral(".local/share/konsole"),
+        QStringLiteral(".local/share/kxmlgui5"),
+        QStringLiteral(".local/share/plasma"),
+        QStringLiteral(".local/share/kwin")
+    };
+    return entries;
+}
+
+const QStringList &backupHomeExcludes()
+{
+    static const QStringList entries = {
+        QStringLiteral(".cache"),
+        QStringLiteral(".local/share/Trash"),
+        QStringLiteral(".local/share/flatpak"),
+        QStringLiteral(".local/share/containers"),
+        QStringLiteral("krisCC Backups"),
+        QStringLiteral("KCC Backups"),
+        QStringLiteral("K-ControlC Backups")
+    };
+    return entries;
 }
 }
 
@@ -138,16 +169,16 @@ QString SystemBackend::quickSystemInfo() const
 {
     QString text;
     QTextStream out(&text);
-    out << "krisCC Quick System Info\n";
-    out << "OS: " << osName() << '\n';
-    out << "Host: " << hostName() << '\n';
-    out << "Kernel: " << kernelVersion() << '\n';
-    out << "Arch: " << architecture() << '\n';
-    out << "RAM: " << memorySummary() << '\n';
-    out << "Storage dati: " << storageSummary() << '\n';
-    out << "Desktop: " << desktopSession() << '\n';
-    out << "Timezone: " << systemTimeZoneName() << '\n';
-    out << "Boot mode: " << (QFileInfo::exists(QStringLiteral("/sys/firmware/efi")) ? "UEFI" : "BIOS") << '\n';
+    out << tr("Informazioni rapide di sistema") << '\n';
+    out << tr("Sistema operativo: ") << osName() << '\n';
+    out << tr("Host: ") << hostName() << '\n';
+    out << tr("Kernel: ") << kernelVersion() << '\n';
+    out << tr("Architettura: ") << architecture() << '\n';
+    out << tr("RAM: ") << memorySummary() << '\n';
+    out << tr("Storage dati: ") << storageSummary() << '\n';
+    out << tr("Desktop: ") << desktopSession() << '\n';
+    out << tr("Fuso orario: ") << systemTimeZoneName() << '\n';
+    out << tr("Modalità di avvio: ") << (QFileInfo::exists(QStringLiteral("/sys/firmware/efi")) ? "UEFI" : "BIOS") << '\n';
     out << "Qt: " << qVersion() << '\n';
     return text.trimmed();
 }
@@ -156,6 +187,55 @@ void SystemBackend::copyToClipboard(const QString &text) const
 {
     if (QGuiApplication::clipboard())
         QGuiApplication::clipboard()->setText(text);
+}
+
+QString SystemBackend::flatpakIconPath(const QString &appId) const
+{
+    static const QRegularExpression safeId(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$"));
+    const QString id = appId.trimmed();
+    if (!safeId.match(id).hasMatch())
+        return {};
+
+    const QString home = QDir::homePath();
+    const QStringList iconRoots = {
+        home + QStringLiteral("/.local/share/flatpak/exports/share/icons/hicolor"),
+        QStringLiteral("/var/lib/flatpak/exports/share/icons/hicolor"),
+        QStringLiteral("/usr/share/icons/hicolor")
+    };
+    const QStringList iconPaths = {
+        QStringLiteral("128x128/apps/") + id + QStringLiteral(".png"),
+        QStringLiteral("64x64/apps/") + id + QStringLiteral(".png"),
+        QStringLiteral("scalable/apps/") + id + QStringLiteral(".svg")
+    };
+
+    for (const QString &root : iconRoots) {
+        for (const QString &relative : iconPaths) {
+            const QString candidate = QDir(root).filePath(relative);
+            if (QFileInfo(candidate).isFile())
+                return QUrl::fromLocalFile(candidate).toString();
+        }
+    }
+
+    const QString arch = QSysInfo::currentCpuArchitecture();
+    const QStringList appstreamRoots = {
+        home + QStringLiteral("/.local/share/flatpak/appstream"),
+        QStringLiteral("/var/lib/flatpak/appstream")
+    };
+    for (const QString &root : appstreamRoots) {
+        QDir appstream(root);
+        const QStringList remotes = appstream.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QString &remote : remotes) {
+            for (const QString &size : {QStringLiteral("128x128"), QStringLiteral("64x64")}) {
+                const QString candidate = appstream.filePath(
+                    remote + QLatin1Char('/') + arch
+                    + QStringLiteral("/active/icons/") + size
+                    + QLatin1Char('/') + id + QStringLiteral(".png"));
+                if (QFileInfo(candidate).isFile())
+                    return QUrl::fromLocalFile(candidate).toString();
+            }
+        }
+    }
+    return {};
 }
 
 QString SystemBackend::resolveExecutable(const QString &program) const
@@ -186,6 +266,7 @@ QString SystemBackend::toolProgram(const QString &toolId) const
         {QStringLiteral("discover"), QStringLiteral("plasma-discover")},
         {QStringLiteral("ksystemlog"), QStringLiteral("ksystemlog")},
         {QStringLiteral("systemmonitor"), QStringLiteral("plasma-systemmonitor")},
+        {QStringLiteral("qdirstat"), QStringLiteral("qdirstat")},
         {QStringLiteral("konsole"), QStringLiteral("konsole")}
     };
     return resolveExecutable(names.value(toolId));
@@ -203,48 +284,6 @@ bool SystemBackend::launchTool(const QString &toolId) const
         return false;
     const QFileInfo info(program);
     return info.exists() && info.isExecutable() && QProcess::startDetached(program, {});
-}
-
-bool SystemBackend::launchFlatpakManager() const
-{
-    const QString discover = resolveExecutable(QStringLiteral("plasma-discover"));
-    return !discover.isEmpty() && QProcess::startDetached(discover, {});
-}
-
-bool SystemBackend::launchQuickAction(const QString &actionId) const
-{
-    const QString konsole = resolveExecutable(QStringLiteral("konsole"));
-    if (konsole.isEmpty())
-        return false;
-
-    if (actionId == QStringLiteral("flatpak-unused")) {
-        const QString flatpak = resolveExecutable(QStringLiteral("flatpak"));
-        return !flatpak.isEmpty()
-            && QProcess::startDetached(konsole, {QStringLiteral("-e"), flatpak,
-                                                 QStringLiteral("uninstall"), QStringLiteral("--user"),
-                                                 QStringLiteral("--unused")});
-    }
-    if (actionId == QStringLiteral("journal-errors")) {
-        const QString journalctl = resolveExecutable(QStringLiteral("journalctl"));
-        return !journalctl.isEmpty()
-            && QProcess::startDetached(konsole, {QStringLiteral("-e"), journalctl,
-                                                 QStringLiteral("-b"), QStringLiteral("-p"), QStringLiteral("warning")});
-    }
-    if (actionId == QStringLiteral("unneeded")) {
-        const QString dnf5 = resolveExecutable(QStringLiteral("dnf5"));
-        return !dnf5.isEmpty()
-            && QProcess::startDetached(konsole, {QStringLiteral("-e"), dnf5,
-                                                 QStringLiteral("repoquery"), QStringLiteral("--installed"),
-                                                 QStringLiteral("--unneeded")});
-    }
-    if (actionId == QStringLiteral("disks")) {
-        const QString lsblk = resolveExecutable(QStringLiteral("lsblk"));
-        return !lsblk.isEmpty()
-            && QProcess::startDetached(konsole, {QStringLiteral("-e"), lsblk,
-                                                 QStringLiteral("-o"),
-                                                 QStringLiteral("NAME,SIZE,FSTYPE,FSUSE%,MOUNTPOINTS,MODEL")});
-    }
-    return false;
 }
 
 bool SystemBackend::programAvailable(const QString &program) const
@@ -292,34 +331,6 @@ bool SystemBackend::restartService(const QString &service)
         const QDBusPendingReply<QDBusObjectPath> reply(*call);
         notify(reply.isError() ? tr("Riavvio servizio non riuscito") : tr("Servizio riavviato"),
                reply.isError() ? reply.error().message() : service);
-        call->deleteLater();
-    });
-    return true;
-}
-
-bool SystemBackend::sessionAction(const QString &action)
-{
-    static const QHash<QString, QString> methods = {
-        {QStringLiteral("poweroff"), QStringLiteral("PowerOff")},
-        {QStringLiteral("reboot"), QStringLiteral("Reboot")},
-        {QStringLiteral("suspend"), QStringLiteral("Suspend")}
-    };
-    if (!methods.contains(action))
-        return false;
-
-    QDBusInterface login(QStringLiteral("org.freedesktop.login1"),
-                         QStringLiteral("/org/freedesktop/login1"),
-                         QStringLiteral("org.freedesktop.login1.Manager"),
-                         QDBusConnection::systemBus());
-    if (!login.isValid())
-        return false;
-
-    auto *watcher = new QDBusPendingCallWatcher(login.asyncCall(methods.value(action), true), this);
-    connect(watcher, &QDBusPendingCallWatcher::finished, this,
-            [this](QDBusPendingCallWatcher *call) {
-        const QDBusPendingReply<> reply(*call);
-        if (reply.isError())
-            notify(tr("Azione di sessione non riuscita"), reply.error().message());
         call->deleteLater();
     });
     return true;
@@ -539,6 +550,43 @@ QString SystemBackend::operationHistory() const
     return OperationLog::recent(50);
 }
 
+QVariantList SystemBackend::operationHistoryEntries() const
+{
+    QVariantList result;
+    QFile file(QDir::homePath() + QStringLiteral("/.local/state/krisCC/history.jsonl"));
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return result;
+
+    QList<QByteArray> lines;
+    while (!file.atEnd()) {
+        const QByteArray line = file.readLine().trimmed();
+        if (!line.isEmpty())
+            lines.append(line);
+    }
+
+    int emitted = 0;
+    for (qsizetype i = lines.size(); i > 0 && emitted < 50; --i) {
+        QJsonParseError error;
+        const QJsonDocument document = QJsonDocument::fromJson(lines.at(i - 1), &error);
+        if (error.error != QJsonParseError::NoError || !document.isObject())
+            continue;
+        const QJsonObject object = document.object();
+        QVariantMap entry;
+        const QString rawTime = object.value(QStringLiteral("time")).toString();
+        const QDateTime parsedTime = QDateTime::fromString(rawTime, Qt::ISODate);
+        entry.insert(QStringLiteral("time"),
+                     parsedTime.isValid() ? QLocale().toString(parsedTime, QLocale::ShortFormat)
+                                          : rawTime);
+        entry.insert(QStringLiteral("category"), object.value(QStringLiteral("category")).toString());
+        entry.insert(QStringLiteral("action"), object.value(QStringLiteral("action")).toString());
+        entry.insert(QStringLiteral("state"), object.value(QStringLiteral("state")).toString());
+        entry.insert(QStringLiteral("detail"), object.value(QStringLiteral("detail")).toString());
+        result.append(entry);
+        ++emitted;
+    }
+    return result;
+}
+
 bool SystemBackend::clearOperationHistory()
 {
     return OperationLog::clear();
@@ -588,23 +636,12 @@ bool SystemBackend::createSnapshot(const QString &kind)
 
     QStringList args = {QStringLiteral("-czf"), partial};
     if (kind == QStringLiteral("home")) {
-        args << QStringLiteral("--exclude=./.cache")
-             << QStringLiteral("--exclude=./.local/share/Trash")
-             << QStringLiteral("--exclude=./krisCC Backups")
-             << QStringLiteral("--exclude=./KCC Backups")
-             << QStringLiteral("--exclude=./K-ControlC Backups")
-             << QStringLiteral("-C") << home << QStringLiteral(".");
+        for (const QString &excluded : backupHomeExcludes())
+            args << QStringLiteral("--exclude=./") + excluded;
+        args << QStringLiteral("-C") << home << QStringLiteral(".");
     } else {
         QStringList entries;
-        const QStringList candidates = {
-            QStringLiteral(".config"),
-            QStringLiteral(".local/share/applications"),
-            QStringLiteral(".local/share/konsole"),
-            QStringLiteral(".local/share/kxmlgui5"),
-            QStringLiteral(".local/share/plasma"),
-            QStringLiteral(".local/share/kwin")
-        };
-        for (const QString &candidate : candidates) {
+        for (const QString &candidate : backupConfigEntries()) {
             if (QFileInfo::exists(home + QLatin1Char('/') + candidate))
                 entries << candidate;
         }
@@ -720,6 +757,39 @@ bool SystemBackend::openBackupFolder() const
     const QString path = QDir::homePath() + QStringLiteral("/krisCC Backups");
     QDir().mkpath(path);
     return QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+}
+
+QVariantList SystemBackend::backupPreview(const QString &kind) const
+{
+    QVariantList result;
+    const QString home = QDir::homePath();
+
+    if (kind == QStringLiteral("config")) {
+        for (const QString &entry : backupConfigEntries()) {
+            QVariantMap item;
+            item.insert(QStringLiteral("path"), QStringLiteral("~/") + entry);
+            item.insert(QStringLiteral("included"), true);
+            item.insert(QStringLiteral("exists"), QFileInfo::exists(home + QLatin1Char('/') + entry));
+            result.append(item);
+        }
+        return result;
+    }
+
+    if (kind == QStringLiteral("home")) {
+        QVariantMap allHome;
+        allHome.insert(QStringLiteral("path"), QStringLiteral("~/"));
+        allHome.insert(QStringLiteral("included"), true);
+        allHome.insert(QStringLiteral("exists"), true);
+        result.append(allHome);
+        for (const QString &entry : backupHomeExcludes()) {
+            QVariantMap item;
+            item.insert(QStringLiteral("path"), QStringLiteral("~/") + entry);
+            item.insert(QStringLiteral("included"), false);
+            item.insert(QStringLiteral("exists"), QFileInfo::exists(home + QLatin1Char('/') + entry));
+            result.append(item);
+        }
+    }
+    return result;
 }
 
 void SystemBackend::setBackupBusy(bool busy)

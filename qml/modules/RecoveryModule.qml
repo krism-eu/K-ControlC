@@ -2,15 +2,19 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import org.kde.kirigami as Kirigami
+import org.kriscc
 
 Kirigami.ScrollablePage {
     id: root
     title: qsTr("Backup e recovery")
 
+    UtilityBackend { id: utilityBackend }
+
     property int backupProfileIndex: 0
     property var backupFiles: []
     property string restorePath: ""
     property string restoreName: ""
+    property string restoreKind: ""
 
     function humanSize(bytes) {
         if (!bytes || bytes <= 0) return "0 B"
@@ -42,7 +46,7 @@ Kirigami.ScrollablePage {
             Layout.fillWidth: true
             contentItem: ColumnLayout {
                 spacing: Kirigami.Units.largeSpacing
-                Kirigami.Heading { level: 2; text: qsTr("Crea backup") }
+                Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Crea backup") }
                 Controls.Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
@@ -70,10 +74,47 @@ Kirigami.ScrollablePage {
                 Controls.Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                    opacity: 0.68
+                    opacity: 0.72
                     text: backupProfile.currentIndex === 0
-                          ? qsTr("Include configurazioni Plasma/Konsole e file utente supportati. Minimo 1 GiB libero.")
+                          ? qsTr("Include le configurazioni utente supportate. Minimo 1 GiB libero.")
                           : qsTr("Include la home, escludendo cache, cestino e backup precedenti. Minimo 5 GiB liberi.")
+                }
+
+                Kirigami.AbstractCard {
+                    Layout.fillWidth: true
+                    contentItem: ColumnLayout {
+                        Kirigami.Heading { level: 3; font.bold: true; text: qsTr("Contenuto del backup") }
+                        Controls.Label {
+                            Layout.fillWidth: true
+                            opacity: 0.72
+                            text: qsTr("Destinazione: ~/krisCC Backups")
+                        }
+                        Repeater {
+                            model: {
+                                root.backupProfileIndex
+                                return SystemBackend.backupPreview(backupProfile.currentIndex === 0 ? "config" : "home")
+                            }
+                            delegate: RowLayout {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                Kirigami.Icon {
+                                    Layout.preferredWidth: 20
+                                    Layout.preferredHeight: 20
+                                    source: modelData.included ? "dialog-ok-apply" : "list-remove"
+                                }
+                                Controls.Label {
+                                    Layout.fillWidth: true
+                                    font.bold: modelData.included
+                                    text: (modelData.included ? qsTr("Incluso: ") : qsTr("Escluso: ")) + modelData.path
+                                }
+                                Controls.Label {
+                                    visible: modelData.exists !== undefined
+                                    opacity: 0.72
+                                    text: modelData.exists ? qsTr("presente") : qsTr("assente")
+                                }
+                            }
+                        }
+                    }
                 }
 
                 RowLayout {
@@ -112,7 +153,7 @@ Kirigami.ScrollablePage {
             contentItem: ColumnLayout {
                 RowLayout {
                     Layout.fillWidth: true
-                    Kirigami.Heading { Layout.fillWidth: true; level: 2; text: qsTr("Backup disponibili") }
+                    Kirigami.Heading { Layout.fillWidth: true; level: 2; font.bold: true; text: qsTr("Backup disponibili") }
                     Controls.Button {
                         text: qsTr("Aggiorna")
                         icon.name: "view-refresh"
@@ -138,7 +179,7 @@ Kirigami.ScrollablePage {
                                 Controls.Label { Layout.fillWidth: true; font.bold: true; text: modelData.name }
                                 Controls.Label {
                                     Layout.fillWidth: true
-                                    opacity: 0.62
+                                    opacity: 0.72
                                     text: (modelData.kind === "home" ? qsTr("Home") : qsTr("Configurazione"))
                                           + " · " + root.humanSize(modelData.size)
                                           + " · " + modelData.modified
@@ -157,6 +198,7 @@ Kirigami.ScrollablePage {
                                 onClicked: {
                                     root.restorePath = modelData.path
                                     root.restoreName = modelData.name
+                                    root.restoreKind = modelData.kind
                                     restoreDialog.open()
                                 }
                             }
@@ -169,7 +211,7 @@ Kirigami.ScrollablePage {
         Kirigami.AbstractCard {
             Layout.fillWidth: true
             contentItem: ColumnLayout {
-                Kirigami.Heading { level: 2; text: qsTr("Recovery KrisOS") }
+                Kirigami.Heading { level: 2; font.bold: true; text: qsTr("Recovery KrisOS") }
                 Controls.Label {
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
@@ -180,8 +222,8 @@ Kirigami.ScrollablePage {
                     Controls.Button {
                         text: qsTr("Mostra stato rk")
                         icon.name: "documentinfo"
-                        enabled: !UtilityBackend.busy
-                        onClicked: UtilityBackend.runBookmark("rk-status")
+                        enabled: !utilityBackend.busy
+                        onClicked: utilityBackend.runBookmark("rk-status")
                     }
                     Controls.Button {
                         text: qsTr("Risincronizza pacchetti")
@@ -193,23 +235,11 @@ Kirigami.ScrollablePage {
                 Controls.TextArea {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 150
-                    visible: UtilityBackend.operationId === "bookmark.rk-status"
+                    visible: utilityBackend.operationId === "bookmark.rk-status"
                     readOnly: true
-                    wrapMode: TextEdit.WrapAnywhere
-                    font.family: "monospace"
-                    text: UtilityBackend.output
-                }
-            }
-        }
-
-        Kirigami.AbstractCard {
-            Layout.fillWidth: true
-            contentItem: ColumnLayout {
-                Kirigami.Heading { level: 2; text: qsTr("Sessione") }
-                RowLayout {
-                    Controls.Button { text: qsTr("Sospendi"); icon.name: "system-suspend"; onClicked: SystemBackend.sessionAction("suspend") }
-                    Controls.Button { text: qsTr("Riavvia"); icon.name: "system-reboot"; onClicked: rebootDialog.open() }
-                    Controls.Button { text: qsTr("Spegni"); icon.name: "system-shutdown"; onClicked: powerDialog.open() }
+                    wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                    font.family: Kirigami.Theme.defaultFixedWidthFont.family
+                    text: utilityBackend.output
                 }
             }
         }
@@ -218,11 +248,13 @@ Kirigami.ScrollablePage {
     Controls.Dialog {
         id: homeDialog
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         title: qsTr("Creare il backup della home?")
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
             wrapMode: Text.WordWrap
-            text: qsTr("La home può essere grande e contenere dati sensibili. Cache, cestino e backup precedenti vengono esclusi.")
+            text: qsTr("La home può essere grande e contenere dati sensibili. Cache, cestino, runtime/app Flatpak (~/.local/share/flatpak), storage Podman inclusi volumi (~/.local/share/containers) e backup precedenti vengono esclusi. I dati personali delle app Flatpak in ~/.var/app restano inclusi.")
         }
         onAccepted: SystemBackend.createSnapshot("home")
     }
@@ -230,11 +262,15 @@ Kirigami.ScrollablePage {
     Controls.Dialog {
         id: restoreDialog
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         title: qsTr("Ripristinare %1?").arg(root.restoreName)
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
             wrapMode: Text.WordWrap
-            text: qsTr("I file presenti nella home con lo stesso percorso possono essere sovrascritti. Il ripristino avviene come utente, senza modificare il deployment KrisOS.")
+            text: root.restoreKind === "home"
+                  ? qsTr("ATTENZIONE: il ripristino della home sovrascrive i file esistenti con lo stesso percorso. Runtime/app Flatpak e storage Podman esclusi dal backup non vengono ripristinati; i dati in ~/.var/app possono invece essere sovrascritti. Il deployment KrisOS non viene modificato.")
+                  : qsTr("Le configurazioni esistenti con lo stesso percorso possono essere sovrascritte. Il ripristino avviene come utente, senza modificare il deployment KrisOS.")
         }
         onAccepted: SystemBackend.restoreSnapshot(root.restorePath)
     }
@@ -242,6 +278,8 @@ Kirigami.ScrollablePage {
     Controls.Dialog {
         id: syncDialog
         modal: true
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
         title: qsTr("Risincronizzare il layer RPM?")
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
@@ -250,7 +288,4 @@ Kirigami.ScrollablePage {
         }
         onAccepted: PolkitHelper.execute("/usr/bin/rk", ["sync"])
     }
-
-    Controls.Dialog { id: rebootDialog; modal: true; title: qsTr("Riavviare il sistema?"); standardButtons: Controls.Dialog.Yes | Controls.Dialog.No; onAccepted: SystemBackend.sessionAction("reboot") }
-    Controls.Dialog { id: powerDialog; modal: true; title: qsTr("Spegnere il sistema?"); standardButtons: Controls.Dialog.Yes | Controls.Dialog.No; onAccepted: SystemBackend.sessionAction("poweroff") }
 }
