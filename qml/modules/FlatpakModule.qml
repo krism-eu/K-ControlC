@@ -13,6 +13,7 @@ Kirigami.ScrollablePage {
     property string lastQuery: ""
     property bool refreshUpdatesAfterAction: false
     property bool refreshSearchAfterInstall: false
+    property bool refreshRemotesAfterAdd: false
 
     function expectedOperationId() {
         return "flatpak." + root.mode
@@ -36,8 +37,16 @@ Kirigami.ScrollablePage {
         return result
     }
 
+    function modeIndex(newMode) {
+        if (newMode === "installed") return 1
+        if (newMode === "updates") return 2
+        if (newMode === "remotes") return 3
+        return 0
+    }
+
     function run(newMode, query) {
         root.mode = newMode
+        flatpakTabs.currentIndex = root.modeIndex(newMode)
         root.lastQuery = query || ""
         utilityBackend.runFlatpak(newMode, query || "")
     }
@@ -48,13 +57,19 @@ Kirigami.ScrollablePage {
         utilityBackend.runFlatpak(action, query || "")
     }
 
-    function installFlatpak(appId) {
+    function preferredRemote(value) {
+        if (!value) return "flathub"
+        var first = value.split(",")[0].trim()
+        return first.length > 0 ? first : "flathub"
+    }
+
+    function installFlatpak(appId, remote) {
         root.refreshSearchAfterInstall = true
-        utilityBackend.runFlatpak("install", appId)
+        utilityBackend.runFlatpak("install", appId, root.preferredRemote(remote))
     }
 
     Connections {
-        target: UtilityBackend
+        target: utilityBackend
         function onStateChanged() {
             if (root.refreshUpdatesAfterAction && !utilityBackend.busy) {
                 root.refreshUpdatesAfterAction = false
@@ -66,6 +81,12 @@ Kirigami.ScrollablePage {
                 root.refreshSearchAfterInstall = false
                 if (root.lastQuery.length >= 2)
                     root.run("search", root.lastQuery)
+                return
+            }
+            if (root.refreshRemotesAfterAdd && !utilityBackend.busy
+                    && utilityBackend.operationId === "flatpak.flathub-add") {
+                root.refreshRemotesAfterAdd = false
+                root.run("remotes", "")
             }
         }
     }
@@ -89,7 +110,7 @@ Kirigami.ScrollablePage {
         Controls.TabBar {
             id: flatpakTabs
             Layout.fillWidth: true
-            currentIndex: root.mode === "installed" ? 1 : root.mode === "updates" ? 2 : root.mode === "remotes" ? 3 : 0
+            currentIndex: 0
             Controls.TabButton {
                 implicitHeight: Kirigami.Units.gridUnit * 2.1
                 font.bold: checked
@@ -242,7 +263,7 @@ Kirigami.ScrollablePage {
                             text: qsTr("Installa")
                             icon.name: "list-add"
                             enabled: !utilityBackend.busy
-                            onClicked: root.installFlatpak(modelData[2])
+                            onClicked: root.installFlatpak(modelData[2], modelData[5] || "")
                         }
 
                         Controls.Button {
@@ -314,8 +335,10 @@ Kirigami.ScrollablePage {
             text: qsTr("Aggiunge Flathub solo per il tuo utente. Se esiste già, non viene duplicato.")
         }
         onAccepted: {
-            utilityBackend.addFlathubUser()
+            root.refreshRemotesAfterAdd = true
             root.mode = "remotes"
+            flatpakTabs.currentIndex = 3
+            utilityBackend.addFlathubUser()
         }
     }
 
