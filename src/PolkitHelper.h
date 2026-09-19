@@ -13,7 +13,6 @@ public:
     explicit PolkitHelper(QObject *parent = nullptr);
 
     Q_INVOKABLE void execute(const QString &program, const QStringList &args);
-    Q_INVOKABLE bool launchUnprivileged(const QString &program, const QStringList &args = {});
 
     bool running() const { return m_running; }
 
@@ -29,7 +28,6 @@ private slots:
 
 private:
     bool isPrivilegedInvocationAllowed(const QString &program, const QStringList &args) const;
-    bool isUnprivilegedInvocationAllowed(const QString &program, const QStringList &args) const;
     bool isValidPackageName(const QString &package) const;
     bool isSafeBootToken(const QString &token) const;
     bool isSafeGrubEntry(const QString &entry) const;
