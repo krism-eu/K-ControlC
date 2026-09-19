@@ -43,15 +43,6 @@ void PolkitHelper::execute(const QString &program, const QStringList &args)
     m_process->start(QStringLiteral("/usr/bin/pkexec"), fullArgs);
 }
 
-bool PolkitHelper::launchUnprivileged(const QString &program, const QStringList &args)
-{
-    if (!isUnprivilegedInvocationAllowed(program, args)) {
-        qWarning() << "PolkitHelper: avvio non consentito:" << program << args;
-        return false;
-    }
-    return QProcess::startDetached(program, args);
-}
-
 void PolkitHelper::onReadyRead()
 {
     if (m_process)
@@ -181,13 +172,6 @@ bool PolkitHelper::isPrivilegedInvocationAllowed(const QString &program, const Q
     if (program == QStringLiteral("/usr/bin/grub2-reboot"))
         return args.size() == 1 && isSafeGrubEntry(args.at(0));
 
-    return false;
-}
-
-bool PolkitHelper::isUnprivilegedInvocationAllowed(const QString &program, const QStringList &args) const
-{
-    if (program == QStringLiteral("/usr/bin/plasma-discover"))
-        return args.isEmpty();
     return false;
 }
 
